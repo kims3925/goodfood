@@ -153,7 +153,18 @@ interface DigestPublishRequest {
   footerText?: string
   maxImagesPerProduct?: number
   date?: string              // ISO 날짜. 없으면 오늘
+  /**
+   * 발행 모드:
+   * - 'digest' (기본): 종합 카드 20장 + 본문 URL 목록 (1개 게시글)
+   * - 'individual': 상품 1개당 게시글 1개 (N개 게시글, 각각 이미지1+URL1 자동 프리뷰)
+   * - 'both': digest 1개 먼저, 이어서 individual N개
+   */
+  publishMode?: 'digest' | 'individual' | 'both'
+  /** 개별 발행 시 각 게시글 사이 대기 시간(초). 기본 3초 */
+  individualIntervalSec?: number
 }
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 export async function POST(request: NextRequest) {
   try {
@@ -163,7 +174,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as DigestPublishRequest
-    const { categoryId, productIds, channelId, headerText, footerText, maxImagesPerProduct, date } = body
+    const {
+      categoryId,
+      productIds,
+      channelId,
+      headerText,
+      footerText,
+      maxImagesPerProduct,
+      date,
+      publishMode = 'digest',
+      individualIntervalSec = 3,
+    } = body
 
     if (!categoryId || !(CATEGORY_CODES as readonly string[]).includes(categoryId)) {
       return NextResponse.json({ success: false, error: '유효한 categoryId가 필요합니다.' }, { status: 400 })
@@ -288,45 +309,134 @@ export async function POST(request: NextRequest) {
       message = '카드 이미지 0장 생성됨'
     }
 
-    // 클립보드 paste 방식으로 이미지-텍스트 교차 삽입
-    // blocks: [헤더] + [카드이미지 + 상품 URL 한 줄] × N + [푸터]
-    const topHeader = [
-      digest.title,
-      (headerText || '').trim(),
-      `총 ${digest.productCount}개 상품 | 신선 직송`,
-      '━━━━━━━━━━━━━━━━━━━━',
-    ].filter(Boolean).join('\n')
+    // ─── 발행 본문 구성 ──────────────────────────────────────
+    // Band 웹 에디터는 paste/drop 해도 모든 이미지를 갤러리로 강제 분리한다.
+    // 따라서 각 카드 PNG 안에 QR·URL 텍스트까지 포함시키고(digest-card-renderer),
+    // 본문에는 번호 매긴 상품 링크 목록을 둔다(Band 자동 링크 프리뷰 활용).
+    const buildDigestContent = () => {
+      const linkLines: string[] = []
+      cardProducts.forEach((p, idx) => {
+        if (p.orderUrl) {
+          linkLines.push(`${idx + 1}. ${p.name}`)
+          linkLines.push(`   🛒 ${p.orderUrl}`)
+        }
+      })
+      return [
+        digest.title,
+        (headerText || '').trim(),
+        `총 ${digest.productCount}개 상품 | 신선 직송`,
+        '━━━━━━━━━━━━━━━━━━━━',
+        ...linkLines,
+        '━━━━━━━━━━━━━━━━━━━━',
+        (footerText || '').trim() ||
+          '📦 배송: 마감 전 주문시 당일 출고, 마감 이후 익일 출고\n💳 결제: 카드결제 / 무통장입금',
+      ]
+        .filter((line, idx, arr) => {
+          if (line !== '') return true
+          return idx > 0 && arr[idx - 1] !== ''
+        })
+        .join('\n')
+    }
 
-    const footer = '━━━━━━━━━━━━━━━━━━━━\n' +
-      ((footerText || '').trim() ||
-        '📦 배송: 마감 전 주문시 당일 출고, 마감 이후 익일 출고\n💳 결제: 카드결제 / 무통장입금')
+    // 개별 발행용 본문 생성기 (상품 1개당 게시글 1개)
+    const buildIndividualContent = (cp: DigestCardProduct, idx: number) => {
+      const lines: string[] = []
+      lines.push(`${idx + 1}. ${cp.name}`)
+      if (cp.priceText) lines.push(`💰 ${cp.priceText}`)
+      if (cp.deadline) lines.push(`⏰ 주문 마감: ${cp.deadline}`)
+      lines.push('')
+      if (cp.orderUrl) lines.push(`🛒 ${cp.orderUrl}`)
+      return lines.join('\n')
+    }
 
-    const blocks: Array<{ type: 'text'; content: string } | { type: 'image'; filePath: string }> = []
-    blocks.push({ type: 'text', content: topHeader })
-
-    renderedCards.forEach((card, i) => {
-      const cp = cardProducts.find((c) => c.id === card.productId) || cardProducts[i]
-      blocks.push({ type: 'image', filePath: card.filePath })
-      // 이미지 바로 아래에 번호 + 상품명 + URL 한 줄 → Band 자동 하이퍼링크 + 프리뷰
-      const lineParts: string[] = []
-      lineParts.push(`${i + 1}. ${cp?.name || ''}`)
-      if (cp?.orderUrl) lineParts.push(`🛒 ${cp.orderUrl}`)
-      blocks.push({ type: 'text', content: lineParts.join('\n') })
-    })
-
-    blocks.push({ type: 'text', content: footer })
+    // 결과 누적 (both 모드에서 양쪽 결과 기록)
+    const subResults: Array<{
+      mode: 'digest' | 'individual'
+      index?: number
+      productId?: number
+      status: 'SUCCESS' | 'FAILED'
+      postKey?: string
+      message?: string
+    }> = []
 
     try {
-      if (renderedCards.length > 0) {
-        const r = await bandPlaywrightService.publishInterleaved({
-          channelId: channel.id,
-          bandKey: channel.channelKey,
-          bandName: channel.name,
-          blocks,
-        })
-        status = r.success ? 'SUCCESS' : 'FAILED'
-        postKey = r.postKey
-        message = r.error || message
+      if (renderedCards.length === 0) {
+        status = 'FAILED'
+      } else {
+        const runDigest = publishMode === 'digest' || publishMode === 'both'
+        const runIndividual = publishMode === 'individual' || publishMode === 'both'
+
+        // 1) 종합 발행 — 카드 전체를 하나의 게시글로
+        if (runDigest) {
+          const r = await bandPlaywrightService.publishWithImages({
+            channelId: channel.id,
+            bandKey: channel.channelKey,
+            bandName: channel.name,
+            content: buildDigestContent(),
+            imageUrls: renderedCards.map((c) => c.filePath),
+          })
+          subResults.push({
+            mode: 'digest',
+            status: r.success ? 'SUCCESS' : 'FAILED',
+            postKey: r.postKey,
+            message: r.error,
+          })
+          if (r.success) {
+            postKey = r.postKey
+            message = r.error || message
+          } else {
+            message = r.error || message
+          }
+        }
+
+        // 2) 개별 발행 — 상품 1개당 게시글 1개 (각 게시글 간 간격 두고 순차 실행)
+        if (runIndividual) {
+          const intervalMs = Math.max(0, individualIntervalSec * 1000)
+          for (let i = 0; i < renderedCards.length; i++) {
+            const card = renderedCards[i]
+            const cp = cardProducts.find((c) => c.id === card.productId) || cardProducts[i]
+            if (!cp) continue
+            if (i > 0 && intervalMs > 0) await sleep(intervalMs)
+            try {
+              const r = await bandPlaywrightService.publishWithImages({
+                channelId: channel.id,
+                bandKey: channel.channelKey,
+                bandName: channel.name,
+                content: buildIndividualContent(cp, i),
+                imageUrls: [card.filePath],
+              })
+              subResults.push({
+                mode: 'individual',
+                index: i + 1,
+                productId: cp.id,
+                status: r.success ? 'SUCCESS' : 'FAILED',
+                postKey: r.postKey,
+                message: r.error,
+              })
+            } catch (err: any) {
+              subResults.push({
+                mode: 'individual',
+                index: i + 1,
+                productId: cp.id,
+                status: 'FAILED',
+                message: err?.message || '개별 발행 오류',
+              })
+            }
+          }
+        }
+
+        // 전체 상태 판정: 하나라도 성공하면 SUCCESS
+        status = subResults.some((r) => r.status === 'SUCCESS') ? 'SUCCESS' : 'FAILED'
+
+        // 집계 메시지
+        const digestRes = subResults.find((r) => r.mode === 'digest')
+        const indivResults = subResults.filter((r) => r.mode === 'individual')
+        const indivSuccess = indivResults.filter((r) => r.status === 'SUCCESS').length
+        const indivFail = indivResults.filter((r) => r.status === 'FAILED').length
+        const parts: string[] = []
+        if (digestRes) parts.push(`종합 ${digestRes.status === 'SUCCESS' ? '성공' : '실패'}`)
+        if (indivResults.length > 0) parts.push(`개별 ${indivSuccess}/${indivResults.length} 성공${indivFail > 0 ? `, ${indivFail} 실패` : ''}`)
+        if (parts.length > 0) message = parts.join(' · ')
       }
     } catch (err: any) {
       status = 'FAILED'
@@ -357,6 +467,8 @@ export async function POST(request: NextRequest) {
         status,
         postKey,
         message,
+        publishMode,
+        subResults,
       },
       categoryMeta: {
         code: categoryId,

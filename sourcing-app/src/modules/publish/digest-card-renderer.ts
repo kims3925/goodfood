@@ -12,6 +12,7 @@ import { chromium } from 'playwright'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import QRCode from 'qrcode'
 
 /**
  * 이미지 URL을 base64 data URI로 변환. HTTP 404나 네트워크 실패 시 null 반환.
@@ -67,6 +68,27 @@ export interface DigestCardProduct {
   imageUrls: string[] // 0~4장. 0장이면 회색 플레이스홀더
 }
 
+/**
+ * 주문 URL로 QR 코드 data URI 생성. 실패 시 null.
+ * Band 웹 에디터가 이미지-텍스트 교차 배치를 허용하지 않아 모든 이미지가
+ * 갤러리로 묶이는 제약을 우회하기 위해, 카드 PNG 자체에 QR을 박아
+ * 사용자가 휴대폰으로 스캔 시 바로 결제 페이지로 이동할 수 있게 한다.
+ */
+async function generateQrDataUri(url: string | null | undefined): Promise<string | null> {
+  if (!url) return null
+  try {
+    return await QRCode.toDataURL(url, {
+      margin: 1,
+      width: 320,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#1D4ED8', light: '#FFFFFF' },
+    })
+  } catch (err) {
+    console.warn(`[digest-card] QR 생성 실패: ${url}`, err)
+    return null
+  }
+}
+
 const FONT_CSS = `
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 `
@@ -106,7 +128,11 @@ function buildImageGridHtml(imageUrls: string[]): string {
   </div>`
 }
 
-function buildCardHtml(product: DigestCardProduct, orderNumber: number): string {
+function buildCardHtml(
+  product: DigestCardProduct,
+  orderNumber: number,
+  qrDataUri: string | null
+): string {
   const name = escapeHtml(product.name || '')
   const priceLine = product.priceText
     ? escapeHtml(product.priceText)
@@ -151,7 +177,6 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   font-size: 22px; color: #4B5563; margin-top: 6px;
 }
 .order-btn {
-  margin-top: 24px;
   padding: 20px 24px;
   background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 100%);
   border-radius: 14px;
@@ -168,11 +193,44 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   border: 2px dashed #93C5FD;
   border-radius: 10px;
   color: #1D4ED8;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   word-break: break-all;
   font-family: 'Pretendard', monospace;
   text-align: center;
+}
+.order-block {
+  margin-top: 24px;
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+}
+.order-qr {
+  flex: 0 0 240px;
+  width: 240px;
+  padding: 12px;
+  background: #FFFFFF;
+  border: 3px solid #2563EB;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.15);
+}
+.order-qr img { width: 100%; height: auto; display: block; }
+.order-qr .qr-label {
+  margin-top: 10px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1D4ED8;
+  text-align: center;
+}
+.order-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 </style>
 </head>
@@ -188,11 +246,19 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
     </div>
     ${priceLine ? `<div class="price">💰 ${priceLine}</div>` : ''}
     ${deadline ? `<div class="meta">⏰ 주문 마감: ${deadline}</div>` : ''}
-    ${orderUrl ? `<div class="order-btn">
-      <span>🛒 상품 자세히 보기</span>
-      <span class="arrow">→</span>
-    </div>
-    <div class="order-url">${escapeHtml(orderUrl)}</div>` : ''}
+    ${orderUrl ? `<div class="order-block">
+      ${qrDataUri ? `<div class="order-qr">
+        <img src="${qrDataUri}" alt="QR">
+        <div class="qr-label">📱 QR 스캔 주문</div>
+      </div>` : ''}
+      <div class="order-right">
+        <div class="order-btn">
+          <span>🛒 상품 자세히 보기</span>
+          <span class="arrow">→</span>
+        </div>
+        <div class="order-url">${escapeHtml(orderUrl)}</div>
+      </div>
+    </div>` : ''}
   </div>
 </div>
 </body>
@@ -235,7 +301,10 @@ export async function renderDigestCards(
       }
       const productForHtml = { ...product, imageUrls: dataUris }
 
-      const html = buildCardHtml(productForHtml, orderNumber)
+      // 2) 주문 URL → QR 코드 data URI (카드에 박아 스캔 가능하게)
+      const qrDataUri = await generateQrDataUri(product.orderUrl)
+
+      const html = buildCardHtml(productForHtml, orderNumber, qrDataUri)
 
       await page.setContent(html, { waitUntil: 'load', timeout: 30_000 })
       // 모든 <img> 요소의 load/error 완료 대기

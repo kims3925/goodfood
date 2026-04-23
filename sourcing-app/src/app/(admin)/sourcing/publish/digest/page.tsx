@@ -8,7 +8,7 @@ import { CATEGORY_LIST, type CategoryCode } from '@/modules/category/category.ke
 import CategoryTabs, { type CategorySummary } from './_components/CategoryTabs'
 import DigestProductList, { type DigestProductItem } from './_components/DigestProductList'
 import DigestPreview from './_components/DigestPreview'
-import DigestPublishBar from './_components/DigestPublishBar'
+import DigestPublishBar, { type PublishMode } from './_components/DigestPublishBar'
 import DigestProgressModal, { type DigestProgressItem } from './_components/DigestProgressModal'
 
 interface FetchedProduct {
@@ -62,6 +62,7 @@ export default function DigestPublishPage() {
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannels, setSelectedChannels] = useState<number[]>([])
   const [isPublishing, setIsPublishing] = useState(false)
+  const [publishMode, setPublishMode] = useState<PublishMode>('digest')
 
   // 발행 진행 상태
   const [progressOpen, setProgressOpen] = useState(false)
@@ -173,6 +174,17 @@ export default function DigestPublishPage() {
   const handlePublish = async () => {
     if (selectedIds.length === 0 || selectedChannels.length === 0) return
 
+    // 개별/둘 다 모드는 게시글 수가 많아 도배 우려 → 사용자 확인
+    if (publishMode === 'individual' || publishMode === 'both') {
+      const postCount = publishMode === 'individual' ? selectedIds.length : selectedIds.length + 1
+      const perChannel = postCount
+      const totalPosts = perChannel * selectedChannels.length
+      const msg =
+        `선택한 ${selectedChannels.length}개 밴드 각각에 총 ${perChannel}개 게시글이 발행됩니다.\n` +
+        `(전체 ${totalPosts}개 게시글, 상품당 약 3초 간격)\n\n계속 진행할까요?`
+      if (!window.confirm(msg)) return
+    }
+
     // 진행 모달 초기화 — 선택한 채널마다 pending 행 생성
     const initItems: DigestProgressItem[] = selectedChannels.map((channelId) => {
       const ch = channels.find((c) => c.id === channelId)
@@ -207,6 +219,7 @@ export default function DigestPublishPage() {
               headerText,
               footerText,
               maxImagesPerProduct,
+              publishMode,
             }),
           })
           const data = await res.json()
@@ -483,6 +496,8 @@ export default function DigestPublishPage() {
         onToggleChannel={toggleChannel}
         onPublish={handlePublish}
         isPublishing={isPublishing}
+        publishMode={publishMode}
+        onChangePublishMode={setPublishMode}
       />
 
       <DigestProgressModal
