@@ -59,6 +59,7 @@ interface CheckoutFormData {
   }
   deliveryMemo: string
   sameAsCustomer: boolean
+  senderSameAsRecipient: boolean // 보내는사람 = 받는사람 동일 여부 (비회원 선택 입력용)
 }
 
 interface UserCoupon {
@@ -119,7 +120,8 @@ function CheckoutContent() {
       zipCode: ''
     },
     deliveryMemo: '',
-    sameAsCustomer: true
+    sameAsCustomer: true,
+    senderSameAsRecipient: true
   })
   const [tempOrderId, setTempOrderId] = useState<string>('') // 주문번호
   const [showPaymentWidget, setShowPaymentWidget] = useState(false)
@@ -575,16 +577,16 @@ function CheckoutContent() {
       detailAddress?: string
     } = {}
 
-    // 비회원일 때 주문자 정보 검증
-    if (isGuest) {
-      const customerNameError = validateName(formData.customerName)
-      if (customerNameError) newErrors.customerName = customerNameError
-
-      const customerPhoneError = validatePhone(formData.customerPhone)
-      if (customerPhoneError) newErrors.customerPhone = customerPhoneError
-
-      const customerEmailError = validateEmail(formData.customerEmail)
-      if (customerEmailError) newErrors.customerEmail = customerEmailError
+    // 비회원 보내는사람 정보 검증 (선택 입력 — 체크 해제 시 입력값이 있으면 형식만 검증)
+    if (isGuest && !formData.senderSameAsRecipient) {
+      if (formData.customerName.trim()) {
+        const customerNameError = validateName(formData.customerName)
+        if (customerNameError) newErrors.customerName = customerNameError
+      }
+      if (formData.customerPhone.trim()) {
+        const customerPhoneError = validatePhone(formData.customerPhone)
+        if (customerPhoneError) newErrors.customerPhone = customerPhoneError
+      }
     }
 
     // 배송지 주소 검증
@@ -653,11 +655,19 @@ function CheckoutContent() {
     try {
       setIsSubmitting(true)
 
+      // 비회원 보내는사람 정보: "받는사람과 동일" 체크 or 미입력 시 수령인 정보로 대체
+      const senderName = (isGuest && formData.senderSameAsRecipient)
+        ? recipientName
+        : (formData.customerName.trim() || recipientName)
+      const senderPhone = (isGuest && formData.senderSameAsRecipient)
+        ? recipientPhone
+        : (formData.customerPhone.trim() || recipientPhone)
+
       // 주문 요청 데이터 준비
       const orderRequestData: any = {
         customerInfo: {
-          name: formData.customerName,
-          phone: formData.customerPhone,
+          name: senderName,
+          phone: senderPhone,
           email: formData.customerEmail || undefined
         },
         shippingAddress: {
@@ -1045,61 +1055,87 @@ function CheckoutContent() {
                   )}
                 </div>
 
-                {/* 주문자 정보 - 비회원일 때만 표시 */}
+                {/* 보내는사람 정보 - 비회원일 때만 표시 (선택) */}
                 {!session && (
                   <div ref={customerInfoRef} className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
                       <User className="w-5 h-5 text-gray-600" />
-                      주문자 정보
+                      보내는사람 정보
+                      <span className="text-xs font-normal text-gray-500">(선택)</span>
                     </h2>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          이름 <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.customerName}
-                          onChange={(e) => {
-                            handleFormChange('customerName', e.target.value)
-                            if (errors.customerName) setErrors(prev => ({ ...prev, customerName: undefined }))
-                          }}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
-                            errors.customerName ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                          }`}
-                          placeholder="홍길동"
-                        />
-                        {errors.customerName && (
-                          <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            {errors.customerName}
-                          </p>
-                        )}
+                    <p className="text-sm text-gray-600 mb-4">
+                      발주서·배송 안내에서 &lsquo;보내는사람&rsquo;으로 표시됩니다. 받는사람과 같으면 아래 체크박스를 유지해 주세요.
+                    </p>
+                    <label className="flex items-center gap-2 mb-4 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formData.senderSameAsRecipient}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          // 체크 해제 시 기존 customer→recipient 자동 동기화도 끔 (받는사람 입력이 덮어씌워지지 않게)
+                          setFormData(prev => ({
+                            ...prev,
+                            senderSameAsRecipient: checked,
+                            sameAsCustomer: checked ? prev.sameAsCustomer : false,
+                          }))
+                          if (checked) {
+                            setErrors(prev => ({ ...prev, customerName: undefined, customerPhone: undefined }))
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-[#FF6B6B] focus:ring-[#FF6B6B]"
+                      />
+                      <span className="text-sm text-gray-800">받는사람과 동일</span>
+                    </label>
+                    {!formData.senderSameAsRecipient && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            이름
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.customerName}
+                            onChange={(e) => {
+                              handleFormChange('customerName', e.target.value)
+                              if (errors.customerName) setErrors(prev => ({ ...prev, customerName: undefined }))
+                            }}
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
+                              errors.customerName ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                            }`}
+                            placeholder="홍길동"
+                          />
+                          {errors.customerName && (
+                            <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              {errors.customerName}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            휴대폰 번호
+                          </label>
+                          <input
+                            type="tel"
+                            value={formData.customerPhone}
+                            onChange={(e) => {
+                              handleFormChange('customerPhone', e.target.value)
+                              if (errors.customerPhone) setErrors(prev => ({ ...prev, customerPhone: undefined }))
+                            }}
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
+                              errors.customerPhone ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                            }`}
+                            placeholder="010-1234-5678"
+                          />
+                          {errors.customerPhone && (
+                            <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              {errors.customerPhone}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          휴대폰 번호 <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="tel"
-                          value={formData.customerPhone}
-                          onChange={(e) => {
-                            handleFormChange('customerPhone', e.target.value)
-                            if (errors.customerPhone) setErrors(prev => ({ ...prev, customerPhone: undefined }))
-                          }}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#FF6B6B] focus:border-transparent ${
-                            errors.customerPhone ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                          }`}
-                          placeholder="010-1234-5678"
-                        />
-                        {errors.customerPhone && (
-                          <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            {errors.customerPhone}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
