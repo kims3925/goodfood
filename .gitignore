@@ -245,6 +245,10 @@ docs/MSA_ARCHITECTURE.md
 band-session-extension/config.js
 tmpclaude-*
 
+# Runtime data-recovery markers
+sourcing-app/.data-recovery-*.done
+shop-app/.data-recovery-*.done
+
 
 # 가이드 ppt
 /workspace
