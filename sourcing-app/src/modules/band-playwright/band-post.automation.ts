@@ -872,15 +872,28 @@ export class BandPostAutomation {
             console.warn(`[밴드자동화:interleaved] Band 최대 이미지 수(${MAX_IMAGES}) 도달, 이하 이미지 건너뜀`)
             continue
           }
-          // 에디터 포커스 확보 후 이미지 1장 업로드
+          // 에디터 포커스 + 커서를 본문 끝으로
           await editor.click()
-          await page.waitForTimeout(150)
-          await this.uploadImages(page, [block.filePath], signal)
-          uploadedImageCount++
-          // 업로드 직후 커서를 끝으로 이동 (다음 블록 입력을 위해)
-          await page.waitForTimeout(300)
           await page.keyboard.press('End')
-          console.log(`[밴드자동화:interleaved] 이미지 업로드 완료 (${i + 1}/${blocks.length}, 누적 ${uploadedImageCount})`)
+          await page.waitForTimeout(100)
+
+          // 1순위: 클립보드 paste 방식 (Ctrl+V와 동일하게 ClipboardEvent 디스패치)
+          let inserted = await this.pasteImageAtCursor(page, block.filePath)
+          // 2순위: drag&drop 방식
+          if (!inserted) {
+            console.warn(`[밴드자동화:interleaved] paste 실패, drop으로 재시도`)
+            inserted = await this.dropImageAtCursor(page, block.filePath)
+          }
+          // 3순위 폴백: 기존 사진버튼 업로드 (갤러리로 분리되지만 이미지는 올라감)
+          if (!inserted) {
+            console.warn(`[밴드자동화:interleaved] paste/drop 모두 실패, 기존 uploadImages로 폴백`)
+            await this.uploadImages(page, [block.filePath], signal)
+          }
+          uploadedImageCount++
+          await page.waitForTimeout(500)
+          // 이미지 뒤에서 새 줄 확보
+          await page.keyboard.press('End')
+          console.log(`[밴드자동화:interleaved] 이미지 삽입 완료 (${i + 1}/${blocks.length}, 누적 ${uploadedImageCount})`)
         }
       }
 
@@ -906,6 +919,139 @@ export class BandPostAutomation {
         return { success: false, error: error.message }
       }
       return { success: false, error: error.message || '게시물 작성 중 오류' }
+    }
+  }
+
+  /**
+   * 클립보드 paste 방식으로 이미지를 에디터 본문 커서 위치에 인라인 삽입.
+   * ClipboardEvent를 DataTransfer로 직접 디스패치하여 CKEditor의 paste 핸들러가
+   * 이미지를 본문 inline 요소로 삽입하도록 유도 (사진 버튼 팝업 경로 우회).
+   *
+   * 성공 여부는 삽입 직후 에디터 내부에 <img> 요소가 증가했는지로 판정.
+   */
+  private async pasteImageAtCursor(page: Page, imagePath: string): Promise<boolean> {
+    try {
+      const buf = fs.readFileSync(imagePath)
+      const base64 = buf.toString('base64')
+      const mimeType = imagePath.toLowerCase().endsWith('.png')
+        ? 'image/png'
+        : imagePath.toLowerCase().endsWith('.webp')
+        ? 'image/webp'
+        : 'image/jpeg'
+
+      const result = await page.evaluate(
+        async ({ base64, mimeType }: { base64: string; mimeType: string }) => {
+          const byteString = atob(base64)
+          const ab = new ArrayBuffer(byteString.length)
+          const ia = new Uint8Array(ab)
+          for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i)
+          const fileName = mimeType === 'image/png' ? 'image.png' : mimeType === 'image/webp' ? 'image.webp' : 'image.jpg'
+          const file = new File([ab], fileName, { type: mimeType })
+          const dt = new DataTransfer()
+          dt.items.add(file)
+
+          const sel =
+            '[data-viewname="DPostWriteLayerView"] [contenteditable="true"], .cPostWrite [contenteditable="true"].cke_editable'
+          const editor = document.querySelector<HTMLElement>(sel)
+          if (!editor) return { ok: false, reason: 'editor not found' }
+
+          const before = editor.querySelectorAll('img').length
+          editor.focus()
+
+          const pasteEvent = new ClipboardEvent('paste', {
+            clipboardData: dt,
+            bubbles: true,
+            cancelable: true,
+          })
+          editor.dispatchEvent(pasteEvent)
+
+          // 업로드/삽입 처리 대기 (최대 3초, 200ms 간격 폴링)
+          for (let i = 0; i < 15; i++) {
+            await new Promise((r) => setTimeout(r, 200))
+            const after = editor.querySelectorAll('img').length
+            if (after > before) return { ok: true, before, after }
+          }
+          return { ok: false, before, reason: 'no img added' }
+        },
+        { base64, mimeType }
+      )
+
+      if (!result?.ok) {
+        console.warn(`[밴드자동화:paste] 이미지 insert 실패:`, result?.reason || 'unknown')
+        return false
+      }
+      console.log(`[밴드자동화:paste] 이미지 insert 성공 (img ${result.before}→${result.after})`)
+      return true
+    } catch (err: any) {
+      console.warn(`[밴드자동화:paste] 예외:`, err?.message)
+      return false
+    }
+  }
+
+  /**
+   * drag & drop으로 이미지를 에디터에 인라인 삽입 (paste 폴백)
+   */
+  private async dropImageAtCursor(page: Page, imagePath: string): Promise<boolean> {
+    try {
+      const buf = fs.readFileSync(imagePath)
+      const base64 = buf.toString('base64')
+      const mimeType = imagePath.toLowerCase().endsWith('.png')
+        ? 'image/png'
+        : imagePath.toLowerCase().endsWith('.webp')
+        ? 'image/webp'
+        : 'image/jpeg'
+
+      const result = await page.evaluate(
+        async ({ base64, mimeType }: { base64: string; mimeType: string }) => {
+          const byteString = atob(base64)
+          const ab = new ArrayBuffer(byteString.length)
+          const ia = new Uint8Array(ab)
+          for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i)
+          const fileName = mimeType === 'image/png' ? 'image.png' : 'image.jpg'
+          const file = new File([ab], fileName, { type: mimeType })
+          const dt = new DataTransfer()
+          dt.items.add(file)
+
+          const sel =
+            '[data-viewname="DPostWriteLayerView"] [contenteditable="true"], .cPostWrite [contenteditable="true"].cke_editable'
+          const editor = document.querySelector<HTMLElement>(sel)
+          if (!editor) return { ok: false, reason: 'editor not found' }
+          const before = editor.querySelectorAll('img').length
+          editor.focus()
+
+          const rect = editor.getBoundingClientRect()
+          const x = rect.left + 50
+          const y = rect.bottom - 20
+          for (const type of ['dragenter', 'dragover', 'drop'] as const) {
+            const ev = new DragEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              dataTransfer: dt,
+            })
+            editor.dispatchEvent(ev)
+          }
+
+          for (let i = 0; i < 15; i++) {
+            await new Promise((r) => setTimeout(r, 200))
+            const after = editor.querySelectorAll('img').length
+            if (after > before) return { ok: true, before, after }
+          }
+          return { ok: false, before, reason: 'no img added after drop' }
+        },
+        { base64, mimeType }
+      )
+
+      if (!result?.ok) {
+        console.warn(`[밴드자동화:drop] 이미지 insert 실패:`, result?.reason)
+        return false
+      }
+      console.log(`[밴드자동화:drop] 이미지 insert 성공 (img ${result.before}→${result.after})`)
+      return true
+    } catch (err: any) {
+      console.warn(`[밴드자동화:drop] 예외:`, err?.message)
+      return false
     }
   }
 
