@@ -24,7 +24,7 @@ export interface AiSettings {
     model: string
     temperature: number
   }
-  claude: {
+  claude?: {
     apiKey: string
     model: string
     temperature: number
