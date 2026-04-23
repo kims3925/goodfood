@@ -71,18 +71,24 @@ export default function DigestPublishPage() {
   const [wholesaleFilter, setWholesaleFilter] = useState<number | 'all'>('all')
   const [deadlineFilter, setDeadlineFilter] = useState<string | 'all'>('all')
   const [publishStatusFilter, setPublishStatusFilter] = useState<'all' | 'unpublished' | 'republish'>('all')
+  // 날짜 필터 (기본: 오늘 상품 — 당일 소싱된 상품만)
+  const [dateFilter, setDateFilter] = useState<'today' | '3d' | '7d' | 'all'>('today')
 
   // ─── Load products + categories for a given category ───────────────────
   const loadCategory = useCallback(
-    async (code: CategoryCode) => {
+    async (code: CategoryCode, df: 'today' | '3d' | '7d' | 'all' = dateFilter) => {
       setIsLoading(true)
       try {
-        const res = await fetch(`/api/publish/digest?categoryId=${code}`)
+        const qs = new URLSearchParams({ categoryId: code })
+        if (df === 'today') qs.set('daysWithin', '1')
+        else if (df === '3d') qs.set('daysWithin', '3')
+        else if (df === '7d') qs.set('daysWithin', '7')
+        const res = await fetch(`/api/publish/digest?${qs.toString()}`)
         const data = await res.json()
         if (data.success) {
           setProducts(data.data.products as FetchedProduct[])
           setCategories(data.data.categories as CategorySummary[])
-          setSelectedIds([]) // 카테고리 바뀌면 선택 초기화
+          setSelectedIds([]) // 카테고리/날짜 바뀌면 선택 초기화
         } else {
           toast.error(data.error || '상품을 불러오지 못했습니다.')
         }
@@ -93,12 +99,12 @@ export default function DigestPublishPage() {
         setIsLoading(false)
       }
     },
-    [toast]
+    [toast, dateFilter]
   )
 
   useEffect(() => {
     loadCategory(activeCategory)
-  }, [activeCategory, loadCategory])
+  }, [activeCategory, dateFilter, loadCategory])
 
   // ─── Load retail channels once ─────────────────────────────────────────
   useEffect(() => {
@@ -323,9 +329,34 @@ export default function DigestPublishPage() {
           <CategoryTabs categories={categories} active={activeCategory} onChange={setActiveCategory} />
         </div>
 
-        {/* 도매방 / 마감시간 / 발행상태 필터 */}
+        {/* 날짜 / 도매방 / 마감시간 / 발행상태 필터 */}
         {(wholesaleOptions.length > 0 || deadlineOptions.length > 0 || products.length > 0) && (
           <div className="mb-4 space-y-2 bg-white border border-gray-200 rounded-lg p-3">
+            {/* 날짜 필터 */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-500 flex-shrink-0">📅 날짜:</span>
+              {[
+                { value: 'today', label: '🔥 오늘 상품' },
+                { value: '3d', label: '최근 3일' },
+                { value: '7d', label: '최근 7일' },
+                { value: 'all', label: '전체' },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setDateFilter(opt.value as typeof dateFilter)}
+                  className={`text-xs px-2.5 py-1.5 rounded-md transition-colors ${
+                    dateFilter === opt.value
+                      ? opt.value === 'today'
+                        ? 'bg-red-500 text-white shadow-sm'
+                        : 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             {/* 발행 상태 */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-gray-500 flex-shrink-0">📌 발행상태:</span>

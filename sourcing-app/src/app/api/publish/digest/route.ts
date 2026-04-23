@@ -15,6 +15,7 @@ import {
   cleanupDigestCards,
   type DigestCardProduct,
 } from '@/modules/publish/digest-card-renderer'
+import { shiftDeadlineEarlier } from '@/modules/publish/deadline-utils'
 import { CATEGORY_MAP, CATEGORY_CODES, CATEGORY_LIST, type CategoryCode } from '@/modules/category/category.keywords'
 
 export const dynamic = 'force-dynamic'
@@ -259,12 +260,14 @@ export async function POST(request: NextRequest) {
       } else if (p.price) {
         priceText = `${p.price.toLocaleString()}원`
       }
+      // 도매방 마감시간의 30분 전을 쇼핑몰 주문 마감으로 표시
+      const displayDeadline = shiftDeadlineEarlier(p.channel?.orderDeadline, 30)
       return {
         id: p.id,
         name: p.name,
         price: p.price,
         priceText,
-        deadline: p.channel?.orderDeadline || null,
+        deadline: displayDeadline,
         orderUrl,
         imageUrls: p.images
           .slice(0, 4)
