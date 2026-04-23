@@ -114,6 +114,7 @@ const nextConfig = {
       'node-cron',
       '@bandauto/db',
       'prisma',
+      'qrcode',
     ],
   },
 }
