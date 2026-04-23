@@ -80,33 +80,20 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function buildImageGridHtml(imageUrls: string[]): string {
+function buildImageStackHtml(imageUrls: string[]): string {
   const imgs = imageUrls.slice(0, 4)
   if (imgs.length === 0) {
-    return `<div style="width:100%;height:560px;background:#E5E7EB;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:20px;">이미지 없음</div>`
+    return `<div style="width:100%;height:400px;background:#E5E7EB;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:22px;">이미지 없음</div>`
   }
-  // 1장 → 단일 큰 이미지, 2장 → 좌우 2분할, 3장 → 상단 큰 + 하단 2분할, 4장 → 2×2
-  if (imgs.length === 1) {
-    return `<div style="width:100%;height:560px;overflow:hidden;">
-      <img src="${imgs[0]}" style="width:100%;height:100%;object-fit:cover;display:block;">
+  // 이미지를 세로로 1장씩 쌓음 (정사각형 기준 크롭)
+  return `<div style="width:100%;display:flex;flex-direction:column;gap:4px;background:#F3F4F6;">
+    ${imgs
+      .map(
+        (u) => `<div style="width:100%;aspect-ratio:4/3;overflow:hidden;background:#f9fafb;">
+      <img src="${u}" style="width:100%;height:100%;object-fit:cover;display:block;">
     </div>`
-  }
-  if (imgs.length === 2) {
-    return `<div style="width:100%;height:560px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-      ${imgs.map((u) => `<img src="${u}" style="width:100%;height:100%;object-fit:cover;display:block;">`).join('')}
-    </div>`
-  }
-  if (imgs.length === 3) {
-    return `<div style="width:100%;height:560px;display:grid;grid-template-rows:2fr 1fr;gap:4px;">
-      <img src="${imgs[0]}" style="width:100%;height:100%;object-fit:cover;display:block;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-        <img src="${imgs[1]}" style="width:100%;height:100%;object-fit:cover;display:block;">
-        <img src="${imgs[2]}" style="width:100%;height:100%;object-fit:cover;display:block;">
-      </div>
-    </div>`
-  }
-  return `<div style="width:100%;height:560px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4px;">
-    ${imgs.slice(0, 4).map((u) => `<img src="${u}" style="width:100%;height:100%;object-fit:cover;display:block;">`).join('')}
+      )
+      .join('')}
   </div>`
 }
 
@@ -130,76 +117,73 @@ ${FONT_CSS}
 html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, system-ui, sans-serif; }
 #card {
   width: 800px; background: #ffffff;
-  /* 상하 여백 + 카드 테두리로 다음 카드와 시각적 구분 */
-  padding: 24px;
-  border-bottom: 8px solid #F3F4F6;
 }
-.card-inner {
-  border: 2px solid #E5E7EB;
-  border-radius: 16px;
-  overflow: hidden;
-  background: #ffffff;
-}
-.image-area { width: 100%; background: #f9fafb; }
-.divider {
-  height: 3px; background: #E5E7EB;
-}
+.image-stack { width: 100%; background: #f9fafb; }
 .text-area {
-  padding: 28px 32px 32px;
+  padding: 40px 40px 48px;
   background: #ffffff;
+  border-top: 6px solid #F3F4F6;
 }
-.row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.row { display: flex; align-items: baseline; gap: 14px; margin-bottom: 16px; }
 .order-num {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 48px; height: 48px; border-radius: 50%;
-  background: #2563EB; color: #fff; font-size: 24px; font-weight: 800;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #2563EB; color: #fff; font-size: 28px; font-weight: 800;
 }
 .title {
-  font-size: 32px; font-weight: 800; color: #111827; line-height: 1.25;
+  font-size: 34px; font-weight: 800; color: #111827; line-height: 1.25;
   word-break: keep-all;
 }
 .price {
-  font-size: 30px; font-weight: 800; color: #DC2626; margin: 14px 0 10px;
+  font-size: 32px; font-weight: 800; color: #DC2626; margin: 18px 0 10px;
 }
 .meta {
-  font-size: 20px; color: #4B5563; margin-top: 6px;
+  font-size: 22px; color: #4B5563; margin-top: 6px;
 }
 .order-btn {
-  margin-top: 22px;
-  padding: 18px 22px;
+  margin-top: 24px;
+  padding: 20px 24px;
   background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 100%);
   border-radius: 14px;
   color: #ffffff;
-  font-size: 22px; font-weight: 800;
+  font-size: 24px; font-weight: 800;
   display: flex; align-items: center; justify-content: space-between;
   box-shadow: 0 4px 12px rgba(37,99,235,0.25);
 }
-.order-btn .arrow {
-  font-size: 28px; font-weight: 800;
+.order-btn .arrow { font-size: 32px; font-weight: 800; }
+.order-url {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: #EFF6FF;
+  border: 2px dashed #93C5FD;
+  border-radius: 10px;
+  color: #1D4ED8;
+  font-size: 20px;
+  font-weight: 600;
+  word-break: break-all;
+  font-family: 'Pretendard', monospace;
+  text-align: center;
 }
-.empty-placeholder { color: #9CA3AF; font-size: 20px; }
 </style>
 </head>
 <body>
 <div id="card">
-  <div class="card-inner">
-    <div class="image-area">
-      ${buildImageGridHtml(product.imageUrls)}
+  <div class="image-stack">
+    ${buildImageStackHtml(product.imageUrls)}
+  </div>
+  <div class="text-area">
+    <div class="row">
+      <span class="order-num">${orderNumber}</span>
+      <span class="title">${name}</span>
     </div>
-    <div class="divider"></div>
-    <div class="text-area">
-      <div class="row">
-        <span class="order-num">${orderNumber}</span>
-        <span class="title">${name}</span>
-      </div>
-      ${priceLine ? `<div class="price">💰 ${priceLine}</div>` : ''}
-      ${deadline ? `<div class="meta">⏰ 마감: ${deadline}</div>` : ''}
-      ${orderUrl ? `<div class="order-btn">
-        <span>🛒 상품 자세히 보기</span>
-        <span class="arrow">→</span>
-      </div>` : ''}
+    ${priceLine ? `<div class="price">💰 ${priceLine}</div>` : ''}
+    ${deadline ? `<div class="meta">⏰ 주문 마감: ${deadline}</div>` : ''}
+    ${orderUrl ? `<div class="order-btn">
+      <span>🛒 상품 자세히 보기</span>
+      <span class="arrow">→</span>
     </div>
+    <div class="order-url">${escapeHtml(orderUrl)}</div>` : ''}
   </div>
 </div>
 </body>
