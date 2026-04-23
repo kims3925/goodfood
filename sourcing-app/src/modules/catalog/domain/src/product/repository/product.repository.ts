@@ -244,16 +244,29 @@ export class ProductRepository {
 
   async create(data: ProductCreateInput & { thumbnailUrl?: string | null; imageUrls?: string[] }) {
     // 합배송 타입 자동 추론
-    // 1. shippingInfo에 "배송비 포함", "택배비 포함", "무료배송" 등 명확한 패턴이 있으면 → INCLUDED
-    // 2. shippingFee > 0 이면 → SEPARATE (배송비 별도형)
-    // 3. 그 외 → NONE
+    // 우선순위:
+    //   1. shippingInfo에 "배송비 별도" / "N원 추가" 같은 명시적 별도 키워드가 있으면 → INCLUDED 아님
+    //      (동시에 "배송비 N원" 패턴에서 금액을 추출해 shippingFee가 0이면 보강)
+    //   2. shippingInfo에 "배송비 포함" / "무료배송" 등 포함/무료 키워드 → INCLUDED
+    //   3. shippingFee > 0 → SEPARATE
+    //   4. 그 외 → NONE
     let bundleShippingType: BundleShippingType = BundleShippingType.NONE
     const shippingInfoStr = String(data.shippingInfo || '')
-    const shippingFeeNum = typeof data.shippingFee === 'number' ? data.shippingFee : 0
+    let shippingFeeNum = typeof data.shippingFee === 'number' ? data.shippingFee : 0
 
-    // "배송비 포함", "택배비 포함", "무료배송" 등 명확한 패턴만 INCLUDED로 판단
-    // 단순히 "포함"만 있으면 "합배송 포함" 같은 오탐 발생
-    const isShippingIncluded = /배송비\s*포함|택배비\s*포함|무료\s*배송|배송\s*무료/.test(shippingInfoStr)
+    // "배송비 별도", "N원 추가/별도/부과" 등 명시적 별도 키워드 우선
+    const hasSeparateKeyword = /배송비\s*별도|택배비\s*별도|\d[\d,]*\s*원\s*(?:별도|추가|부과)/.test(shippingInfoStr)
+
+    // "배송비 N,NNN원" 패턴에서 금액 추출 (shippingFee가 비어 있을 때 보강)
+    const feeMatch = shippingInfoStr.match(/배송비[\s:]*(\d{1,3}(?:,\d{3})*|\d+)\s*원/)
+    if (shippingFeeNum === 0 && feeMatch) {
+      const parsed = parseInt(feeMatch[1].replace(/,/g, ''), 10)
+      if (!isNaN(parsed) && parsed > 0) shippingFeeNum = parsed
+    }
+
+    // 별도 키워드가 없을 때만 포함/무료 키워드 판정
+    const isShippingIncluded = !hasSeparateKeyword
+      && /배송비\s*포함|택배비\s*포함|무료\s*배송|배송\s*무료/.test(shippingInfoStr)
 
     if (isShippingIncluded) {
       bundleShippingType = BundleShippingType.INCLUDED
@@ -274,7 +287,7 @@ export class ProductRepository {
         currency: data.currency || 'KRW',
         wholesalePrice: data.wholesalePrice || null,
         price: data.price || null,
-        shippingFee: data.shippingFee || null,
+        shippingFee: shippingFeeNum > 0 ? shippingFeeNum : (data.shippingFee || null),
         shippingInfo: data.shippingInfo || null,
         bundleMaxQty: data.bundleMaxQty || 1,
         bundleShippingType,
