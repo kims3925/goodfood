@@ -95,6 +95,8 @@ export async function GET(request: NextRequest) {
       categoryId: p.categoryId,
       thumbnailUrl: p.thumbnailUrl,
       price: p.price,
+      createdAt: p.createdAt,
+      lastDigestPublishedAt: p.lastDigestPublishedAt,
       variants: p.variants.map((v) => ({
         id: v.id,
         optionSummary: v.optionSummary,
@@ -128,7 +130,7 @@ export async function GET(request: NextRequest) {
 interface DigestPublishRequest {
   categoryId: CategoryCode
   productIds: number[]       // 사용자가 선택한 순서 유지
-  channelIds: number[]       // 발행할 소매밴드 채널 ID 목록
+  channelId: number          // 단일 채널에 발행 (클라이언트가 채널별로 순차 호출)
   headerText?: string
   footerText?: string
   maxImagesPerProduct?: number
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as DigestPublishRequest
-    const { categoryId, productIds, channelIds, headerText, footerText, maxImagesPerProduct, date } = body
+    const { categoryId, productIds, channelId, headerText, footerText, maxImagesPerProduct, date } = body
 
     if (!categoryId || !(CATEGORY_CODES as readonly string[]).includes(categoryId)) {
       return NextResponse.json({ success: false, error: '유효한 categoryId가 필요합니다.' }, { status: 400 })
@@ -151,8 +153,8 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(productIds) || productIds.length === 0) {
       return NextResponse.json({ success: false, error: '발행할 상품을 선택하세요.' }, { status: 400 })
     }
-    if (!Array.isArray(channelIds) || channelIds.length === 0) {
-      return NextResponse.json({ success: false, error: '발행할 소매밴드를 선택하세요.' }, { status: 400 })
+    if (!channelId || typeof channelId !== 'number') {
+      return NextResponse.json({ success: false, error: '발행할 소매밴드(channelId)를 지정하세요.' }, { status: 400 })
     }
 
     // 상품 조회 (선택 순서 유지)
@@ -197,10 +199,10 @@ export async function POST(request: NextRequest) {
       maxImagesPerProduct: typeof maxImagesPerProduct === 'number' ? maxImagesPerProduct : 1,
     })
 
-    // 채널 조회
-    const channels = await prisma.channel.findMany({
+    // 채널 조회 (단일)
+    const channel = await prisma.channel.findFirst({
       where: {
-        id: { in: channelIds },
+        id: channelId,
         userId: user.userId,
         kind: ChannelKind.RETAIL,
         isActive: true,
@@ -208,58 +210,63 @@ export async function POST(request: NextRequest) {
       select: { id: true, name: true, channelKey: true },
     })
 
-    const results: Array<{
-      channelId: number
-      channelName: string
-      status: 'SUCCESS' | 'FAILED'
-      postKey?: string
-      message?: string
-    }> = []
+    if (!channel) {
+      return NextResponse.json(
+        { success: false, error: '채널을 찾을 수 없거나 발행 권한이 없습니다.' },
+        { status: 404 }
+      )
+    }
 
-    for (const channel of channels) {
-      if (!channel.channelKey) {
-        results.push({
-          channelId: channel.id,
-          channelName: channel.name,
-          status: 'FAILED',
-          message: '채널에 bandKey(channelKey)가 없습니다.',
-        })
-        continue
-      }
-      try {
-        const r = await bandPlaywrightService.publishWithImages({
-          channelId: channel.id,
-          bandKey: channel.channelKey,
-          bandName: channel.name,
-          content: digest.content,
-          imageUrls: digest.imageUrls,
-        })
-        results.push({
-          channelId: channel.id,
-          channelName: channel.name,
-          status: r.success ? 'SUCCESS' : 'FAILED',
-          postKey: r.postKey,
-          message: r.error,
-        })
-      } catch (err: any) {
-        results.push({
-          channelId: channel.id,
-          channelName: channel.name,
-          status: 'FAILED',
-          message: err?.message || '발행 중 오류',
-        })
-      }
+    if (!channel.channelKey) {
+      return NextResponse.json(
+        { success: false, error: '채널에 bandKey(channelKey)가 없습니다.' },
+        { status: 400 }
+      )
+    }
+
+    let status: 'SUCCESS' | 'FAILED' = 'FAILED'
+    let postKey: string | undefined
+    let message: string | undefined
+
+    try {
+      const r = await bandPlaywrightService.publishWithImages({
+        channelId: channel.id,
+        bandKey: channel.channelKey,
+        bandName: channel.name,
+        content: digest.content,
+        imageUrls: digest.imageUrls,
+      })
+      status = r.success ? 'SUCCESS' : 'FAILED'
+      postKey = r.postKey
+      message = r.error
+    } catch (err: any) {
+      status = 'FAILED'
+      message = err?.message || '발행 중 오류'
+    }
+
+    // 발행 성공 시 선택된 상품들에 lastDigestPublishedAt 기록
+    if (status === 'SUCCESS') {
+      await prisma.product.updateMany({
+        where: { id: { in: productIds }, userId: user.userId },
+        data: { lastDigestPublishedAt: new Date() },
+      })
     }
 
     return NextResponse.json({
-      success: true,
+      success: status === 'SUCCESS',
       digest: {
         title: digest.title,
         productCount: digest.productCount,
         imageCount: digest.imageUrls.length,
         truncated: digest.truncated,
       },
-      results,
+      result: {
+        channelId: channel.id,
+        channelName: channel.name,
+        status,
+        postKey,
+        message,
+      },
       categoryMeta: {
         code: categoryId,
         ...CATEGORY_MAP[categoryId],

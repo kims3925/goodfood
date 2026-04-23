@@ -9,6 +9,7 @@ import CategoryTabs, { type CategorySummary } from './_components/CategoryTabs'
 import DigestProductList, { type DigestProductItem } from './_components/DigestProductList'
 import DigestPreview from './_components/DigestPreview'
 import DigestPublishBar from './_components/DigestPublishBar'
+import DigestProgressModal, { type DigestProgressItem } from './_components/DigestProgressModal'
 
 interface FetchedProduct {
   id: number
@@ -17,6 +18,8 @@ interface FetchedProduct {
   categoryId: string | null
   thumbnailUrl: string | null
   price: number | null
+  createdAt?: string | null
+  lastDigestPublishedAt?: string | null
   variants: { id: number; optionSummary: string | null; price: number }[]
   images: { url: string; sortOrder: number }[]
   shopProducts: {
@@ -52,6 +55,10 @@ export default function DigestPublishPage() {
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannels, setSelectedChannels] = useState<number[]>([])
   const [isPublishing, setIsPublishing] = useState(false)
+
+  // 발행 진행 상태
+  const [progressOpen, setProgressOpen] = useState(false)
+  const [progressItems, setProgressItems] = useState<DigestProgressItem[]>([])
 
   // ─── Load products + categories for a given category ───────────────────
   const loadCategory = useCallback(
@@ -147,41 +154,79 @@ export default function DigestPublishPage() {
 
   const handlePublish = async () => {
     if (selectedIds.length === 0 || selectedChannels.length === 0) return
+
+    // 진행 모달 초기화 — 선택한 채널마다 pending 행 생성
+    const initItems: DigestProgressItem[] = selectedChannels.map((channelId) => {
+      const ch = channels.find((c) => c.id === channelId)
+      return {
+        channelId,
+        channelName: ch?.name || `채널 ${channelId}`,
+        status: 'pending',
+      }
+    })
+    setProgressItems(initItems)
+    setProgressOpen(true)
     setIsPublishing(true)
+
+    let totalSuccess = 0
+    let totalFailed = 0
+
     try {
-      const res = await fetch('/api/publish/digest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          categoryId: activeCategory,
-          productIds: selectedIds,
-          channelIds: selectedChannels,
-          headerText,
-          footerText,
-          maxImagesPerProduct,
-        }),
-      })
-      const data = await res.json()
-      if (!data.success) {
-        toast.error(data.error || '발행 실패')
-        return
+      for (const channelId of selectedChannels) {
+        // publishing 상태로
+        setProgressItems((prev) =>
+          prev.map((p) => (p.channelId === channelId ? { ...p, status: 'publishing' } : p))
+        )
+
+        try {
+          const res = await fetch('/api/publish/digest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              categoryId: activeCategory,
+              productIds: selectedIds,
+              channelId,
+              headerText,
+              footerText,
+              maxImagesPerProduct,
+            }),
+          })
+          const data = await res.json()
+          const result = data.result || {}
+          const status: 'success' | 'failed' =
+            result.status === 'SUCCESS' ? 'success' : 'failed'
+
+          setProgressItems((prev) =>
+            prev.map((p) =>
+              p.channelId === channelId
+                ? { ...p, status, message: result.message || (status === 'failed' ? data.error : undefined) }
+                : p
+            )
+          )
+          if (status === 'success') totalSuccess++
+          else totalFailed++
+        } catch (err: any) {
+          setProgressItems((prev) =>
+            prev.map((p) =>
+              p.channelId === channelId
+                ? { ...p, status: 'failed', message: err?.message || '네트워크 오류' }
+                : p
+            )
+          )
+          totalFailed++
+        }
       }
-      const successes = (data.results || []).filter((r: any) => r.status === 'SUCCESS')
-      const failures = (data.results || []).filter((r: any) => r.status === 'FAILED')
-      if (successes.length > 0) {
-        toast.success(`${successes.length}개 밴드에 종합 발행 완료 (상품 ${data.digest.productCount}개)`)
+
+      if (totalSuccess > 0) {
+        toast.success(`${totalSuccess}개 밴드에 종합 발행 완료`)
       }
-      if (failures.length > 0) {
-        console.error('[digest] 발행 실패:', failures)
-        toast.error(`${failures.length}개 밴드 실패: ${failures[0].message || ''}`)
+      if (totalFailed > 0) {
+        toast.error(`${totalFailed}개 밴드 발행 실패`)
       }
-      // 발행 후 상태 초기화
+      // 발행 후 상태 초기화 + 상품 목록 새로고침 (lastDigestPublishedAt 반영)
       setSelectedIds([])
       setSelectedChannels([])
       loadCategory(activeCategory)
-    } catch (err: any) {
-      console.error(err)
-      toast.error(`발행 중 오류: ${err?.message || '알 수 없는 오류'}`)
     } finally {
       setIsPublishing(false)
     }
@@ -193,6 +238,8 @@ export default function DigestPublishPage() {
     price: p.price,
     thumbnailUrl: p.thumbnailUrl,
     images: p.images,
+    createdAt: p.createdAt,
+    lastDigestPublishedAt: p.lastDigestPublishedAt,
   }))
 
   return (
@@ -248,6 +295,16 @@ export default function DigestPublishPage() {
         onToggleChannel={toggleChannel}
         onPublish={handlePublish}
         isPublishing={isPublishing}
+      />
+
+      <DigestProgressModal
+        isOpen={progressOpen}
+        items={progressItems}
+        digestTitle={preview.title}
+        productCount={preview.productCount}
+        imageCount={preview.imageUrls.length}
+        canClose={!isPublishing}
+        onClose={() => setProgressOpen(false)}
       />
     </div>
   )

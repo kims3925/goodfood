@@ -16,6 +16,7 @@ model Product {
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)
   republishedAt      DateTime?         @map("republished_at") @db.Timestamp(0) // 재발행 시점 (product/list 발행상태에 "재발행완료" 표기용)
+  lastDigestPublishedAt DateTime?      @map("last_digest_published_at") @db.Timestamp(0) // 마지막 종합발행 시점 (digest UI에 "종합발행 완료" 뱃지)
   shippingFee        Int?              @map("shipping_fee")
   shippingInfo       String?           @map("shipping_info") @db.Text
   bundleMaxQty       Int?              @default(1) @map("bundle_max_qty") // 합배송 최대 수량

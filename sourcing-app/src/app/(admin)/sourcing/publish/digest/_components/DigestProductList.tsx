@@ -1,7 +1,6 @@
 'use client'
 
-import Image from 'next/image'
-import { Package } from 'lucide-react'
+import { CheckCircle, Clock, Package } from 'lucide-react'
 
 export interface DigestProductItem {
   id: number
@@ -9,6 +8,19 @@ export interface DigestProductItem {
   price: number | null
   thumbnailUrl: string | null
   images: { url: string; sortOrder: number }[]
+  createdAt?: string | null
+  lastDigestPublishedAt?: string | null
+}
+
+function formatShortDate(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  return `${mm}-${dd} ${hh}:${mi}`
 }
 
 interface Props {
@@ -90,9 +102,23 @@ export default function DigestProductList({ products, selectedIds, onToggle, onS
                   <p className="text-xs text-gray-500 mt-0.5">
                     {product.price ? `${product.price.toLocaleString()}원~` : '가격 미설정'}
                   </p>
-                  <span className="inline-block text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 mt-1">
-                    이미지 {product.images?.length || 0}장
-                  </span>
+                  <div className="flex items-center gap-1 flex-wrap mt-1">
+                    <span className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">
+                      이미지 {product.images?.length || 0}장
+                    </span>
+                    {product.createdAt && (
+                      <span className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600" title="소싱 등록일">
+                        <Clock size={10} />
+                        {formatShortDate(product.createdAt)}
+                      </span>
+                    )}
+                    {product.lastDigestPublishedAt && (
+                      <span className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700" title="마지막 종합발행 시각">
+                        <CheckCircle size={10} />
+                        종합발행 {formatShortDate(product.lastDigestPublishedAt)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </label>
             </li>
