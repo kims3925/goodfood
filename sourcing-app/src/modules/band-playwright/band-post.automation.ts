@@ -910,34 +910,72 @@ export class BandPostAutomation {
   }
 
   /**
-   * 글쓰기 레이어(에디터) 열기 — createPostWithImages 내부 로직을 재사용하기 위한 헬퍼.
-   * 실제 구현은 간소화하여 핵심 버튼 클릭만 수행. 실패 시 에러 throw.
+   * 글쓰기 레이어(에디터) 열기 — 기존 createPostWithImages의 2단계 로직을 추출.
+   * 글쓰기 버튼 클릭 → 에디터 렌더 대기 → 재시도 포함.
    */
   private async openWriteEditor(page: Page): Promise<void> {
-    // 글쓰기 버튼 셀렉터 후보
     const writeButtonSelectors = [
-      'a._postWriteBtn',
-      '.postWrite ._postWriteBtn',
-      'button.uPostWriteBtn',
-      '[data-uiselector="postWriteBtn"]',
-      'a[href*="postwrite"]',
+      'button.uButton._btnPostWrite',
+      'button._btnOpenWriteLayer',
+      'button.cPostWriteEventWrapper',
+      'button._btnPostWrite',
+      '[data-viewname="DPostFakeEditorView"]',
     ]
-    for (const sel of writeButtonSelectors) {
-      const btn = await page.$(sel)
-      if (btn && await btn.isVisible()) {
-        await btn.click()
-        break
+    const editorSelector =
+      '[data-viewname="DPostWriteLayerView"] [contenteditable="true"], .cPostWrite [contenteditable="true"].cke_editable'
+
+    // 네트워크 idle 대기 (옵션)
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 10_000 })
+    } catch { /* 무시 */ }
+
+    // 글쓰기 버튼 가시화 대기
+    try {
+      await page.waitForSelector(writeButtonSelectors.join(', '), {
+        timeout: 10_000,
+        state: 'visible',
+      })
+    } catch {
+      console.warn('[밴드자동화:interleaved] 글쓰기 버튼 대기 타임아웃')
+    }
+
+    // 최대 2회 시도 — 실패 시 reload
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let clicked = false
+      for (const sel of writeButtonSelectors) {
+        const btn = await page.$(sel)
+        if (btn && (await btn.isVisible())) {
+          console.log(`[밴드자동화:interleaved] 글쓰기 버튼 발견: ${sel} (시도 ${attempt + 1})`)
+          await btn.click()
+          clicked = true
+          break
+        }
+      }
+      if (!clicked) {
+        console.warn('[밴드자동화:interleaved] 글쓰기 버튼을 찾지 못함')
+      }
+      try {
+        await page.waitForSelector(editorSelector, { timeout: 5_000, state: 'visible' })
+        console.log('[밴드자동화:interleaved] 에디터 로드됨')
+        return
+      } catch {
+        console.warn(`[밴드자동화:interleaved] 에디터 대기 타임아웃 (시도 ${attempt + 1})`)
+        if (attempt === 0) {
+          await page.reload({ waitUntil: 'load' })
+          await page.waitForTimeout(2_000)
+        }
       }
     }
-    // 에디터 렌더 대기 (최대 10초)
-    try {
-      await page.waitForSelector(
-        '[data-viewname="DPostWriteLayerView"] [contenteditable="true"], .cPostWrite [contenteditable="true"].cke_editable',
-        { timeout: 10_000 }
+
+    // 로그인 페이지로 밀렸는지 체크
+    if (await this.isLoginPage(page)) {
+      throw new BandPlaywrightError(
+        '세션이 만료되어 로그인 페이지로 이동했습니다.',
+        BandPlaywrightErrorCode.SESSION_EXPIRED
       )
-    } catch {
-      throw new BandPlaywrightError('글쓰기 에디터 대기 실패', BandPlaywrightErrorCode.POST_FAILED)
     }
+
+    throw new BandPlaywrightError('글쓰기 에디터 열기 실패', BandPlaywrightErrorCode.POST_FAILED)
   }
 
   /**
