@@ -13,6 +13,50 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 
+/**
+ * 이미지 URL을 base64 data URI로 변환. HTTP 404나 네트워크 실패 시 null 반환.
+ * - 상대 경로(/...) → NEXT_PUBLIC_APP_URL prefix
+ * - file:// 또는 OS 절대 경로 → fs로 읽기
+ * - http(s) → fetch
+ */
+async function toDataUri(urlOrPath: string): Promise<string | null> {
+  try {
+    // 로컬 절대 경로
+    if (urlOrPath.startsWith('file://')) {
+      const p = urlOrPath.replace(/^file:\/\//, '')
+      if (!fs.existsSync(p)) return null
+      const buf = fs.readFileSync(p)
+      const mime = p.endsWith('.png') ? 'image/png' : p.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
+      return `data:${mime};base64,${buf.toString('base64')}`
+    }
+    // 일반 파일시스템 절대 경로 (리눅스 /xxx 또는 윈도우 C:\xxx)
+    if ((urlOrPath.startsWith('/') && !urlOrPath.startsWith('//')) || /^[a-zA-Z]:[\\/]/.test(urlOrPath)) {
+      // URL path vs filesystem path — 실제 파일이면 파일로 처리
+      if (fs.existsSync(urlOrPath)) {
+        const buf = fs.readFileSync(urlOrPath)
+        const mime = urlOrPath.endsWith('.png') ? 'image/png' : urlOrPath.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
+        return `data:${mime};base64,${buf.toString('base64')}`
+      }
+      // 파일이 아니면 NEXT_PUBLIC_APP_URL prefix 붙여 fetch
+      const base = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
+      urlOrPath = `${base}${urlOrPath.startsWith('/') ? urlOrPath : '/' + urlOrPath}`
+    }
+
+    const res = await fetch(urlOrPath, {
+      headers: { 'User-Agent': 'Mozilla/5.0 BandAuto/1.0' },
+    })
+    if (!res.ok) return null
+    const buf = Buffer.from(await res.arrayBuffer())
+    const mime =
+      res.headers.get('content-type')?.split(';')[0] ||
+      (urlOrPath.endsWith('.png') ? 'image/png' : urlOrPath.endsWith('.webp') ? 'image/webp' : 'image/jpeg')
+    return `data:${mime};base64,${buf.toString('base64')}`
+  } catch (err) {
+    console.warn(`[digest-card] toDataUri 실패: ${urlOrPath}`, err)
+    return null
+  }
+}
+
 export interface DigestCardProduct {
   id: number
   name: string
@@ -157,11 +201,33 @@ export async function renderDigestCards(
     for (let i = 0; i < products.length; i++) {
       const product = products[i]
       const orderNumber = i + 1
-      const html = buildCardHtml(product, orderNumber)
 
-      await page.setContent(html, { waitUntil: 'networkidle', timeout: 30_000 })
-      // 이미지 로딩 안정화를 위해 약간 대기
-      await page.waitForTimeout(300)
+      // 1) 원본 이미지 URL들을 모두 base64로 변환 (네트워크 의존 제거)
+      const dataUris: string[] = []
+      for (const src of product.imageUrls.slice(0, 4)) {
+        const uri = await toDataUri(src)
+        if (uri) dataUris.push(uri)
+      }
+      const productForHtml = { ...product, imageUrls: dataUris }
+
+      const html = buildCardHtml(productForHtml, orderNumber)
+
+      await page.setContent(html, { waitUntil: 'load', timeout: 30_000 })
+      // 모든 <img> 요소의 load/error 완료 대기
+      await page.evaluate(async () => {
+        const imgs = Array.from(document.images)
+        await Promise.all(
+          imgs.map((img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise<void>((resolve) => {
+                  img.onload = () => resolve()
+                  img.onerror = () => resolve()
+                })
+          )
+        )
+      })
+      await page.waitForTimeout(200) // 폰트/레이아웃 안정화
 
       const element = await page.$('#card')
       if (!element) {

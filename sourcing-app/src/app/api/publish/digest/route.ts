@@ -285,13 +285,30 @@ export async function POST(request: NextRequest) {
       message = '카드 이미지 0장 생성됨'
     }
 
+    // Band 본문은 카드 이미지가 주 콘텐츠이므로 짧은 제목/안내만 포함
+    // (상품별 번호·제목·가격·링크는 모두 카드 이미지 안에 렌더링됨)
+    const shortContent = [
+      digest.title,
+      '',
+      (headerText || '').trim(),
+      `총 ${digest.productCount}개 상품 | 신선 직송`,
+      '',
+      (footerText || '').trim() || '📦 배송: 주문 당일 또는 익일 출고\n💳 결제: 카드결제 / 무통장입금',
+    ]
+      .filter((line, idx, arr) => {
+        // 빈 문자열 2연속 방지
+        if (line !== '' ) return true
+        return idx > 0 && arr[idx - 1] !== ''
+      })
+      .join('\n')
+
     try {
       if (renderedCards.length > 0) {
         const r = await bandPlaywrightService.publishWithImages({
           channelId: channel.id,
           bandKey: channel.channelKey,
           bandName: channel.name,
-          content: digest.content,
+          content: shortContent,
           imageUrls: renderedCards.map((c) => c.filePath), // 로컬 파일 경로 전달
         })
         status = r.success ? 'SUCCESS' : 'FAILED'
