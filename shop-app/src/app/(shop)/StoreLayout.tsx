@@ -7,6 +7,7 @@ import { useSession, signOut } from 'next-auth/react'
 import { Search, ShoppingCart, User, MapPin, ChevronDown, Phone, MessageSquare, LogOut, Home, Headphones, Trophy } from 'lucide-react'
 import { CartNotificationProvider, useCartNotification } from '@/contexts/CartNotificationContext'
 import CartNotificationBubble from '@/components/cart/CartNotificationBubble'
+import CategoryNav from './CategoryNav'
 import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
 import { usePresence } from '@/hooks/usePresence'
@@ -272,6 +273,9 @@ function StoreLayoutContent({
         </div>
 
       </header>
+
+      {/* 카테고리 네비게이션 */}
+      <CategoryNav />
 
       {/* 무통장입금 계좌 안내 배너 */}
       {bankInfo && (

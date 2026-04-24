@@ -40,6 +40,7 @@ import {
   KeyRound,
   UserPlus,
   Megaphone,
+  LayoutGrid,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -106,6 +107,7 @@ export const sourcingMenuItems: MenuItem[] = [
 export const shopMenuItems: MenuItem[] = [
   { label: '대시보드', href: '/shop/dashboard', icon: LayoutDashboard },
   { label: '쇼핑몰 관리', href: '/shop/store/list', icon: ShoppingBag },
+  { label: '카테고리', href: '/shop/category/list', icon: LayoutGrid },
   {
     label: '주문/정산',
     icon: ClipboardList,
@@ -224,6 +226,7 @@ export const sourcingPathToMenuMap: Record<string, string> = {
 export const shopPathToMenuMap: Record<string, string> = {
   '/shop/dashboard': '대시보드',
   '/shop/store': '쇼핑몰 관리',
+  '/shop/category': '카테고리',
   '/shop/order': '주문/정산',
   '/shop/wholesale-orders': '주문/정산',
   '/shop/settlement': '주문/정산',
