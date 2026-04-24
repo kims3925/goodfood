@@ -101,7 +101,6 @@ async function removeBackgroundFromBuffer(
 ): Promise<Buffer | null> {
   try {
     // 동적 import — 모듈 자체가 없거나 onnxruntime-node가 안 깔린 경우 폴백
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const mod = await import('@imgly/background-removal-node').catch(() => null)
     if (!mod || typeof mod.removeBackground !== 'function') {
       console.warn('[collage] @imgly/background-removal-node 미설치 — 배경제거 스킵')
