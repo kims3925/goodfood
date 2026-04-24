@@ -354,8 +354,33 @@ ChannelProduct / ShopProduct (product/list 발행완료 탭, publish 페이지)
 - 핵심 파일: `sourcing-app/src/modules/publish/digest-collage-renderer.ts` (`renderCollagePoster`, `extractSpec`)
 - 배경 제거: `@imgly/background-removal-node` (서버 CPU, ONNX U2-Net). 실패 시 원본으로 폴백
 - 카테고리 링크: `shop-app/src/app/(shop)/category/[code]/page.tsx` — `/{subdomain}/category/SEA` 형태
-- UI: `/sourcing/publish/digest` 상단 `📋 발행조건 설정` 패널 (그리드 크기, 배경제거 on/off, 제목, 우상단 강조 배지)
+- UI 진입점:
+  - `/sourcing/publish/digest` 상단 `📋 발행조건 설정` 패널 (기존 종합발행 페이지에 통합)
+  - **`/sourcing/publish/ad` 탭 1**: 광고 페이지의 콜라주 발행 탭 (메뉴: "광고")
 - 선택 개수 ≠ 그리드 크기면 발행 버튼 비활성, 카테고리당 정확히 N개 선택 필요
+
+## 광고 페이지 (Ad) — 작업지시서_카카오톡광고_자동생성.md
+
+`/sourcing/publish/ad` — 사이드바 "상품및광고 > 광고" 메뉴. 2개 탭으로 구성.
+
+### 탭 1: 🖼️ 콜라주 발행
+- 12개 상품을 배경 제거된 포스터 1장으로 합성 → 소매밴드 발행
+- 종합발행 페이지의 콜라주 모드와 동일 API(`POST /api/publish/digest`, `publishMode='collage'`) 호출
+- 차이점: 종합발행 페이지에서 분리된 단일 모드 전용 UI
+
+### 탭 2: 📱 카톡 광고 발행
+- 1~10개(권장 6개) 상품에 대해 **AI(Claude Haiku)가 카드별 카피 자동 생성**
+- 720×1280 세로 PNG 카드 → ZIP 다운로드 → 카카오톡 채널에 수동 첨부 발송 (Phase 1)
+- 각 카드: 3D 윤곽선 타이틀(빨강/파랑/녹색) + 회색 서브타이틀 박스 + 원본 상품 이미지(배경 유지) + 옵션 리본/배지/배너 + 본문 + 가격
+- 타이틀 색상: 카테고리 자동 매핑 (수산물=파랑 / 농산물·축산물·반찬·가공=빨강 / 건강식품=녹색)
+- 핵심 파일:
+  - `sourcing-app/src/modules/ad-composer/ad-content-generator.ts` (Claude 호출 4종: title/subtitle/desc/banner)
+  - `sourcing-app/src/modules/ad-composer/ad-card-renderer.ts` (Playwright HTML→PNG)
+  - `sourcing-app/src/modules/ad-composer/templates/kakao-ad-card.html.ts`
+  - `sourcing-app/src/app/api/ad/kakao/{generate,card/[id],preview/[id],send,batches}/route.ts`
+- DB: `KakaoAdCard`, `KakaoAdBatch` (사용자별 일 단위 배치) + enum `KakaoSendStatus`
+- 미리보기 모달에서 카드별 편집(타이틀/색상/배너/본문/가격) 후 PATCH로 저장 시 즉시 PNG 재합성
+- ZIP 다운로드: `POST /api/ad/kakao/send` (Phase 2 카카오 API 자동 발송은 미구현)
 
 ## 쇼핑몰 체크아웃 변경
 

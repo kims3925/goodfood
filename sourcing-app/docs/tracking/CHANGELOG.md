@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260424-002 | Done | 2026-04-24 | - | 카카오톡 광고 자동 생성 기능 + 신규 광고 페이지 (콜라주 발행/카톡 광고 2탭) + '상품및광고' 메뉴 재편 | Large | Claude |
 | TR-20260424-001 | Done | 2026-04-24 | - | 종합발행 콜라주(Collage) 모드 추가 - 12개 상품을 배경 제거된 포스터 1장으로 합성 + 쇼핑몰 카테고리 페이지 신설 | Medium | Claude |
 | TR-20260406-001 | Done | 2026-04-06 | - | 수집상품/가공상품 페이지 통합 (탭 구조), 수집게시물 AI미가공 필터링, 네비게이션 메뉴 정리 | Medium | Claude |
 | TR-20260404-001 | Done | 2026-04-04 | - | 독립 어드민 패널 구현 (전용 레이아웃/사이드바/헤더) + 에이전트 대시보드 17개 에이전트 데이터 강화 + 에이전트 설정 페이지 추가 | Medium | Claude |
@@ -2594,4 +2595,100 @@ uploadProgressEmitter (EventEmitter 싱글톤)
 ### 관련 항목
 - 작업지시서: `C:\Users\kims3\SNS_AUTO\작업지시서_종합발행_콜라주모드.md`
 - Flow: 종합 발행 → 콜라주 모드
+
+---
+
+## TR-20260424-002 — 카카오톡 광고 자동 생성 + 신규 광고 페이지 + 메뉴 재편
+
+| 항목 | 값 |
+|-----|-----|
+| Status | Done |
+| Date | 2026-04-24 |
+| REQ-ID | - (작업지시서: `작업지시서_카카오톡광고_자동생성.md`) |
+| Risk | Large |
+| Author | Claude |
+
+### 요약
+- 사이드바 메뉴 "소싱" → **"상품및광고"** 로 재편, 신규 하위 메뉴 "광고" 추가
+- 신규 페이지 `/sourcing/publish/ad` (광고) — 2탭 구조
+  - 탭 1: 🖼️ 콜라주 발행 (기존 종합발행의 콜라주 모드를 단일 모드 전용 UI로 분리 노출. 동일 API 사용)
+  - 탭 2: 📱 카톡 광고 발행 (신규)
+- 카톡 광고: 1~10개(권장 6개) 상품 → AI(Claude Haiku)가 카드별 카피 자동 생성 → 720×1280 PNG 카드 → ZIP 다운로드
+- 종합발행 페이지(`/sourcing/publish/digest`)는 그대로 유지 (콜라주 모드 포함)
+
+### 신규 파일
+- DB
+  - `db/prisma/models/kakao-ad.prisma` — `KakaoAdCard`, `KakaoAdBatch`, `KakaoSendStatus` enum
+- 모듈 (`sourcing-app/src/modules/ad-composer/`)
+  - `ad-content-generator.ts` — Claude 호출 4종(title/subtitle/desc/banner) + 카테고리→색상 규칙 + 리본 정규식
+  - `ad-card-renderer.ts` — Playwright 720×1280 PNG 합성 (배치 모드 포함)
+  - `templates/kakao-ad-card.html.ts` — 3D 윤곽선 타이틀 + 회색 서브박스 + 옵션 리본/배지/배너
+  - `prompts/{title,subtitle,description,banner}.prompt.ts` — Haiku 프롬프트
+- API (`sourcing-app/src/app/api/ad/kakao/`)
+  - `generate/route.ts` — POST: 카드 N개 AI 생성 + DB upsert + PNG 합성
+  - `card/[id]/route.ts` — GET 조회, PATCH 편집(저장 시 즉시 재합성)
+  - `preview/[id]/route.ts` — GET PNG 스트림 (결측 시 즉석 재합성)
+  - `send/route.ts` — POST ZIP 다운로드 (Phase 1)
+  - `batches/route.ts` — GET 최근 배치 이력
+- UI (`sourcing-app/src/app/(admin)/sourcing/publish/ad/`)
+  - `page.tsx` — 2탭 컨테이너
+  - `_components/CollageTab.tsx` — 콜라주 탭 (DigestSettingsPanel 재사용)
+  - `_components/KakaoAdTab.tsx` — 카톡 광고 탭 (옵션 패널 + 생성 버튼)
+  - `_components/KakaoAdPreviewModal.tsx` — 미리보기 그리드 + 인라인 편집 + ZIP 다운로드
+  - `_hooks/useAdProducts.ts` — 카테고리/날짜 필터 + 상품 로드 공유 훅
+
+### 수정 파일
+- `sourcing-app/src/config/navigation.ts`
+  - 부모 메뉴 "소싱" → "상품및광고"
+  - 자식 메뉴에 "광고" (`/sourcing/publish/ad`, Megaphone 아이콘) 추가
+- `db/prisma/models/user.prisma` — `kakaoAdCards`, `kakaoAdBatches` 역관계 추가
+- `db/prisma/models/product.prisma` — `kakaoAdCards` 역관계 추가
+
+### AI 동작 (Claude Haiku, claude-haiku-4-5-20251001)
+- 카드당 4 호출(title/subtitle/desc/banner) 병렬 실행, subtitle은 title 의존성으로 순차
+- 동시성 3 → rate limit 회피
+- 실패 시 폴백: 상품명/원본설명을 그대로 사용 → `aiGenerated=false` 표시
+- 타이틀 색상 매핑(코드 상수): SEA=blue, AGR/MEA/MKT/PRC/COM/ETC=red, HLT=green
+- 리본 정규식 감지: "국내산"/"유기농"/"친환경"
+
+### 동작 플로우
+1. `/sourcing/publish/ad` 접속 → 카톡 광고 탭
+2. 카테고리/날짜 필터 → 상품 1~10개 선택
+3. 옵션(타이틀 색상, 강조 배너) → "🎨 광고 카드 생성"
+4. POST `/api/ad/kakao/generate` → AI 생성 + DB(KakaoAdCard, KakaoAdBatch) + PNG 합성
+5. 미리보기 모달: 카드 그리드 + 클릭 시 인라인 편집 (PATCH 시 즉시 재합성)
+6. "📦 ZIP 다운로드" → 카카오톡 채널에 수동 첨부
+
+### 영향도
+- DB 변경: `kakao_ad_card`, `kakao_ad_batch` 테이블 신설 (배포 시 `prisma db push` 자동 실행됨)
+- API 신규: `/api/ad/kakao/*` 5개
+- 라우트 신규: `/sourcing/publish/ad`
+- 사이드바 라벨 변경: "소싱" → "상품및광고"
+- 기존 `/sourcing/publish/digest` 무영향
+
+### 의존성
+- 기존 `@anthropic-ai/sdk` 재사용 (Claude 클라이언트)
+- 기존 `archiver` 재사용 (ZIP)
+- 기존 `playwright` 재사용 (HTML→PNG)
+
+### 비용 (Claude Haiku)
+- 카드당 ~2000 토큰 → 6장 ≈ $0.015
+- 일 1회 사용 시 월 ≈ $0.45
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Lint | Pass |
+| Typecheck | Pass (sourcing-app, shop-app) |
+| Build | 미수행 (CI/CD에서 검증) |
+| Integration | 운영 배포 후 실제 1배치 생성 + ZIP 다운로드 검증 필요 |
+
+### Phase 2 (후속)
+- 카카오톡 채널 비즈메시지 API 직접 발송
+- KakaoAdAgent (매일 08:30 자동 Draft 생성)
+- 발송 이력 탭 UI
+
+### 관련 항목
+- 작업지시서: `C:\Users\kims3\SNS_AUTO\작업지시서_카카오톡광고_자동생성.md`
+- Flow: 광고 → 카톡 광고 자동 생성
 
