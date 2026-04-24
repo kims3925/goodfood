@@ -7,31 +7,6 @@ on:
 
 jobs:
   notify:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Send Slack Notification
-        uses: slackapi/slack-github-action@v2
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            {
-              "text": "*[<${{ github.server_url }}/${{ github.repository }}|${{ github.repository }}>]* `${{ github.actor }}`님이 main에 푸시했습니다.",
-              "attachments": [
-                {
-                  "color": "#36a64f",
-                  "fields": [
-                    {
-                      "title": "커밋 메시지",
-                      "value": "${{ github.event.head_commit.message }}",
-                      "short": false
-                    },
-                    {
-                      "title": "커밋 링크",
-                      "value": "<${{ github.event.head_commit.url }}|${{ github.sha }}>",
-                      "short": true
-                    }
-                  ]
-                }
-              ]
-            }
+    uses: ABC-Group-Tech/ci/.github/workflows/main-push-slack-notify.yml@main
+    secrets: inherit
+
