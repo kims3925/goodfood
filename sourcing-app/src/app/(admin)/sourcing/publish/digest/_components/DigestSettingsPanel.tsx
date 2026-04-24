@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Settings2 } from 'lucide-react'
 
-export type GridSize = '3x4' | '4x4' | '2x3'
+export type GridSize = '3x4' | '3x3' | '2x3'
 
 export interface CollageSettingsValue {
   collageTitle: string
@@ -24,7 +24,7 @@ interface Props {
 
 const GRID_OPTIONS: Array<{ value: GridSize; label: string; count: number }> = [
   { value: '3x4', label: '3 × 4 (12개)', count: 12 },
-  { value: '4x4', label: '4 × 4 (16개)', count: 16 },
+  { value: '3x3', label: '3 × 3 (9개)', count: 9 },
   { value: '2x3', label: '2 × 3 (6개)', count: 6 },
 ]
 
@@ -33,7 +33,7 @@ export function gridSizeToCount(size: GridSize): number {
 }
 
 export function gridSizeToColsRows(size: GridSize): { cols: number; rows: number } {
-  if (size === '4x4') return { cols: 4, rows: 4 }
+  if (size === '3x3') return { cols: 3, rows: 3 }
   if (size === '2x3') return { cols: 2, rows: 3 }
   return { cols: 3, rows: 4 }
 }

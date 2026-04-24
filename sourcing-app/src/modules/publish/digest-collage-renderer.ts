@@ -152,6 +152,17 @@ function buildPosterHtml(opts: {
   posterWidth: number
 }): string {
   const { title, subtitle, topBadgeText, cells, gridCols, gridRows, posterWidth } = opts
+
+  // 셀 수가 적을수록 각 셀이 커지므로 내부 요소 크기를 비례 확대.
+  // 기준: 12셀(3×4) = 1.0배. 셀당 가용 면적비의 제곱근으로 선형 증감하면
+  // 시각적 균형이 유지된다 (면적 2배 → 선형 √2배).
+  const cellCount = gridCols * gridRows
+  const cellScale = Math.min(1.8, Math.max(1, Math.sqrt(12 / cellCount)))
+  const imgH = Math.round(240 * cellScale)
+  const specSize = Math.round(22 * cellScale)
+  const nameSize = Math.round(30 * cellScale)
+  const priceSize = Math.round(42 * cellScale)
+  const nameMinH = Math.round(70 * cellScale)
   const cellsHtml = cells
     .map((c) => {
       const img = c.imgDataUri
@@ -215,13 +226,13 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   position: relative;
 }
 .spec {
-  font-size: 22px; font-weight: 800; color: #DC2626;
+  font-size: ${specSize}px; font-weight: 800; color: #DC2626;
   letter-spacing: -0.5px;
-  min-height: 28px;
+  min-height: ${Math.round(28 * cellScale)}px;
 }
 .spec-empty { visibility: hidden; }
 .img-wrap {
-  height: 240px;
+  height: ${imgH}px;
   display: flex; align-items: center; justify-content: center;
   margin: 10px 0 12px;
 }
@@ -238,18 +249,18 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   border-radius: 12px; font-size: 18px;
 }
 .name {
-  font-size: 30px; font-weight: 800; color: #111827;
+  font-size: ${nameSize}px; font-weight: 800; color: #111827;
   line-height: 1.18; word-break: keep-all;
   margin-top: 4px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 70px;
+  min-height: ${nameMinH}px;
 }
 .price {
   margin-top: 10px;
-  font-size: 42px; font-weight: 900;
+  font-size: ${priceSize}px; font-weight: 900;
   color: #FBBF24;
   -webkit-text-stroke: 2px #111827;
   letter-spacing: -1px;
@@ -351,8 +362,13 @@ export async function renderCollagePoster(
   )
 
   try {
+    // 6셀(scale≈1.41) 모드에서 포스터 세로가 1800px을 넘길 수 있어
+    // 뷰포트를 여유있게 잡는다. element.screenshot은 스크롤 캡처지만
+    // 레이아웃 안정성을 위해 충분한 크기 확보.
+    const expectedPosterHeight =
+      Math.ceil(300 + gridRows * Math.max(450, 420 * Math.sqrt(12 / (gridCols * gridRows))))
     const page = await browser.newPage({
-      viewport: { width: posterWidth + 40, height: 1800 },
+      viewport: { width: posterWidth + 40, height: Math.max(1800, expectedPosterHeight + 200) },
       deviceScaleFactor: 1.5,
     })
     await page.setContent(html, { waitUntil: 'load', timeout: 60_000 })
