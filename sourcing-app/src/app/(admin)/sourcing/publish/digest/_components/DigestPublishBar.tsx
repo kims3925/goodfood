@@ -8,7 +8,7 @@ interface Channel {
   name: string
 }
 
-export type PublishMode = 'digest' | 'individual' | 'both' | 'incremental'
+export type PublishMode = 'digest' | 'individual' | 'both' | 'incremental' | 'collage'
 
 interface Props {
   selectedCount: number
@@ -20,6 +20,8 @@ interface Props {
   isPublishing: boolean
   publishMode: PublishMode
   onChangePublishMode: (mode: PublishMode) => void
+  /** 콜라주 모드에서 정확히 필요한 상품 수 (gridCols × gridRows). 모드별 검증 라벨에 사용 */
+  collageExpectedCount?: number
 }
 
 const MODE_OPTIONS: Array<{
@@ -35,6 +37,11 @@ const MODE_OPTIONS: Array<{
     label: '점진 1+수정',
     desc: '1개 먼저 게시 후 "수정"으로 1개씩 추가 (실험적 · 이미지-텍스트 인라인 배치)',
   },
+  {
+    value: 'collage',
+    label: '🖼️ 콜라주',
+    desc: '배경 제거된 상품 12개를 포스터 1장으로 합성 + 카테고리 링크 본문',
+  },
 ]
 
 export default function DigestPublishBar({
@@ -47,11 +54,22 @@ export default function DigestPublishBar({
   isPublishing,
   publishMode,
   onChangePublishMode,
+  collageExpectedCount = 12,
 }: Props) {
-  const canPublish = selectedCount > 0 && selectedChannels.length > 0 && !isPublishing
+  const collageMismatch =
+    publishMode === 'collage' && selectedCount !== collageExpectedCount
+  const canPublish =
+    selectedCount > 0 &&
+    selectedChannels.length > 0 &&
+    !isPublishing &&
+    !collageMismatch
 
   const buttonLabel =
-    publishMode === 'digest'
+    publishMode === 'collage'
+      ? collageMismatch
+        ? `🖼️ ${collageExpectedCount}개 선택 필요 (현재 ${selectedCount}개)`
+        : `🖼️ 콜라주 발행 (${collageExpectedCount}장 → 포스터 1장)`
+      : publishMode === 'digest'
       ? '종합 발행하기'
       : publishMode === 'individual'
       ? `개별 ${selectedCount}건 발행`

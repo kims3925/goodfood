@@ -4,12 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useToast } from '@/components/ui/Toast'
 import Loading from '@/components/ui/Loading'
 import { buildDigest, type DigestProduct } from '@/modules/publish/digest-builder.service'
-import { CATEGORY_LIST, type CategoryCode } from '@/modules/category/category.keywords'
+import { CATEGORY_LIST, CATEGORY_MAP, type CategoryCode } from '@/modules/category/category.keywords'
 import CategoryTabs, { type CategorySummary } from './_components/CategoryTabs'
 import DigestProductList, { type DigestProductItem } from './_components/DigestProductList'
 import DigestPreview from './_components/DigestPreview'
 import DigestPublishBar, { type PublishMode } from './_components/DigestPublishBar'
 import DigestProgressModal, { type DigestProgressItem } from './_components/DigestProgressModal'
+import DigestSettingsPanel, {
+  gridSizeToCount,
+  gridSizeToColsRows,
+  type CollageSettingsValue,
+} from './_components/DigestSettingsPanel'
 
 interface FetchedProduct {
   id: number
@@ -71,6 +76,15 @@ export default function DigestPublishPage() {
   // 발행 진행 상태
   const [progressOpen, setProgressOpen] = useState(false)
   const [progressItems, setProgressItems] = useState<DigestProgressItem[]>([])
+
+  // 콜라주 모드 설정
+  const [collageSettings, setCollageSettings] = useState<CollageSettingsValue>({
+    collageTitle: '',
+    topBadgeText: '',
+    gridSize: '3x4',
+    removeBackground: true,
+  })
+  const collageExpectedCount = gridSizeToCount(collageSettings.gridSize)
 
   // 상품 필터 (카테고리 아래)
   const [wholesaleFilter, setWholesaleFilter] = useState<number | 'all'>('all')
@@ -273,6 +287,28 @@ export default function DigestPublishPage() {
       if (!window.confirm(msg)) return
     }
 
+    // 콜라주 모드: 카테고리별 선택 개수가 그리드와 정확히 일치해야 함
+    if (publishMode === 'collage') {
+      const wrongCategories = resolvedSelections.filter(
+        (s) => s.productIds.length !== collageExpectedCount
+      )
+      if (wrongCategories.length > 0) {
+        toast.error(
+          `콜라주 모드는 카테고리당 정확히 ${collageExpectedCount}개 상품이 필요합니다. ` +
+            `(${wrongCategories.map((w) => `${w.code}: ${w.productIds.length}개`).join(', ')})`
+        )
+        return
+      }
+      const msg =
+        `${resolvedSelections.length}개 카테고리 × ${selectedChannels.length}개 밴드 각각에\n` +
+        `상품 ${collageExpectedCount}개를 포스터 1장으로 합성해 발행합니다.\n` +
+        (collageSettings.removeBackground
+          ? '배경 제거 처리로 발행당 1-2분 소요될 수 있습니다.\n\n'
+          : '\n') +
+        '계속 진행할까요?'
+      if (!window.confirm(msg)) return
+    }
+
     // 진행 모달 초기화 — (카테고리 × 채널) 조합마다 pending 행 생성
     const catMap = new Map<string, { name: string; emoji: string }>()
     for (const c of categories) catMap.set(c.code, { name: c.name, emoji: c.emoji })
@@ -311,6 +347,19 @@ export default function DigestPublishPage() {
           )
 
           try {
+            const collagePayload =
+              publishMode === 'collage'
+                ? (() => {
+                    const { cols, rows } = gridSizeToColsRows(collageSettings.gridSize)
+                    return {
+                      title: collageSettings.collageTitle.trim() || undefined,
+                      gridCols: cols,
+                      gridRows: rows,
+                      removeBackground: collageSettings.removeBackground,
+                      topBadgeText: collageSettings.topBadgeText.trim() || undefined,
+                    }
+                  })()
+                : undefined
             const res = await fetch('/api/publish/digest', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -322,6 +371,7 @@ export default function DigestPublishPage() {
                 footerText,
                 maxImagesPerProduct,
                 publishMode,
+                ...(collagePayload ? { collageOptions: collagePayload } : {}),
               }),
             })
             const data = await res.json()
@@ -438,6 +488,16 @@ export default function DigestPublishPage() {
       : null,
   }))
 
+  // 콜라주 모드 — 현재 활성 카테고리 기준 쇼핑몰 카테고리 URL 미리 계산
+  const collageDefaultTitle = `오늘의${CATEGORY_MAP[activeCategory].name}추천`
+  const collageShopCategoryUrl = (() => {
+    const firstSelected = selectedIds.map((id) => productMap.get(id)).find(Boolean)
+    const subdomain = firstSelected?.shopProducts[0]?.shopSubdomain
+    return subdomain
+      ? `https://${SHOP_DOMAIN}/${subdomain}/category/${activeCategory}`
+      : undefined
+  })()
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -462,6 +522,13 @@ export default function DigestPublishPage() {
           각 카테고리별로 상품 선택은 탭을 전환하며 해주세요 (선택 상태는 카테고리별로 저장됩니다).
           체크된 카테고리가 없으면 현재 탭 1개만 발행됩니다.
         </p>
+
+        <DigestSettingsPanel
+          value={collageSettings}
+          onChange={setCollageSettings}
+          shopCategoryUrl={collageShopCategoryUrl}
+          defaultTitle={collageDefaultTitle}
+        />
 
         {/* 날짜 / 도매방 / 마감시간 / 발행상태 필터 */}
         {(wholesaleOptions.length > 0 || deadlineOptions.length > 0 || products.length > 0) && (
@@ -619,6 +686,7 @@ export default function DigestPublishPage() {
         isPublishing={isPublishing}
         publishMode={publishMode}
         onChangePublishMode={setPublishMode}
+        collageExpectedCount={collageExpectedCount}
       />
 
       <DigestProgressModal
