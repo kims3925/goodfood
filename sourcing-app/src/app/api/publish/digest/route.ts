@@ -327,15 +327,7 @@ export async function POST(request: NextRequest) {
     const buildDigestBody = () => {
       const linkCount = cardProducts.filter((p) => p.orderUrl).length
       // 본문 텍스트는 Band CKEditor의 "크게 + 볼드" 스타일이 setTextStyle()에서 일괄 적용됨.
-      // 상단 배너: 사용자 요청 문구 (위치/경로 명시). 하단 배너: 기존 문구 유지.
-      const topBanner = [
-        '━━━━━━━━━━━━━━━━━━━━',
-        '📢 ▶ 상품보기 / 주문 ◀',
-        '',
-        '🛒 사진 우측 아래 댓글에 상세보기/주문 링크가 있고,',
-        '🛒 아래 댓글란에도 번호별 상세보기/주문링크가 있습니다',
-        '━━━━━━━━━━━━━━━━━━━━',
-      ]
+      // 배너는 하단 1개만 유지 (상단 중복 제거).
       const bottomBanner = [
         '━━━━━━━━━━━━━━━━━━━━',
         '📢 ▶ 상품보기 / 주문 ◀',
@@ -345,8 +337,6 @@ export async function POST(request: NextRequest) {
         '━━━━━━━━━━━━━━━━━━━━',
       ]
       return [
-        ...(linkCount > 0 ? topBanner : []),
-        '',
         digest.title,
         (headerText || '').trim(),
         `총 ${digest.productCount}개 상품 | 신선 직송`,
