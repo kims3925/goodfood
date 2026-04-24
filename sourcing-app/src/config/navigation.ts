@@ -39,6 +39,7 @@ import {
   ExternalLink,
   KeyRound,
   UserPlus,
+  Megaphone,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -61,13 +62,14 @@ export const sourcingMenuItems: MenuItem[] = [
   { label: '대시보드', href: '/sourcing/dashboard', icon: LayoutDashboard },
   { label: '채널 관리', href: '/sourcing/channel/list', icon: Store },
   {
-    label: '소싱',
+    label: '상품및광고',
     icon: Package,
     children: [
       { label: '소싱작업', href: '/sourcing/post/list', icon: FileText },
       { label: '가공 상품', href: '/sourcing/product/list', icon: Package },
       { label: '가공상품 발행', href: '/sourcing/publish', icon: Upload },
       { label: '종합 발행', href: '/sourcing/publish/digest', icon: LayoutList },
+      { label: '광고', href: '/sourcing/publish/ad', icon: Megaphone },
     ],
   },
   {
