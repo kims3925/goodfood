@@ -346,6 +346,17 @@ ChannelProduct / ShopProduct (product/list 발행완료 탭, publish 페이지)
 - 쇼핑몰 링크: `ShopProduct.shop.subdomain`이 있으면 `https://{NEXT_PUBLIC_SHOP_DOMAIN}/{subdomain}/product/{id}` 자동 생성
 - 현재 종합 발행 이력은 DB에 별도 기록하지 않음(Band 발행만). 필요 시 `DigestPublish` 모델 추가 가능
 
+### 콜라주(Collage) 모드 — 작업지시서_종합발행_콜라주모드.md
+
+- `publishMode='collage'`: N×M(기본 3×4=12) 상품을 **포스터 PNG 1장**으로 합성해 발행
+- 본문은 **쇼핑몰 카테고리 링크 1줄**만 포함 (상품별 링크 없음)
+- 할인율 표시 금지 — 각 셀: 스펙(용량/갯수) + 배경 제거된 상품 이미지 + 상품명 + 가격(첫 variant)
+- 핵심 파일: `sourcing-app/src/modules/publish/digest-collage-renderer.ts` (`renderCollagePoster`, `extractSpec`)
+- 배경 제거: `@imgly/background-removal-node` (서버 CPU, ONNX U2-Net). 실패 시 원본으로 폴백
+- 카테고리 링크: `shop-app/src/app/(shop)/category/[code]/page.tsx` — `/{subdomain}/category/SEA` 형태
+- UI: `/sourcing/publish/digest` 상단 `📋 발행조건 설정` 패널 (그리드 크기, 배경제거 on/off, 제목, 우상단 강조 배지)
+- 선택 개수 ≠ 그리드 크기면 발행 버튼 비활성, 카테고리당 정확히 N개 선택 필요
+
 ## 쇼핑몰 체크아웃 변경
 
 `shop-app/src/app/(shop)/checkout/page.tsx`:

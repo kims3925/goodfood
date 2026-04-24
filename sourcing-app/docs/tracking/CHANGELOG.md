@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260424-001 | Done | 2026-04-24 | - | 종합발행 콜라주(Collage) 모드 추가 - 12개 상품을 배경 제거된 포스터 1장으로 합성 + 쇼핑몰 카테고리 페이지 신설 | Medium | Claude |
 | TR-20260406-001 | Done | 2026-04-06 | - | 수집상품/가공상품 페이지 통합 (탭 구조), 수집게시물 AI미가공 필터링, 네비게이션 메뉴 정리 | Medium | Claude |
 | TR-20260404-001 | Done | 2026-04-04 | - | 독립 어드민 패널 구현 (전용 레이아웃/사이드바/헤더) + 에이전트 대시보드 17개 에이전트 데이터 강화 + 에이전트 설정 페이지 추가 | Medium | Claude |
 | TR-20260318-001 | Done | 2026-03-18 | - | 전체 파이프라인 실행 대시보드 추가 - 소싱 자동화, 주문/발주, 정산 현황을 한 화면에서 관리 | Low | Claude |
@@ -2531,4 +2532,66 @@ uploadProgressEmitter (EventEmitter 싱글톤)
 ### 관련 항목
 - REQ-ID: -
 - Flow-ID: 소싱 대시보드
+
+---
+
+## TR-20260424-001 — 종합발행 콜라주(Collage) 모드 추가
+
+| 항목 | 값 |
+|-----|-----|
+| Status | Done |
+| Date | 2026-04-24 |
+| REQ-ID | - (작업지시서: `작업지시서_종합발행_콜라주모드.md`) |
+| Risk | Medium |
+| Author | Claude |
+
+### 요약
+- `/sourcing/publish/digest`에 콜라주 모드 추가: N×M(기본 3×4=12) 상품을 배경 제거된 상품 이미지 + 스펙 + 상품명 + 가격으로 합성한 포스터 PNG 1장으로 발행.
+- 본문은 쇼핑몰 카테고리 링크 1줄만 포함. 상품별 링크는 표시하지 않음.
+- 할인율은 표시하지 않음 (작업지시서 절대 준수 규칙).
+- 옵션 있는 상품은 첫 번째 variant 가격만 사용 (min/max 범위 금지).
+
+### 구현 파일
+- 신규
+  - `sourcing-app/src/modules/publish/digest-collage-renderer.ts` — 콜라주 렌더러 + `extractSpec()` (variant→description→name 3단 폴백)
+  - `sourcing-app/src/app/(admin)/sourcing/publish/digest/_components/DigestSettingsPanel.tsx` — 발행조건 설정 패널
+  - `shop-app/src/app/(shop)/category/[code]/page.tsx` + `CategoryClient.tsx` — 쇼핑몰 카테고리 페이지
+  - `shop-app/src/lib/categories.ts` — shop-app 독립 카테고리 상수 (앱 간 모듈 격리)
+- 수정
+  - `sourcing-app/src/app/api/publish/digest/route.ts` — `publishMode='collage'` 분기 추가
+  - `sourcing-app/src/app/(admin)/sourcing/publish/digest/page.tsx` — 패널 통합, payload 확장
+  - `sourcing-app/src/app/(admin)/sourcing/publish/digest/_components/DigestPublishBar.tsx` — collage 모드 옵션 + 검증
+  - `sourcing-app/package.json` — `@imgly/background-removal-node@^1.4.5` 추가
+  - `sourcing-app/next.config.js` — serverComponentsExternalPackages에 imgly/onnxruntime-node/sharp 추가
+  - `docker/Dockerfile.sourcing` — 모델 사전 다운로드 + runner 단계 패키지 설치
+
+### 핵심 동작
+1. UI에서 `🖼️ 콜라주` 모드 선택 + 정확히 N개 상품 체크
+2. POST `/api/publish/digest` (publishMode=collage, collageOptions={gridCols,gridRows,removeBackground,title,topBadgeText})
+3. 서버: `renderCollagePoster()` 호출 — 각 이미지에 `@imgly/background-removal-node` 적용 (실패 시 원본 폴백)
+4. Playwright chromium으로 1200×N HTML→PNG 합성
+5. `bandPlaywrightService.publishWithImages()`로 포스터 1장 + 카테고리 링크 본문 발행
+6. 성공 시 `Product.lastDigestPublishedAt` 갱신
+
+### 영향도
+- [ ] DB 변경 없음
+- [ ] API 변경: POST `/api/publish/digest` body에 `publishMode='collage'`, `collageOptions` 추가 (기존 호출 호환)
+- [ ] 기존 digest/individual/both/incremental 모드 미변경
+- [ ] shop-app 신규 라우트: `/{subdomain}/category/{code}` (404 처리 포함)
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Lint | Pass |
+| Typecheck | Pass (sourcing-app, shop-app) |
+| Build | 미수행 (CI/CD에서 검증) |
+| Integration | 운영 배포 후 실제 발행 1건 검증 필요 |
+
+### 롤백 계획
+1. `git revert {commit-hash}` (커밋 6개 일괄 되돌리기)
+2. `pnpm install` 재실행 (Dockerfile 변경분도 롤백)
+
+### 관련 항목
+- 작업지시서: `C:\Users\kims3\SNS_AUTO\작업지시서_종합발행_콜라주모드.md`
+- Flow: 종합 발행 → 콜라주 모드
 
