@@ -15,6 +15,12 @@ import {
   cleanupDigestCards,
   type DigestCardProduct,
 } from '@/modules/publish/digest-card-renderer'
+import {
+  renderCollagePoster,
+  cleanupCollagePoster,
+  extractSpec,
+  type CollageCardProduct,
+} from '@/modules/publish/digest-collage-renderer'
 import { shiftDeadlineEarlier } from '@/modules/publish/deadline-utils'
 import { CATEGORY_MAP, CATEGORY_CODES, CATEGORY_LIST, type CategoryCode } from '@/modules/category/category.keywords'
 
@@ -160,7 +166,7 @@ interface DigestPublishRequest {
    * - 'both': digest 1개 먼저, 이어서 individual N개
    * - 'incremental': 1개 상품으로 먼저 게시 후, 나머지 상품을 "수정"으로 1개씩 덧붙임 (1 게시글, N-1회 수정)
    */
-  publishMode?: 'digest' | 'individual' | 'both' | 'incremental'
+  publishMode?: 'digest' | 'individual' | 'both' | 'incremental' | 'collage'
   /** 개별/점진 발행 시 각 게시글 사이 대기 시간(초). 기본 3초 */
   individualIntervalSec?: number
   /**
@@ -169,6 +175,19 @@ interface DigestPublishRequest {
    *   발행이 150-250초 추가되어 nginx 600초 타임아웃에 걸릴 수 있음.
    */
   enablePerPhotoComments?: boolean
+  /**
+   * publishMode === 'collage' 일 때 사용. 그리드 크기와 옵션을 지정.
+   * - 선택 상품 수가 gridCols × gridRows와 정확히 일치해야 함.
+   * - 본문은 카테고리 링크 1줄만, 이미지는 합성 포스터 1장.
+   */
+  collageOptions?: {
+    title?: string
+    subtitle?: string
+    gridCols?: number     // 기본 3
+    gridRows?: number     // 기본 4
+    removeBackground?: boolean // 기본 true
+    topBadgeText?: string
+  }
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -192,6 +211,7 @@ export async function POST(request: NextRequest) {
       publishMode = 'digest',
       individualIntervalSec = 3,
       enablePerPhotoComments = false,
+      collageOptions,
     } = body
 
     if (!categoryId || !(CATEGORY_CODES as readonly string[]).includes(categoryId)) {
@@ -271,6 +291,147 @@ export async function POST(request: NextRequest) {
         { success: false, error: '채널에 bandKey(channelKey)가 없습니다.' },
         { status: 400 }
       )
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // 🖼️ 콜라주 모드 — N×M 포스터 1장 + 카테고리 링크 본문
+    // ────────────────────────────────────────────────────────────
+    // 작업지시서: C:\Users\kims3\SNS_AUTO\작업지시서_종합발행_콜라주모드.md
+    // 기존 digest/individual/both/incremental 경로와 완전 분리.
+    if (publishMode === 'collage') {
+      const gridCols = collageOptions?.gridCols ?? 3
+      const gridRows = collageOptions?.gridRows ?? 4
+      const expected = gridCols * gridRows
+
+      if (orderedProducts.length !== expected) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `콜라주 모드는 정확히 ${expected}개 상품이 필요합니다 (현재 ${orderedProducts.length}개).`,
+          },
+          { status: 400 }
+        )
+      }
+
+      const collageCards: CollageCardProduct[] = orderedProducts.map((p) => {
+        // 가격: 옵션 있으면 첫 번째 variant, 없으면 product.price (할인율 표시 금지)
+        const firstVariant = p.variants[0]
+        const priceValue = firstVariant?.price ?? p.price ?? 0
+        const priceText = priceValue > 0 ? `${priceValue.toLocaleString()}원` : '가격 문의'
+        const firstImage = [...p.images].sort((a, b) => a.sortOrder - b.sortOrder)[0]
+        return {
+          id: p.id,
+          name: p.name,
+          spec: extractSpec({
+            name: p.name,
+            description: p.description,
+            variants: p.variants.map((v) => ({ optionSummary: v.optionSummary })),
+          }),
+          priceText,
+          imageUrl: firstImage?.url || '',
+        }
+      })
+
+      // 쇼핑몰 카테고리 링크 (첫 상품의 shop subdomain 기준)
+      const firstShopProduct = orderedProducts[0]?.shopProducts[0]
+      const subdomain = firstShopProduct?.shop?.subdomain
+      const shopCategoryUrl = subdomain
+        ? `https://${shopDomain}/${subdomain}/category/${categoryId}`
+        : undefined
+
+      const cat = CATEGORY_MAP[categoryId]
+      const defaultTitle = `오늘의${cat.name}추천`
+      const titleText = collageOptions?.title?.trim() || defaultTitle
+
+      let posterPath: string | undefined
+      let collageStatus: 'SUCCESS' | 'FAILED' = 'FAILED'
+      let collageMessage: string | undefined
+      let collagePostKey: string | undefined
+      let bgRemovedCount = 0
+      let bgFailedCount = 0
+
+      try {
+        const result = await renderCollagePoster({
+          title: titleText,
+          subtitle: collageOptions?.subtitle,
+          products: collageCards,
+          gridCols,
+          gridRows,
+          removeBackground: collageOptions?.removeBackground ?? true,
+          topBadgeText: collageOptions?.topBadgeText,
+        })
+        posterPath = result.filePath
+        bgRemovedCount = result.bgRemovedCount
+        bgFailedCount = result.bgFailedCount
+
+        // 본문: 제목 + 카테고리 링크 1줄 (상품별 링크 없음)
+        const contentLines: string[] = []
+        contentLines.push(`${cat.emoji} ${titleText}`)
+        contentLines.push('')
+        contentLines.push(`총 ${expected}개 상품 | 신선 직송`)
+        if (shopCategoryUrl) {
+          contentLines.push('')
+          contentLines.push('🛒 전체 상품 보기 👇')
+          contentLines.push(shopCategoryUrl)
+        }
+        if (footerText && footerText.trim()) {
+          contentLines.push('')
+          contentLines.push(footerText.trim())
+        }
+        const content = contentLines.join('\n')
+
+        const r = await bandPlaywrightService.publishWithImages({
+          channelId: channel.id,
+          bandKey: channel.channelKey,
+          bandName: channel.name,
+          content,
+          imageUrls: [posterPath],
+        })
+        collageStatus = r.success ? 'SUCCESS' : 'FAILED'
+        collageMessage = r.error
+        collagePostKey = r.postKey
+
+        if (r.success) {
+          await prisma.product.updateMany({
+            where: { id: { in: productIds }, userId: user.userId },
+            data: { lastDigestPublishedAt: new Date() },
+          })
+        }
+      } catch (err: any) {
+        collageStatus = 'FAILED'
+        collageMessage = err?.message || '콜라주 발행 중 오류'
+      } finally {
+        if (posterPath) cleanupCollagePoster(posterPath)
+      }
+
+      return NextResponse.json({
+        success: collageStatus === 'SUCCESS',
+        digest: {
+          title: titleText,
+          productCount: expected,
+          imageCount: 1,
+          truncated: false,
+        },
+        result: {
+          channelId: channel.id,
+          channelName: channel.name,
+          status: collageStatus,
+          postKey: collagePostKey,
+          message: collageMessage,
+          publishMode: 'collage',
+          collage: {
+            gridCols,
+            gridRows,
+            shopCategoryUrl,
+            bgRemovedCount,
+            bgFailedCount,
+          },
+        },
+        categoryMeta: {
+          code: categoryId,
+          ...cat,
+        },
+      })
     }
 
     // ── 상품별 "사진(최대 4장 2×2 그리드) + 번호/제목/가격/마감/주문링크" 카드를
