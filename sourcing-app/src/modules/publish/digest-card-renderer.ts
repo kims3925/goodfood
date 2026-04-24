@@ -320,7 +320,7 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
             <div class="guide-text">
               💬 댓글에 <span class="hl">(${orderNumber})번</span> 상품보기 주문링크 있어요
             </div>
-            <div class="guide-arrow">→</div>
+            <div class="guide-arrow">↓</div>
           </div>
         </div>
       </div>

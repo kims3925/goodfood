@@ -55,6 +55,10 @@ export default function DigestPublishPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
+  // 다중 카테고리 발행: 체크된 카테고리 집합 + 카테고리별 선택 상품 ID 저장소
+  const [checkedCategories, setCheckedCategories] = useState<Set<CategoryCode>>(new Set())
+  const [selectionsByCategory, setSelectionsByCategory] = useState<Record<string, number[]>>({})
+
   const [headerText, setHeaderText] = useState('')
   const [footerText, setFooterText] = useState('')
   const [maxImagesPerProduct, setMaxImagesPerProduct] = useState(1)
@@ -89,7 +93,8 @@ export default function DigestPublishPage() {
         if (data.success) {
           setProducts(data.data.products as FetchedProduct[])
           setCategories(data.data.categories as CategorySummary[])
-          setSelectedIds([]) // 카테고리/날짜 바뀌면 선택 초기화
+          // 카테고리별로 저장된 선택이 있으면 복원, 없으면 초기화
+          setSelectedIds((_prev) => selectionsByCategory[code] || [])
         } else {
           toast.error(data.error || '상품을 불러오지 못했습니다.')
         }
@@ -100,12 +105,50 @@ export default function DigestPublishPage() {
         setIsLoading(false)
       }
     },
+    // selectionsByCategory는 의도적으로 의존성에서 제외 (선택 변경마다 재조회 방지)
+    // 대신 loadCategory가 호출될 때의 최신 값을 캡처.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [toast, dateFilter]
   )
 
   useEffect(() => {
     loadCategory(activeCategory)
   }, [activeCategory, dateFilter, loadCategory])
+
+  // 현재 활성 카테고리의 선택 변경을 selectionsByCategory에 미러
+  useEffect(() => {
+    setSelectionsByCategory((prev) => {
+      const existing = prev[activeCategory] || []
+      // 배열 동등성 간단 체크 (길이 + 내용)
+      if (
+        existing.length === selectedIds.length &&
+        existing.every((v, i) => v === selectedIds[i])
+      ) {
+        return prev
+      }
+      return { ...prev, [activeCategory]: selectedIds }
+    })
+  }, [selectedIds, activeCategory])
+
+  // 발행 대상 전체 상품 수 (체크된 카테고리 합 or 단일 활성 카테고리)
+  const totalSelectedCount = useMemo(() => {
+    if (checkedCategories.size === 0) return selectedIds.length
+    let sum = 0
+    for (const code of checkedCategories) {
+      if (code === activeCategory) sum += selectedIds.length
+      else sum += (selectionsByCategory[code] || []).length
+    }
+    return sum
+  }, [checkedCategories, selectedIds, activeCategory, selectionsByCategory])
+
+  const toggleCategoryCheck = (code: CategoryCode) => {
+    setCheckedCategories((prev) => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code)
+      else next.add(code)
+      return next
+    })
+  }
 
   // ─── Load retail channels once ─────────────────────────────────────────
   useEffect(() => {
@@ -172,38 +215,82 @@ export default function DigestPublishPage() {
   }
 
   const handlePublish = async () => {
-    if (selectedIds.length === 0 || selectedChannels.length === 0) return
+    if (selectedChannels.length === 0) return
+
+    // 발행 대상 카테고리 결정:
+    // - 체크박스로 체크된 카테고리가 1개 이상이면 해당 카테고리들
+    // - 아니면 현재 활성 카테고리만 (레거시 단일 카테고리 발행)
+    const targetCategoryCodes: CategoryCode[] =
+      checkedCategories.size > 0
+        ? (Array.from(checkedCategories) as CategoryCode[])
+        : [activeCategory]
+
+    // 활성 카테고리의 최신 선택은 아직 selectionsByCategory에 반영 안 됐을 수 있어 override
+    const resolvedSelections: Array<{
+      code: CategoryCode
+      productIds: number[]
+    }> = targetCategoryCodes
+      .map((code) => ({
+        code,
+        productIds:
+          code === activeCategory ? selectedIds : selectionsByCategory[code] || [],
+      }))
+      .filter((x) => x.productIds.length > 0)
+
+    if (resolvedSelections.length === 0) {
+      toast.error('발행할 상품이 선택된 카테고리가 없습니다.')
+      return
+    }
+
+    const totalProductCount = resolvedSelections.reduce(
+      (sum, s) => sum + s.productIds.length,
+      0
+    )
 
     // 개별/둘 다 모드는 게시글 수가 많아 도배 우려 → 사용자 확인
     if (publishMode === 'individual' || publishMode === 'both') {
-      const postCount = publishMode === 'individual' ? selectedIds.length : selectedIds.length + 1
-      const perChannel = postCount
+      const perChannel =
+        publishMode === 'individual'
+          ? totalProductCount
+          : totalProductCount + resolvedSelections.length
       const totalPosts = perChannel * selectedChannels.length
       const msg =
-        `선택한 ${selectedChannels.length}개 밴드 각각에 총 ${perChannel}개 게시글이 발행됩니다.\n` +
-        `(전체 ${totalPosts}개 게시글, 상품당 약 3초 간격)\n\n계속 진행할까요?`
+        `${resolvedSelections.length}개 카테고리 × ${selectedChannels.length}개 밴드에 총 ${totalPosts}개 게시글이 발행됩니다.\n` +
+        `(상품당 약 3초 간격)\n\n계속 진행할까요?`
       if (!window.confirm(msg)) return
     }
 
     // 점진 모드: 게시글 1개지만 N-1회 수정이 순차 실행됨 → 소요시간 안내
     if (publishMode === 'incremental') {
-      const editCount = Math.max(selectedIds.length - 1, 0)
+      const editCount = resolvedSelections.reduce(
+        (sum, s) => sum + Math.max(s.productIds.length - 1, 0),
+        0
+      )
       const msg =
-        `선택한 ${selectedChannels.length}개 밴드 각각에 게시글 1개를 먼저 게시하고,\n` +
+        `${resolvedSelections.length}개 카테고리 × ${selectedChannels.length}개 밴드 각각에 게시글 1개를 먼저 게시하고,\n` +
         `이후 ${editCount}회 "수정"으로 상품을 1개씩 추가합니다.\n` +
-        `(실험적 모드 — Band 수정 모드의 이미지 삽입 경로가 동작하는지 검증용)\n\n계속 진행할까요?`
+        `(실험적 모드)\n\n계속 진행할까요?`
       if (!window.confirm(msg)) return
     }
 
-    // 진행 모달 초기화 — 선택한 채널마다 pending 행 생성
-    const initItems: DigestProgressItem[] = selectedChannels.map((channelId) => {
-      const ch = channels.find((c) => c.id === channelId)
-      return {
-        channelId,
-        channelName: ch?.name || `채널 ${channelId}`,
-        status: 'pending',
+    // 진행 모달 초기화 — (카테고리 × 채널) 조합마다 pending 행 생성
+    const catMap = new Map<string, { name: string; emoji: string }>()
+    for (const c of categories) catMap.set(c.code, { name: c.name, emoji: c.emoji })
+    const initItems: DigestProgressItem[] = []
+    for (const sel of resolvedSelections) {
+      const meta = catMap.get(sel.code)
+      const label = meta ? `${meta.emoji} ${meta.name}` : sel.code
+      for (const channelId of selectedChannels) {
+        const ch = channels.find((c) => c.id === channelId)
+        initItems.push({
+          channelId,
+          channelName: ch?.name || `채널 ${channelId}`,
+          categoryCode: sel.code,
+          categoryLabel: label,
+          status: 'pending',
+        })
       }
-    })
+    }
     setProgressItems(initItems)
     setProgressOpen(true)
     setIsPublishing(true)
@@ -212,60 +299,73 @@ export default function DigestPublishPage() {
     let totalFailed = 0
 
     try {
-      for (const channelId of selectedChannels) {
-        // publishing 상태로
-        setProgressItems((prev) =>
-          prev.map((p) => (p.channelId === channelId ? { ...p, status: 'publishing' } : p))
-        )
-
-        try {
-          const res = await fetch('/api/publish/digest', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              categoryId: activeCategory,
-              productIds: selectedIds,
-              channelId,
-              headerText,
-              footerText,
-              maxImagesPerProduct,
-              publishMode,
-            }),
-          })
-          const data = await res.json()
-          const result = data.result || {}
-          const status: 'success' | 'failed' =
-            result.status === 'SUCCESS' ? 'success' : 'failed'
-
+      for (const sel of resolvedSelections) {
+        for (const channelId of selectedChannels) {
+          // publishing 상태로
           setProgressItems((prev) =>
             prev.map((p) =>
-              p.channelId === channelId
-                ? { ...p, status, message: result.message || (status === 'failed' ? data.error : undefined) }
+              p.categoryCode === sel.code && p.channelId === channelId
+                ? { ...p, status: 'publishing' }
                 : p
             )
           )
-          if (status === 'success') totalSuccess++
-          else totalFailed++
-        } catch (err: any) {
-          setProgressItems((prev) =>
-            prev.map((p) =>
-              p.channelId === channelId
-                ? { ...p, status: 'failed', message: err?.message || '네트워크 오류' }
-                : p
+
+          try {
+            const res = await fetch('/api/publish/digest', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                categoryId: sel.code,
+                productIds: sel.productIds,
+                channelId,
+                headerText,
+                footerText,
+                maxImagesPerProduct,
+                publishMode,
+              }),
+            })
+            const data = await res.json()
+            const result = data.result || {}
+            const status: 'success' | 'failed' =
+              result.status === 'SUCCESS' ? 'success' : 'failed'
+
+            setProgressItems((prev) =>
+              prev.map((p) =>
+                p.categoryCode === sel.code && p.channelId === channelId
+                  ? {
+                      ...p,
+                      status,
+                      message:
+                        result.message || (status === 'failed' ? data.error : undefined),
+                    }
+                  : p
+              )
             )
-          )
-          totalFailed++
+            if (status === 'success') totalSuccess++
+            else totalFailed++
+          } catch (err: any) {
+            setProgressItems((prev) =>
+              prev.map((p) =>
+                p.categoryCode === sel.code && p.channelId === channelId
+                  ? { ...p, status: 'failed', message: err?.message || '네트워크 오류' }
+                  : p
+              )
+            )
+            totalFailed++
+          }
         }
       }
 
       if (totalSuccess > 0) {
-        toast.success(`${totalSuccess}개 밴드에 종합 발행 완료`)
+        toast.success(`${totalSuccess}건 종합 발행 완료`)
       }
       if (totalFailed > 0) {
-        toast.error(`${totalFailed}개 밴드 발행 실패`)
+        toast.error(`${totalFailed}건 발행 실패`)
       }
-      // 발행 후 상태 초기화 + 상품 목록 새로고침 (lastDigestPublishedAt 반영)
+      // 발행 후 상태 초기화 + 상품 목록 새로고침
       setSelectedIds([])
+      setSelectionsByCategory({})
+      setCheckedCategories(new Set())
       setSelectedChannels([])
       loadCategory(activeCategory)
     } finally {
@@ -348,9 +448,20 @@ export default function DigestPublishPage() {
           </p>
         </div>
 
-        <div className="mb-4">
-          <CategoryTabs categories={categories} active={activeCategory} onChange={setActiveCategory} />
+        <div className="mb-1">
+          <CategoryTabs
+            categories={categories}
+            active={activeCategory}
+            onChange={setActiveCategory}
+            checked={checkedCategories}
+            onToggleChecked={toggleCategoryCheck}
+          />
         </div>
+        <p className="mb-4 text-xs text-gray-500">
+          💡 카테고리별 체크박스를 켜면 여러 카테고리를 한꺼번에 발행할 수 있습니다.
+          각 카테고리별로 상품 선택은 탭을 전환하며 해주세요 (선택 상태는 카테고리별로 저장됩니다).
+          체크된 카테고리가 없으면 현재 탭 1개만 발행됩니다.
+        </p>
 
         {/* 날짜 / 도매방 / 마감시간 / 발행상태 필터 */}
         {(wholesaleOptions.length > 0 || deadlineOptions.length > 0 || products.length > 0) && (
@@ -499,7 +610,7 @@ export default function DigestPublishPage() {
       </div>
 
       <DigestPublishBar
-        selectedCount={selectedIds.length}
+        selectedCount={totalSelectedCount}
         imageCount={preview.imageUrls.length}
         channels={channels}
         selectedChannels={selectedChannels}

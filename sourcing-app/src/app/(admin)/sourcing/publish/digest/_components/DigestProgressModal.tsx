@@ -7,6 +7,9 @@ export type DigestProgressStatus = 'pending' | 'publishing' | 'success' | 'faile
 export interface DigestProgressItem {
   channelId: number
   channelName: string
+  /** 다중 카테고리 발행 시 카테고리 식별자 + 라벨 */
+  categoryCode?: string
+  categoryLabel?: string
   status: DigestProgressStatus
   message?: string
 }
@@ -84,9 +87,9 @@ export default function DigestProgressModal({
         </div>
 
         <ul className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
-          {items.map((item) => (
+          {items.map((item, idx) => (
             <li
-              key={item.channelId}
+              key={`${item.categoryCode || 'cat'}-${item.channelId}-${idx}`}
               className={`flex items-start gap-3 p-3 rounded-lg border ${
                 item.status === 'failed'
                   ? 'border-red-200 bg-red-50'
@@ -103,6 +106,9 @@ export default function DigestProgressModal({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-gray-900 truncate" title={item.channelName}>
+                    {item.categoryLabel && (
+                      <span className="text-xs text-blue-600 mr-1.5">[{item.categoryLabel}]</span>
+                    )}
                     {item.channelName}
                   </span>
                   <span className="text-xs text-gray-600 whitespace-nowrap">
