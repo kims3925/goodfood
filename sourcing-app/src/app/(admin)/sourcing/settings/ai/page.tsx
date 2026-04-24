@@ -1,25 +1,33 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Save, Check, AlertCircle, Sparkles, Zap, DollarSign } from 'lucide-react'
+import { Settings, Save, Check, AlertCircle, Sparkles, Zap, DollarSign, Bot } from 'lucide-react'
+
+type ProviderKey = 'gemini' | 'openai' | 'claude'
 
 interface AISettings {
-  provider: 'gemini' | 'openai'
+  provider: ProviderKey
   geminiApiKey: string
   openaiApiKey: string
+  claudeApiKey: string
   geminiModel: string
   openaiModel: string
+  claudeModel: string
   temperature: number
   isValid?: boolean
 }
+
+const CLAUDE_DEFAULT_MODEL = 'claude-haiku-4-5-20251001'
 
 export default function AISettingsPage() {
   const [settings, setSettings] = useState<AISettings>({
     provider: 'openai',
     geminiApiKey: '',
     openaiApiKey: '',
+    claudeApiKey: '',
     geminiModel: 'gemini-2.5-flash',
     openaiModel: 'gpt-4.1-mini',
+    claudeModel: CLAUDE_DEFAULT_MODEL,
     temperature: 0.7,
   })
   const [isSaving, setIsSaving] = useState(false)
@@ -42,14 +50,41 @@ export default function AISettingsPage() {
           ...prev,
           geminiApiKey: data.settings.gemini?.apiKey || '',
           openaiApiKey: data.settings.openai?.apiKey || '',
+          claudeApiKey: data.settings.claude?.apiKey || '',
           geminiModel: data.settings.gemini?.model || 'gemini-2.5-flash',
           openaiModel: data.settings.openai?.model || 'gpt-4.1-mini',
+          claudeModel: data.settings.claude?.model || CLAUDE_DEFAULT_MODEL,
           temperature: data.settings.gemini?.temperature || 0.7,
         }))
       }
     } catch (error) {
       console.error('설정 로드 실패:', error)
     }
+  }
+
+  // provider별 키/모델 추출용 맵 (저장·테스트·버튼 색상에서 공통 사용)
+  const apiKeyMap: Record<ProviderKey, string> = {
+    gemini: settings.geminiApiKey,
+    openai: settings.openaiApiKey,
+    claude: settings.claudeApiKey,
+  }
+  const modelMap: Record<ProviderKey, string> = {
+    gemini: settings.geminiModel,
+    openai: settings.openaiModel,
+    claude: settings.claudeModel,
+  }
+  const providerColor: Record<ProviderKey, 'green' | 'purple' | 'orange'> = {
+    openai: 'green',
+    gemini: 'purple',
+    claude: 'orange',
+  }
+  const currentApiKey = apiKeyMap[settings.provider]
+  const color = providerColor[settings.provider]
+
+  const selectProvider = (p: ProviderKey) => {
+    setSettings(prev => ({ ...prev, provider: p }))
+    setIsTestSuccess(false)
+    setTestResult(null)
   }
 
   const saveSettings = async () => {
@@ -65,8 +100,8 @@ export default function AISettingsPage() {
         body: JSON.stringify({
           provider: settings.provider.toUpperCase(),
           settings: {
-            apiKey: settings.provider === 'gemini' ? settings.geminiApiKey : settings.openaiApiKey,
-            model: settings.provider === 'gemini' ? settings.geminiModel : settings.openaiModel,
+            apiKey: apiKeyMap[settings.provider],
+            model: modelMap[settings.provider],
             temperature: settings.temperature,
           }
         })
@@ -103,8 +138,10 @@ export default function AISettingsPage() {
           provider: settings.provider,
           geminiApiKey: settings.geminiApiKey,
           openaiApiKey: settings.openaiApiKey,
+          claudeApiKey: settings.claudeApiKey,
           geminiModel: settings.geminiModel,
           openaiModel: settings.openaiModel,
+          claudeModel: settings.claudeModel,
         })
       })
 
@@ -126,8 +163,6 @@ export default function AISettingsPage() {
     }
   }
 
-  const currentApiKey = settings.provider === 'gemini' ? settings.geminiApiKey : settings.openaiApiKey
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -140,7 +175,6 @@ export default function AISettingsPage() {
           <p className="text-gray-600">AI 제공업체 및 모델 설정을 관리합니다.</p>
         </div>
 
-        {/* Settings Content */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-6 space-y-6">
             {/* Provider Selection */}
@@ -148,9 +182,9 @@ export default function AISettingsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 AI 제공업체 선택
               </label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <button
-                  onClick={() => setSettings(prev => ({ ...prev, provider: 'openai' }))}
+                  onClick={() => selectProvider('openai')}
                   className={`p-4 border-2 rounded-lg transition-all ${
                     settings.provider === 'openai'
                       ? 'border-green-500 bg-green-50'
@@ -164,12 +198,12 @@ export default function AISettingsPage() {
                   <div className="text-xs text-gray-500 space-y-1">
                     <div>• ₩70~₩290 / 100개</div>
                     <div>• 안정적인 품질</div>
-                    <div>• 추천!</div>
+                    <div>• 상품가공 추천</div>
                   </div>
                 </button>
 
                 <button
-                  onClick={() => setSettings(prev => ({ ...prev, provider: 'gemini' }))}
+                  onClick={() => selectProvider('gemini')}
                   className={`p-4 border-2 rounded-lg transition-all ${
                     settings.provider === 'gemini'
                       ? 'border-purple-500 bg-purple-50'
@@ -186,6 +220,25 @@ export default function AISettingsPage() {
                     <div>• 테스트용 추천</div>
                   </div>
                 </button>
+
+                <button
+                  onClick={() => selectProvider('claude')}
+                  className={`p-4 border-2 rounded-lg transition-all ${
+                    settings.provider === 'claude'
+                      ? 'border-orange-500 bg-orange-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Bot className="h-5 w-5 text-orange-600" />
+                    <span className="font-semibold text-gray-900">Claude</span>
+                  </div>
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <div>• ₩15~₩60 / 100개</div>
+                    <div>• 카카오 광고 전용</div>
+                    <div>• 광고 생성 필수!</div>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -197,7 +250,6 @@ export default function AISettingsPage() {
                   <h3 className="text-lg font-semibold text-gray-900">OpenAI 설정</h3>
                 </div>
 
-                {/* OpenAI API Key */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     OpenAI API Key
@@ -215,7 +267,6 @@ export default function AISettingsPage() {
                   />
                 </div>
 
-                {/* OpenAI Model Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     OpenAI 모델
@@ -236,7 +287,6 @@ export default function AISettingsPage() {
                   </select>
                 </div>
 
-                {/* Model Pricing Info */}
                 <div className="bg-green-50 border border-green-200 rounded-md p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <DollarSign className="h-4 w-4 text-green-600" />
@@ -251,7 +301,6 @@ export default function AISettingsPage() {
                   <div className="text-xs text-green-600 mt-2">※ 환율 $1=₩1,400 기준, 실제 비용은 게시글 길이에 따라 달라질 수 있음</div>
                 </div>
 
-                {/* OpenAI Platform Button */}
                 <div className="bg-green-50 border border-green-200 rounded-md p-4">
                   <p className="text-xs text-green-700 mb-3">
                     OpenAI Platform에서 API 키를 발급받으세요
@@ -277,7 +326,6 @@ export default function AISettingsPage() {
                   <h3 className="text-lg font-semibold text-gray-900">Gemini 설정</h3>
                 </div>
 
-                {/* Gemini API Key */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Gemini API Key
@@ -295,7 +343,6 @@ export default function AISettingsPage() {
                   />
                 </div>
 
-                {/* Gemini Model Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Gemini 모델
@@ -315,7 +362,6 @@ export default function AISettingsPage() {
                   </select>
                 </div>
 
-                {/* Google AI Studio Button */}
                 <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
                   <p className="text-xs text-purple-700 mb-3">
                     Google AI Studio에서 무료로 API 키를 발급받으세요
@@ -333,11 +379,89 @@ export default function AISettingsPage() {
               </div>
             )}
 
+            {/* Claude Settings */}
+            {settings.provider === 'claude' && (
+              <div className="space-y-4 border-t pt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Bot className="h-5 w-5 text-orange-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">Claude 설정</h3>
+                </div>
+
+                <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                  <p className="text-xs text-orange-800 font-medium">
+                    카카오톡 광고 카드 생성에 사용됩니다. 광고 발행 기능을 이용하려면 Claude API 키를 등록하세요.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Claude API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.claudeApiKey}
+                    onChange={(e) => {
+                      setSettings(prev => ({ ...prev, claudeApiKey: e.target.value }))
+                      setIsTestSuccess(false)
+                      setTestResult(null)
+                    }}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    placeholder="sk-ant-로 시작하는 API 키"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Claude 모델
+                  </label>
+                  <select
+                    value={settings.claudeModel}
+                    onChange={(e) => {
+                      setSettings(prev => ({ ...prev, claudeModel: e.target.value }))
+                      setIsTestSuccess(false)
+                      setTestResult(null)
+                    }}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 · ₩15/100개 · 광고 추천!</option>
+                    <option value="claude-sonnet-4-6">Claude Sonnet 4.6 · ₩60/100개 · 고품질</option>
+                    <option value="claude-opus-4-7">Claude Opus 4.7 · 최고 품질 (비용 높음)</option>
+                  </select>
+                </div>
+
+                <div className="bg-orange-50 border border-orange-200 rounded-md p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-4 w-4 text-orange-600" />
+                    <span className="text-sm font-medium text-orange-800">예상 비용 (광고 카드 생성 기준)</span>
+                  </div>
+                  <div className="text-xs text-orange-700 space-y-1">
+                    <div>• Claude Haiku 4.5: <strong>카드 1개당 ~₩20</strong> (빠르고 저렴, 광고 추천!)</div>
+                    <div>• Claude Sonnet 4.6: <strong>카드 1개당 ~₩80</strong> (높은 품질)</div>
+                  </div>
+                  <div className="text-xs text-orange-600 mt-2">※ 환율 $1=₩1,400 기준, 카드별 실제 토큰 사용량에 따라 변동</div>
+                </div>
+
+                <div className="bg-orange-50 border border-orange-200 rounded-md p-4">
+                  <p className="text-xs text-orange-700 mb-3">
+                    Anthropic Console에서 API 키를 발급받으세요
+                  </p>
+                  <a
+                    href="https://console.anthropic.com/settings/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-md transition-colors"
+                  >
+                    <Bot className="w-4 h-4" />
+                    Anthropic Console 열기
+                  </a>
+                </div>
+              </div>
+            )}
+
             {/* Common Settings */}
             <div className="space-y-4 border-t pt-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">공통 설정</h3>
 
-              {/* Temperature */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   창의성 수준 (Temperature)
@@ -360,12 +484,10 @@ export default function AISettingsPage() {
                   0에 가까울수록 일관성 있는 결과, 2에 가까울수록 창의적인 결과
                 </p>
               </div>
-
             </div>
 
             {/* Action Buttons */}
             <div className="border-t pt-6">
-              {/* Test Result */}
               {testResult && (
                 <div className={`mb-4 border rounded-md p-4 ${
                   testResult.success
@@ -381,7 +503,7 @@ export default function AISettingsPage() {
                     <span className={`text-sm font-semibold ${
                       testResult.success ? 'text-green-800' : 'text-red-800'
                     }`}>
-                      {testResult.success ? '✅ 연결 성공!' : '❌ 연결 실패'}
+                      {testResult.success ? '연결 성공!' : '연결 실패'}
                     </span>
                   </div>
                   <p className={`text-sm ${
@@ -392,7 +514,6 @@ export default function AISettingsPage() {
                 </div>
               )}
 
-              {/* Helper Text */}
               {!currentApiKey ? (
                 <p className="text-xs text-gray-500 text-right mb-2">
                   * API Key를 입력해주세요
@@ -404,7 +525,6 @@ export default function AISettingsPage() {
               )}
 
               <div className="flex justify-end gap-3">
-                {/* 연결 테스트 버튼 */}
                 <button
                   onClick={testConnection}
                   disabled={isTesting || !currentApiKey}
@@ -423,12 +543,11 @@ export default function AISettingsPage() {
                   )}
                 </button>
 
-                {/* 저장 버튼 - 연결 테스트 성공 후 활성화 */}
                 <button
                   onClick={saveSettings}
                   disabled={isSaving || !currentApiKey || !isTestSuccess}
                   className={`flex items-center gap-2 px-6 py-2 text-white rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
-                    settings.provider === 'gemini' ? 'bg-purple-500' : 'bg-green-500'
+                    color === 'green' ? 'bg-green-500' : color === 'purple' ? 'bg-purple-500' : 'bg-orange-500'
                   }`}
                   title={!isTestSuccess ? '연결 테스트를 먼저 진행해주세요' : ''}
                 >

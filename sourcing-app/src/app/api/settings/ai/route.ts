@@ -71,6 +71,52 @@ async function testOpenAIConnection(apiKey: string, model: string): Promise<{ su
   }
 }
 
+async function testClaudeConnection(apiKey: string, model: string): Promise<{ success: boolean; message: string }> {
+  try {
+    console.log('[Claude API Test] 연결 테스트 시작, 모델:', model)
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: model || 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'Hi' }],
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      if (response.status === 401) {
+        return { success: false, message: 'API Key가 유효하지 않습니다. Anthropic Console에서 키를 확인해주세요.' }
+      }
+      if (response.status === 403) {
+        return { success: false, message: 'API Key 권한이 없습니다. 해당 키가 Messages API 사용 권한을 갖는지 확인해주세요.' }
+      }
+      if (response.status === 429) {
+        return { success: false, message: 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.' }
+      }
+      if (response.status === 400 && /model/i.test(errorData.error?.message || '')) {
+        return { success: false, message: `모델 '${model}'을 사용할 수 없습니다. 다른 모델을 선택해주세요.` }
+      }
+      return {
+        success: false,
+        message: `Claude API 오류 (${response.status}): ${errorData.error?.message || '알 수 없는 오류'}`,
+      }
+    }
+
+    console.log('[Claude API Test] 연결 성공')
+    return { success: true, message: `Claude API 연결 성공! 모델: ${model}` }
+  } catch (error: any) {
+    console.error('[Claude API Test] 오류:', error.message)
+    return { success: false, message: `연결 실패: ${error.message || '네트워크 오류'}` }
+  }
+}
+
 // GET: AI 설정 조회
 export async function GET(request: NextRequest) {
   try {
@@ -127,6 +173,8 @@ export async function POST(request: NextRequest) {
       testResult = await testGeminiConnection(apiKey, model || 'gemini-2.5-flash')
     } else if (provider === 'OPENAI') {
       testResult = await testOpenAIConnection(apiKey, model || 'gpt-4o-mini')
+    } else if (provider === 'CLAUDE') {
+      testResult = await testClaudeConnection(apiKey, model || 'claude-haiku-4-5-20251001')
     } else {
       return NextResponse.json(
         { success: false, error: '지원하지 않는 AI 제공업체입니다.' },
