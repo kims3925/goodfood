@@ -262,27 +262,36 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   margin-top: auto;
   background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
   color: #ffffff;
-  padding: 16px 18px 14px;
+  padding: 20px 22px 18px;
   border-radius: 14px;
   box-shadow: 0 4px 12px rgba(37,99,235,0.25);
 }
 .guide-title {
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 800;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
+}
+.guide-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 .guide-text {
-  font-size: 15px;
-  line-height: 1.5;
+  flex: 1;
+  font-size: 22px;
+  line-height: 1.4;
   opacity: 0.96;
+  font-weight: 700;
 }
-.guide-text .hl { font-weight: 800; }
-.guide-arrow {
-  font-size: 36px;
+.guide-text .hl {
   font-weight: 900;
-  text-align: center;
+  font-size: 24px;
+}
+.guide-arrow {
+  flex: 0 0 auto;
+  font-size: 56px;
+  font-weight: 900;
   line-height: 1;
-  margin-top: 4px;
 }
 </style>
 </head>
@@ -307,11 +316,12 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
         ${description ? `<div class="desc">${description}</div>` : ''}
         <div class="guide-box">
           <div class="guide-title">🛒 상품보기 / 주문</div>
-          <div class="guide-text">
-            <span class="hl">사진 댓글</span>에 링크가 있고,<br>
-            댓글란에도 <span class="hl">(${orderNumber})번</span> 주문링크가 있습니다
+          <div class="guide-row">
+            <div class="guide-text">
+              💬 댓글에 <span class="hl">(${orderNumber})번</span> 상품보기 주문링크 있어요
+            </div>
+            <div class="guide-arrow">→</div>
           </div>
-          <div class="guide-arrow">↓</div>
         </div>
       </div>
     </div>
