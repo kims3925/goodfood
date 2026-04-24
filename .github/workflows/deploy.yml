@@ -146,7 +146,7 @@ jobs:
           ECR_REGISTRY: 178788708152.dkr.ecr.ap-northeast-2.amazonaws.com
           ECR_PASSWORD: ${{ steps.ecr-auth.outputs.password }}
           INSTANCE_ID: i-0e6ef7c646a61356f
-          GHCR_TOKEN: ${{ secrets.GHCR_PAT }}
+          GHCR_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           set -euo pipefail
 
