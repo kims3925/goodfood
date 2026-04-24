@@ -136,46 +136,114 @@ jobs:
         id: ecr-auth
         run: echo "password=$(aws ecr get-login-password --region ap-northeast-2)" >> $GITHUB_OUTPUT
 
-      - name: Deploy via SSM
-        # NOTE: 43353ee에서 ABC-Group-Tech/ci/actions/ssm-deploy@main 으로 변경됐으나
-        # 해당 레포가 존재하지 않거나 접근 불가("repository not found")로 모든 배포 실패.
-        # 작동하던 ABC-Group-Tech/.github/actions/ssm-deploy@main 으로 임시 복원.
-        # ci 레포 마이그레이션이 완료되면 다시 전환 가능.
-        uses: ABC-Group-Tech/.github/actions/ssm-deploy@main
-        with:
-          instance-id: 'i-0e6ef7c646a61356f'
-          timeout: '600'
-          script: |
-            set -e
+      # 인라인 SSM 호출 — 외부 액션 의존성 제거
+      # 과거 ABC-Group-Tech/.github/actions/ssm-deploy@main / ABC-Group-Tech/ci/actions/...
+      # 양쪽 모두 액션 레포 가용성에 종속되어 배포가 실패한 이력이 있음.
+      # AWS CLI(v2 사전 설치됨)로 직접 send-command 후 완료 대기.
+      - name: Deploy via SSM (inline)
+        id: ssm
+        env:
+          ECR_REGISTRY: 178788708152.dkr.ecr.ap-northeast-2.amazonaws.com
+          ECR_PASSWORD: ${{ steps.ecr-auth.outputs.password }}
+          INSTANCE_ID: i-0e6ef7c646a61356f
+          GHCR_TOKEN: ${{ secrets.GHCR_PAT }}
+        run: |
+          set -euo pipefail
 
-            ECR_REGISTRY=178788708152.dkr.ecr.ap-northeast-2.amazonaws.com
-            ECR_PASSWORD=${{ steps.ecr-auth.outputs.password }}
+          # ──────────────────────────────────────────────────────────
+          # 원격에서 실행할 배포 스크립트 (jq로 JSON 인코딩 후 SSM에 전달)
+          # ──────────────────────────────────────────────────────────
+          REMOTE_SCRIPT=$(cat <<EOF
+          set -e
 
-            echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+          ECR_REGISTRY="${ECR_REGISTRY}"
 
-            docker pull "$ECR_REGISTRY/bandauto-shop:latest"
-            docker pull "$ECR_REGISTRY/bandauto-sourcing:latest"
+          echo "==> Docker login to ECR"
+          echo "${ECR_PASSWORD}" | docker login --username AWS --password-stdin "\$ECR_REGISTRY"
 
-            docker tag "$ECR_REGISTRY/bandauto-shop:latest" bandauto-shop:latest
-            docker tag "$ECR_REGISTRY/bandauto-sourcing:latest" bandauto-sourcing:latest
+          echo "==> Pull latest images"
+          docker pull "\$ECR_REGISTRY/bandauto-shop:latest"
+          docker pull "\$ECR_REGISTRY/bandauto-sourcing:latest"
 
-            git config --global --add safe.directory /home/ubuntu/bandauto
-            cd /home/ubuntu/bandauto
+          echo "==> Re-tag for compose"
+          docker tag "\$ECR_REGISTRY/bandauto-shop:latest" bandauto-shop:latest
+          docker tag "\$ECR_REGISTRY/bandauto-sourcing:latest" bandauto-sourcing:latest
 
-            GHCR_TOKEN="${{ secrets.GHCR_PAT }}"
-            git remote set-url origin "https://x-access-token:${GHCR_TOKEN}@github.com/ABC-Group-Tech/bandauto.git"
-            git fetch origin main
-            git reset --hard origin/main
-            git clean -fd
-            git remote set-url origin "https://github.com/ABC-Group-Tech/bandauto.git"
+          echo "==> Sync repo on EC2"
+          git config --global --add safe.directory /home/ubuntu/bandauto
+          cd /home/ubuntu/bandauto
+          git remote set-url origin "https://x-access-token:${GHCR_TOKEN}@github.com/ABC-Group-Tech/bandauto.git"
+          git fetch origin main
+          git reset --hard origin/main
+          git clean -fd
+          git remote set-url origin "https://github.com/ABC-Group-Tech/bandauto.git"
 
-            docker compose up -d --force-recreate
+          echo "==> docker compose up -d --force-recreate"
+          docker compose up -d --force-recreate
 
+          sleep 10
+
+          echo "==> prisma db push"
+          docker compose exec -T sourcing-app sh -c "cd /app/db && npx prisma@6 db push --schema prisma" || true
+
+          echo "==> db-migrate.sh"
+          bash scripts/db-migrate.sh || true
+
+          docker compose ps
+          echo "Deploy completed at \$(date '+%Y-%m-%d %H:%M:%S %Z')"
+          EOF
+          )
+
+          # ──────────────────────────────────────────────────────────
+          # SSM send-command 호출 + 완료 대기
+          # ──────────────────────────────────────────────────────────
+          echo "==> Sending command to instance ${INSTANCE_ID}"
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "${INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "GitHub Actions deploy ${GITHUB_SHA::8}" \
+            --timeout-seconds 600 \
+            --cloud-watch-output-config CloudWatchOutputEnabled=false \
+            --parameters "$(jq -n --arg cmd "$REMOTE_SCRIPT" '{commands: [$cmd], executionTimeout: ["3600"]}')" \
+            --query "Command.CommandId" \
+            --output text)
+          echo "Command ID: $CMD_ID"
+
+          echo "==> Waiting for command to complete (up to ~10 min)"
+          STATUS=""
+          for i in $(seq 1 60); do
             sleep 10
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$CMD_ID" \
+              --details \
+              --query "CommandInvocations[0].Status" \
+              --output text 2>/dev/null || echo "Pending")
+            echo "  [$i/60] status=$STATUS"
+            case "$STATUS" in
+              Success|Failed|Cancelled|TimedOut)
+                break
+                ;;
+            esac
+          done
 
-            docker compose exec -T sourcing-app sh -c "cd /app/db && npx prisma@6 db push --schema prisma" || true
+          echo "==> Final status: $STATUS"
+          echo ""
+          echo "==> Output (stdout):"
+          aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "${INSTANCE_ID}" \
+            --query "StandardOutputContent" \
+            --output text || true
+          echo ""
+          echo "==> Output (stderr):"
+          aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "${INSTANCE_ID}" \
+            --query "StandardErrorContent" \
+            --output text || true
 
-            bash scripts/db-migrate.sh
-
-            docker compose ps
-            echo "Deploy completed at $(date '+%Y-%m-%d %H:%M:%S %Z')"
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::SSM command finished with status: $STATUS"
+            exit 1
+          fi
+          echo "Deploy succeeded."
