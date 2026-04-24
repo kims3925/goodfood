@@ -137,7 +137,11 @@ jobs:
         run: echo "password=$(aws ecr get-login-password --region ap-northeast-2)" >> $GITHUB_OUTPUT
 
       - name: Deploy via SSM
-        uses: ABC-Group-Tech/ci/actions/ssm-deploy@main
+        # NOTE: 43353ee에서 ABC-Group-Tech/ci/actions/ssm-deploy@main 으로 변경됐으나
+        # 해당 레포가 존재하지 않거나 접근 불가("repository not found")로 모든 배포 실패.
+        # 작동하던 ABC-Group-Tech/.github/actions/ssm-deploy@main 으로 임시 복원.
+        # ci 레포 마이그레이션이 완료되면 다시 전환 가능.
+        uses: ABC-Group-Tech/.github/actions/ssm-deploy@main
         with:
           instance-id: 'i-0e6ef7c646a61356f'
           timeout: '600'
