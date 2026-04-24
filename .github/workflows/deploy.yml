@@ -156,6 +156,10 @@ jobs:
           REMOTE_SCRIPT=$(cat <<EOF
           set -e
 
+          # SSM RunCommand는 비대화형 세션이라 \$HOME이 비어 있고,
+          # 이 상태에서 git이 "fatal: \$HOME not set"으로 실패함 (exit 128).
+          export HOME=/root
+
           ECR_REGISTRY="${ECR_REGISTRY}"
 
           echo "==> Docker login to ECR"
