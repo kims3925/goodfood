@@ -115,6 +115,9 @@ const nextConfig = {
       '@bandauto/db',
       'prisma',
       'qrcode',
+      '@imgly/background-removal-node',
+      'onnxruntime-node',
+      'sharp',
     ],
   },
 }

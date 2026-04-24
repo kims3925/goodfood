@@ -16,6 +16,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@google/generative-ai": "^0.24.1",
+    "@imgly/background-removal-node": "^1.4.5",
     "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
     "bull": "^4.16.5",

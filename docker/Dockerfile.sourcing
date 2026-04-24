@@ -62,6 +62,12 @@ WORKDIR /app
 RUN pnpm --filter sourcing-app build && \
     mkdir -p /app/sourcing-app/public
 
+# @imgly/background-removal-node 모델 사전 다운로드 (런타임 첫 실행 지연 제거)
+# 모델은 ~/.cache/imgly_bg_removal/ 또는 패키지 자체 dist 디렉터리에 캐시됨.
+# 다운로드 실패해도 빌드는 계속 (런타임에 재시도) — 인터넷 단절된 빌드 환경 대비.
+RUN mkdir -p /root/.cache/imgly_bg_removal && \
+    node -e "const{removeBackground}=require('/app/node_modules/@imgly/background-removal-node');const fs=require('fs');const buf=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=','base64');fs.writeFileSync('/tmp/seed.png',buf);removeBackground('/tmp/seed.png',{progress:(k,c,t)=>console.log('imgly-prefetch',k,c,'/',t)}).then(()=>console.log('imgly-prefetch DONE')).catch(e=>console.warn('imgly-prefetch SKIP',e.message));" || true
+
 # ============================================
 # Stage 3: Runner (Playwright 포함)
 # ============================================
@@ -78,6 +84,10 @@ ENV APP_NAME=sourcing
 # sharp 설치 (이미지 최적화용)
 RUN npm install --omit=dev sharp
 
+# @imgly/background-removal-node 모델·런타임 (next standalone이 트래킹하지 못하는 native ONNX)
+# 콜라주 모드에서 상품 이미지 배경 제거에 사용. 미설치 시 폴백(원본 이미지)으로 발행은 계속.
+RUN npm install --omit=dev @imgly/background-removal-node@^1.4.5 || true
+
 # Prisma 스키마 및 클라이언트 복사
 COPY --from=builder /app/db/prisma ./db/prisma
 COPY --from=builder /app/prisma-client ./node_modules/.prisma
@@ -86,6 +96,9 @@ COPY --from=builder /app/prisma-client ./node_modules/.prisma
 COPY --from=builder /app/sourcing-app/.next/standalone ./
 COPY --from=builder /app/sourcing-app/.next/static ./sourcing-app/.next/static
 COPY --from=builder /app/sourcing-app/public ./sourcing-app/public
+
+# @imgly 모델 캐시 복사 (빌더에서 사전 다운로드한 것)
+COPY --from=builder /root/.cache/imgly_bg_removal /root/.cache/imgly_bg_removal
 
 # root로 실행 (볼륨 마운트 접근 권한)
 EXPOSE 3001
