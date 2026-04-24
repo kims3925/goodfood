@@ -30,6 +30,7 @@ model Product {
   shopProducts       ShopProduct[]
   channelProducts    ChannelProduct[]
   wishlists          Wishlist[]
+  kakaoAdCards       KakaoAdCard[]
 
   @@index([userId], name: "product_user_id_idx")
   @@index([channelId], name: "product_channel_id_idx")

@@ -44,6 +44,8 @@ model User {
   workflowLogs       WorkflowLog[]
   notifications      Notification[]
   googleSheetConfig  GoogleSheetConfig?
+  kakaoAdCards       KakaoAdCard[]
+  kakaoAdBatches     KakaoAdBatch[]
 
   @@index([shopId])
   @@index([email])

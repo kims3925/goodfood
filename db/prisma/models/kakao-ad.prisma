@@ -1,0 +1,81 @@
+// 카카오톡 채널 광고 카드 & 배치
+//
+// 작업지시서: 작업지시서_카카오톡광고_자동생성.md
+// /sourcing/publish/digest 페이지의 '카카오톡 광고' 탭에서 생성되는 광고 카드.
+// 상품당 1장의 720×1280 세로 PNG 광고 카드를 Claude AI로 자동 생성한다.
+// KakaoAdBatch는 일 단위(사용자별) 묶음.
+
+enum KakaoSendStatus {
+  DRAFT
+  PREVIEW
+  SENT
+  FAILED
+}
+
+model KakaoAdBatch {
+  id               Int             @id @default(autoincrement())
+  userId           Int             @map("user_id")
+  date             String          @db.VarChar(10) // YYYY-MM-DD
+  cardCount        Int             @default(0) @map("card_count")
+  sentCount        Int             @default(0) @map("sent_count")
+  failedCount      Int             @default(0) @map("failed_count")
+  totalDurationSec Int?            @map("total_duration_sec")
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards            KakaoAdCard[]   @relation("BatchCards")
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@map("kakao_ad_batch")
+}
+
+model KakaoAdCard {
+  id               Int             @id @default(autoincrement())
+  userId           Int             @map("user_id")
+  productId        Int             @map("product_id")
+  batchId          Int?            @map("batch_id")
+
+  // AI 생성 결과 (사용자 수정 가능)
+  title            String          @db.VarChar(100)
+  titleColor       String          @default("red") @map("title_color") @db.VarChar(20) // red|blue|green
+  subtitle         String          @db.VarChar(200)
+  bannerText       String?         @map("banner_text") @db.VarChar(200)   // 빨간 강조 배너 (선택)
+  ribbonText       String?         @map("ribbon_text") @db.VarChar(50)    // "국내산100%" 등
+  saleBadge        Boolean         @default(false) @map("sale_badge")     // "행사상품" 배지 사용 여부
+
+  productName      String          @map("product_name") @db.VarChar(300)  // 원본 or AI 축약
+  descriptionHtml  String          @map("description_html") @db.Text       // AI 생성 본문 (또는 plain)
+  priceText        String          @map("price_text") @db.VarChar(200)     // "1kg 19,900원" 등
+
+  // 이미지
+  sourceImageUrl   String          @map("source_image_url") @db.VarChar(1000) // 원본 상품 이미지
+  renderedPngPath  String?         @map("rendered_png_path") @db.VarChar(500) // 합성된 카드 PNG 경로 (임시)
+
+  // 편집/메타
+  aiGenerated      Boolean         @default(true) @map("ai_generated")
+  editedAt         DateTime?       @map("edited_at") @db.Timestamp(0)
+  aiTokensUsed     Int?            @map("ai_tokens_used")
+
+  // 발송 상태
+  sendStatus       KakaoSendStatus @default(DRAFT) @map("send_status")
+  sentAt           DateTime?       @map("sent_at") @db.Timestamp(0)
+  kakaoMessageId   String?         @map("kakao_message_id") @db.VarChar(100)
+  sendError        String?         @map("send_error") @db.VarChar(500)
+
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  batch            KakaoAdBatch?   @relation("BatchCards", fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([productId])
+  @@index([batchId])
+  @@index([sendStatus])
+  @@index([createdAt])
+  @@map("kakao_ad_card")
+}
