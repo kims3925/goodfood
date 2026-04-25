@@ -44,6 +44,15 @@ export async function GET(request: NextRequest) {
     const daysWithin = searchParams.get('daysWithin')
     const channelIdParam = searchParams.get('channelId')
     const searchParam = searchParams.get('search')
+    const limitParam = searchParams.get('limit')
+
+    // 페이지 사이즈 — 1~500. 광고 페이지의 "20/50/100개 보기" 드롭다운에서 전달.
+    const limit = (() => {
+      if (!limitParam) return 100
+      const n = parseInt(limitParam, 10)
+      if (Number.isFinite(n) && n > 0) return Math.min(n, 500)
+      return 100
+    })()
 
     const where: any = {
       userId: user.userId,
@@ -102,7 +111,7 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: 500,
+      take: limit,
     })
 
     // 카테고리별 분포 집계

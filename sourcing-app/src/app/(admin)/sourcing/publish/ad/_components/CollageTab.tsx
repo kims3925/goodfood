@@ -17,6 +17,7 @@ import DigestSettingsPanel, {
 import DigestProgressModal, {
   type DigestProgressItem,
 } from '../../digest/_components/DigestProgressModal'
+import ProductDetailModal from './ProductDetailModal'
 import { useAdProducts, type AdFetchedProduct } from '../_hooks/useAdProducts'
 
 const SHOP_DOMAIN = (process.env.NEXT_PUBLIC_SHOP_DOMAIN || 'shop.abcpharm.net').replace(/\/$/, '')
@@ -76,7 +77,12 @@ export default function CollageTab() {
     setWholesaleChannelId,
     searchQuery,
     setSearchQuery,
+    pageSize,
+    setPageSize,
   } = useAdProducts('SEA')
+
+  // 상세보기 모달 — 클릭한 productId
+  const [detailProductId, setDetailProductId] = useState<number | null>(null)
 
   // 다중 카테고리 체크박스 — 발행 풀에 포함시킬 카테고리들
   const [checkedCategories, setCheckedCategories] = useState<Set<CategoryCode>>(new Set(['SEA']))
@@ -472,6 +478,17 @@ export default function CollageTab() {
             ✕
           </button>
         )}
+        <span className="mx-2 h-4 w-px bg-gray-200" aria-hidden="true" />
+        <span className="text-xs text-gray-500">📄 보기:</span>
+        <select
+          value={pageSize}
+          onChange={(e) => setPageSize(Number(e.target.value) as 20 | 50 | 100)}
+          className="text-xs border border-gray-300 rounded-md px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value={20}>20개</option>
+          <option value={50}>50개</option>
+          <option value={100}>100개</option>
+        </select>
       </div>
 
       <DigestSettingsPanel
@@ -660,17 +677,6 @@ export default function CollageTab() {
                 </div>
               )
             })}
-            {/* 남는 셀 표시 */}
-            {Array.from({
-              length: Math.max(0, expectedCount - orderedSelected.length),
-            }).map((_, i) => (
-              <div
-                key={`empty-${i}`}
-                className="aspect-square border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-400"
-              >
-                #{orderedSelected.length + i + 1} 빈 칸
-              </div>
-            ))}
           </div>
         </div>
       )}
@@ -686,6 +692,8 @@ export default function CollageTab() {
             selectedIds={selectedIds}
             onToggle={toggleProduct}
             onSelectAll={setAllSelectedForActive}
+            onViewDetail={(id) => setDetailProductId(id)}
+            pageSize={pageSize}
           />
         </div>
       )}
@@ -748,6 +756,11 @@ export default function CollageTab() {
           </Button>
         </div>
       </div>
+
+      <ProductDetailModal
+        productId={detailProductId}
+        onClose={() => setDetailProductId(null)}
+      />
 
       <DigestProgressModal
         isOpen={progressOpen}

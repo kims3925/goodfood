@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckCircle, Clock, Package, RefreshCw, Store } from 'lucide-react'
+import { CheckCircle, Clock, Package, RefreshCw, Store, ExternalLink } from 'lucide-react'
 
 export interface DigestProductItem {
   id: number
@@ -33,10 +33,20 @@ interface Props {
   selectedIds: number[]
   onToggle: (id: number) => void
   onSelectAll: (ids: number[]) => void
-  maxProducts?: number
+  /** 상세보기 버튼 클릭 콜백. 미지정 시 버튼 표시 안 함. */
+  onViewDetail?: (productId: number) => void
+  /** 한 번에 표시 가능한 상품 수 표기 (선택). 표시는 패널 외부에서 컨트롤. */
+  pageSize?: number
 }
 
-export default function DigestProductList({ products, selectedIds, onToggle, onSelectAll, maxProducts = 20 }: Props) {
+export default function DigestProductList({
+  products,
+  selectedIds,
+  onToggle,
+  onSelectAll,
+  onViewDetail,
+  pageSize,
+}: Props) {
   const allVisibleIds = products.map((p) => p.id)
   const someSelected = selectedIds.length > 0
   const hasAnyVisible = allVisibleIds.length > 0
@@ -45,16 +55,19 @@ export default function DigestProductList({ products, selectedIds, onToggle, onS
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-gray-900">
-          상품 선택 <span className="text-gray-500">({products.length}개 / 최대 {maxProducts})</span>
+          상품 선택{' '}
+          <span className="text-gray-500">
+            ({products.length}개{pageSize ? ` / 페이지 ${pageSize}` : ''})
+          </span>
         </h3>
         <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={!hasAnyVisible}
-            onClick={() => onSelectAll(allVisibleIds.slice(0, maxProducts))}
+            onClick={() => onSelectAll(allVisibleIds)}
             className="text-xs px-2.5 py-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            상위 {maxProducts}개 선택
+            표시된 모두 선택
           </button>
           <button
             type="button"
@@ -79,9 +92,24 @@ export default function DigestProductList({ products, selectedIds, onToggle, onS
           const isSelected = orderIdx !== -1
           const thumb = product.thumbnailUrl || product.images?.[0]?.url || null
           return (
-            <li key={product.id}>
+            <li key={product.id} className="relative">
+              {onViewDetail && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onViewDetail(product.id)
+                  }}
+                  className="absolute top-2 right-2 z-10 inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 shadow-sm"
+                  title="상품 상세 보기"
+                >
+                  <ExternalLink size={11} />
+                  상세보기
+                </button>
+              )}
               <label
-                className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                className={`flex items-center gap-3 p-3 pr-24 border rounded-lg cursor-pointer transition-colors ${
                   isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
                 }`}
               >

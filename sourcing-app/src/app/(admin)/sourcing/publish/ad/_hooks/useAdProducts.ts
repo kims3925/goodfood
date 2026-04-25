@@ -48,6 +48,9 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
     return () => clearTimeout(t)
   }, [searchQuery])
 
+  // 페이지 사이즈 — 한 번에 가져올 상품 수 (20/50/100)
+  const [pageSize, setPageSize] = useState<20 | 50 | 100>(20)
+
   // 도매 채널 목록 1회 로드
   useEffect(() => {
     let cancelled = false
@@ -74,7 +77,8 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
       code: CategoryCode = activeCategory,
       df: typeof dateFilter = dateFilter,
       chId: number | null = wholesaleChannelId,
-      q: string = debouncedSearch
+      q: string = debouncedSearch,
+      ps: number = pageSize
     ) => {
       setIsLoading(true)
       try {
@@ -84,6 +88,7 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
         else if (df === '7d') qs.set('daysWithin', '7')
         if (chId != null) qs.set('channelId', String(chId))
         if (q) qs.set('search', q)
+        qs.set('limit', String(ps))
         const res = await fetch(`/api/publish/digest?${qs.toString()}`)
         const data = await res.json()
         if (data.success) {
@@ -94,12 +99,12 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
         setIsLoading(false)
       }
     },
-    [activeCategory, dateFilter, wholesaleChannelId, debouncedSearch]
+    [activeCategory, dateFilter, wholesaleChannelId, debouncedSearch, pageSize]
   )
 
   useEffect(() => {
-    reload(activeCategory, dateFilter, wholesaleChannelId, debouncedSearch)
-  }, [activeCategory, dateFilter, wholesaleChannelId, debouncedSearch, reload])
+    reload(activeCategory, dateFilter, wholesaleChannelId, debouncedSearch, pageSize)
+  }, [activeCategory, dateFilter, wholesaleChannelId, debouncedSearch, pageSize, reload])
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
 
@@ -118,5 +123,7 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
     setWholesaleChannelId,
     searchQuery,
     setSearchQuery,
+    pageSize,
+    setPageSize,
   }
 }

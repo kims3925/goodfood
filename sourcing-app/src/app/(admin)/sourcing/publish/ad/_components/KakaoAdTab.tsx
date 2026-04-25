@@ -10,6 +10,7 @@ import CategoryTabs from '../../digest/_components/CategoryTabs'
 import DigestProductList from '../../digest/_components/DigestProductList'
 import { useAdProducts } from '../_hooks/useAdProducts'
 import KakaoAdPreviewModal, { type KakaoAdCard } from './KakaoAdPreviewModal'
+import ProductDetailModal from './ProductDetailModal'
 
 export type AdTitleColor = 'red' | 'blue' | 'green' | 'auto'
 
@@ -32,7 +33,11 @@ export default function KakaoAdTab() {
     setWholesaleChannelId,
     searchQuery,
     setSearchQuery,
+    pageSize,
+    setPageSize,
   } = useAdProducts('SEA')
+
+  const [detailProductId, setDetailProductId] = useState<number | null>(null)
 
   // 다중 카테고리 — 체크박스 + 카테고리별 선택 Map
   const [checkedCategories, setCheckedCategories] = useState<Set<CategoryCode>>(new Set(['SEA']))
@@ -241,6 +246,17 @@ export default function KakaoAdTab() {
             ✕
           </button>
         )}
+        <span className="mx-2 h-4 w-px bg-gray-200" aria-hidden="true" />
+        <span className="text-xs text-gray-500">📄 보기:</span>
+        <select
+          value={pageSize}
+          onChange={(e) => setPageSize(Number(e.target.value) as 20 | 50 | 100)}
+          className="text-xs border border-gray-300 rounded-md px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value={20}>20개</option>
+          <option value={50}>50개</option>
+          <option value={100}>100개</option>
+        </select>
       </div>
 
       <div className="mb-4 bg-white border border-gray-200 rounded-lg p-3">
@@ -318,6 +334,8 @@ export default function KakaoAdTab() {
             selectedIds={selectedIds}
             onToggle={toggleProduct}
             onSelectAll={setAllSelectedForActive}
+            onViewDetail={(id) => setDetailProductId(id)}
+            pageSize={pageSize}
           />
         </div>
       )}
@@ -348,6 +366,11 @@ export default function KakaoAdTab() {
           🎨 광고 카드 생성 ({totalCount}장)
         </Button>
       </div>
+
+      <ProductDetailModal
+        productId={detailProductId}
+        onClose={() => setDetailProductId(null)}
+      />
 
       <KakaoAdPreviewModal
         isOpen={previewOpen}
