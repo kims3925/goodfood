@@ -154,12 +154,7 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   line-height: 1.3;
   margin: 18px 0 0;
   word-break: keep-all;
-  flex: 0 0 auto;
-}
-.divider {
-  height: 2px;
-  background: #E5E7EB;
-  margin: 8px 0;
+  text-align: center;
   flex: 0 0 auto;
 }
 .description {
@@ -167,6 +162,7 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   font-weight: 500;
   color: #1F2937;
   line-height: 1.5;
+  margin-top: 14px;
   white-space: normal;
   word-break: keep-all;
   flex: 0 0 auto;
@@ -226,13 +222,12 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
     ${subtitle ? `<div class="subtitle-box">${subtitle}</div>` : ''}
   </div>
   <div class="product-name">${productName}</div>
-  <div class="divider"></div>
-  <div class="description">${descHtml}</div>
-  <div class="price-line">💰 ${priceText}</div>
-  ${banner ? `<div class="banner">${banner}</div>` : ''}
   <div class="image-area">
     ${imgSrc ? `<img src="${imgSrc}" alt="">` : `<div class="image-empty">이미지 없음</div>`}
   </div>
+  ${banner ? `<div class="banner">${banner}</div>` : ''}
+  <div class="description">${descHtml}</div>
+  <div class="price-line">💰 ${priceText}</div>
 </div>
 </body>
 </html>`
