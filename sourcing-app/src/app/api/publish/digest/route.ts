@@ -196,6 +196,15 @@ interface DigestPublishRequest {
     gridRows?: number     // 기본 4
     removeBackground?: boolean // 기본 true
     topBadgeText?: string
+    /**
+     * 셀별 overlay 설정 — 각 productId에 해당하는 이미지 위 배지.
+     * 클라이언트가 미리보기에서 편집한 값을 그대로 전달.
+     */
+    cellOverrides?: Array<{
+      productId: number
+      overlayText?: string
+      overlayColor?: 'red' | 'yellow' | 'blue'
+    }>
   }
 }
 
@@ -329,12 +338,25 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      const overrideMap = new Map(
+        (collageOptions?.cellOverrides ?? [])
+          .filter((o) => o && typeof o.productId === 'number')
+          .map((o) => [
+            o.productId,
+            {
+              overlayText: typeof o.overlayText === 'string' ? o.overlayText.trim() : '',
+              overlayColor: o.overlayColor || 'red',
+            },
+          ])
+      )
+
       const collageCards: CollageCardProduct[] = orderedProducts.map((p) => {
         // 가격: 옵션 있으면 첫 번째 variant, 없으면 product.price (할인율 표시 금지)
         const firstVariant = p.variants[0]
         const priceValue = firstVariant?.price ?? p.price ?? 0
         const priceText = priceValue > 0 ? `${priceValue.toLocaleString()}원` : '가격 문의'
         const firstImage = [...p.images].sort((a, b) => a.sortOrder - b.sortOrder)[0]
+        const ov = overrideMap.get(p.id)
         return {
           id: p.id,
           name: p.name,
@@ -345,6 +367,8 @@ export async function POST(request: NextRequest) {
           }),
           priceText,
           imageUrl: firstImage?.url || '',
+          overlayText: ov?.overlayText || undefined,
+          overlayColor: ov?.overlayColor,
         }
       })
 

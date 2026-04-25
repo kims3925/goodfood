@@ -17,6 +17,8 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 
+export type CellOverlayColor = 'red' | 'yellow' | 'blue'
+
 export interface CollageCardProduct {
   id: number
   name: string
@@ -26,6 +28,10 @@ export interface CollageCardProduct {
   priceText: string
   /** 원본 이미지 URL — 배경 제거 전 */
   imageUrl: string
+  /** 셀별 추가 문구 (선택). 상품 이미지 위 반투명 배지로 표시. */
+  overlayText?: string
+  /** overlayText 표시 색. 기본 red. */
+  overlayColor?: CellOverlayColor
 }
 
 export interface RenderCollageOptions {
@@ -146,7 +152,14 @@ function buildPosterHtml(opts: {
   title: string
   subtitle?: string
   topBadgeText?: string
-  cells: { spec: string; name: string; priceText: string; imgDataUri: string | null }[]
+  cells: {
+    spec: string
+    name: string
+    priceText: string
+    imgDataUri: string | null
+    overlayText?: string
+    overlayColor?: CellOverlayColor
+  }[]
   gridCols: number
   gridRows: number
   posterWidth: number
@@ -173,10 +186,13 @@ function buildPosterHtml(opts: {
       const img = c.imgDataUri
         ? `<img src="${c.imgDataUri}" alt="">`
         : `<div class="img-placeholder">이미지 없음</div>`
+      const overlay = c.overlayText
+        ? `<div class="overlay-badge overlay-${c.overlayColor || 'red'}">${escapeHtml(c.overlayText)}</div>`
+        : ''
       return `
       <div class="cell">
         ${c.spec ? `<div class="spec">${escapeHtml(c.spec)}</div>` : '<div class="spec spec-empty">&nbsp;</div>'}
-        <div class="img-wrap">${img}</div>
+        <div class="img-wrap">${img}${overlay}</div>
         <div class="name">${escapeHtml(c.name)}</div>
         <div class="price">${escapeHtml(c.priceText)}</div>
       </div>`
@@ -245,7 +261,28 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   height: ${imgH}px;
   display: flex; align-items: center; justify-content: center;
   margin: 10px 0 12px;
+  position: relative;
 }
+.overlay-badge {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: ${Math.round(6 * cellScale)}px ${Math.round(16 * cellScale)}px;
+  font-size: ${Math.round(20 * cellScale)}px;
+  font-weight: 900;
+  border-radius: 999px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  white-space: nowrap;
+  letter-spacing: -0.5px;
+  z-index: 2;
+  max-width: 95%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.overlay-red { background: #DC2626; color: #fff; }
+.overlay-yellow { background: #FCD34D; color: #111827; }
+.overlay-blue { background: #2563EB; color: #fff; }
 .img-wrap img {
   max-width: 100%;
   max-height: 100%;
@@ -321,7 +358,14 @@ export async function renderCollagePoster(
   // 메모리 보호를 위해 순차 처리. 12장 기준 1-2분 예상.
   let bgRemovedCount = 0
   let bgFailedCount = 0
-  const cellData: { spec: string; name: string; priceText: string; imgDataUri: string | null }[] = []
+  const cellData: {
+    spec: string
+    name: string
+    priceText: string
+    imgDataUri: string | null
+    overlayText?: string
+    overlayColor?: CellOverlayColor
+  }[] = []
 
   for (let i = 0; i < products.length; i++) {
     const p = products[i]
@@ -352,6 +396,8 @@ export async function renderCollagePoster(
       name: p.name,
       priceText: p.priceText,
       imgDataUri,
+      overlayText: p.overlayText,
+      overlayColor: p.overlayColor,
     })
   }
 
