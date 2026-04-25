@@ -147,11 +147,58 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   text-underline-offset: 4px;
   text-decoration-thickness: 2px;
 }
-.image-area {
+.product-name {
+  font-size: 30px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.3;
+  margin: 18px 0 0;
+  word-break: keep-all;
   flex: 0 0 auto;
-  margin: 24px 0 12px;
+}
+.divider {
+  height: 2px;
+  background: #E5E7EB;
+  margin: 8px 0;
+  flex: 0 0 auto;
+}
+.description {
+  font-size: 22px;
+  font-weight: 500;
+  color: #1F2937;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: keep-all;
+  flex: 0 0 auto;
+}
+/* 본문(설명)과 가격라인 사이 여백 없음 — 사용자 요청 */
+.price-line {
+  font-size: 28px;
+  font-weight: 900;
+  color: #DC2626;
+  margin: 0;
+  letter-spacing: -0.5px;
+  word-break: keep-all;
+  flex: 0 0 auto;
+}
+.banner {
+  background: #DC2626;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 800;
+  padding: 14px 18px;
+  border-radius: 8px;
+  text-align: center;
+  margin: 14px 0 0;
+  letter-spacing: -0.5px;
+  word-break: keep-all;
+  flex: 0 0 auto;
+}
+.image-area {
+  flex: 1 1 auto;
+  margin: 14px 0 0;
   width: 100%;
-  height: 460px;
+  min-height: 460px;
   background: #F3F4F6;
   border-radius: 12px;
   overflow: hidden;
@@ -168,49 +215,6 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   color: #9CA3AF;
   font-size: 22px;
 }
-.banner {
-  background: #DC2626;
-  color: #ffffff;
-  font-size: 24px;
-  font-weight: 800;
-  padding: 14px 18px;
-  border-radius: 8px;
-  text-align: center;
-  margin-bottom: 14px;
-  letter-spacing: -0.5px;
-  word-break: keep-all;
-}
-.product-name {
-  font-size: 30px;
-  font-weight: 800;
-  color: #111827;
-  line-height: 1.3;
-  margin: 6px 0 6px;
-  word-break: keep-all;
-}
-.divider {
-  height: 2px;
-  background: #E5E7EB;
-  margin: 8px 0 12px;
-}
-.description {
-  flex: 1 1 auto;
-  font-size: 22px;
-  font-weight: 500;
-  color: #1F2937;
-  line-height: 1.5;
-  white-space: normal;
-  word-break: keep-all;
-  overflow: hidden;
-}
-.price-line {
-  font-size: 28px;
-  font-weight: 900;
-  color: #DC2626;
-  margin-top: 10px;
-  letter-spacing: -0.5px;
-  word-break: keep-all;
-}
 </style>
 </head>
 <body>
@@ -221,14 +225,14 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
     <div class="title">${title}</div>
     ${subtitle ? `<div class="subtitle-box">${subtitle}</div>` : ''}
   </div>
-  <div class="image-area">
-    ${imgSrc ? `<img src="${imgSrc}" alt="">` : `<div class="image-empty">이미지 없음</div>`}
-  </div>
-  ${banner ? `<div class="banner">${banner}</div>` : ''}
   <div class="product-name">${productName}</div>
   <div class="divider"></div>
   <div class="description">${descHtml}</div>
   <div class="price-line">💰 ${priceText}</div>
+  ${banner ? `<div class="banner">${banner}</div>` : ''}
+  <div class="image-area">
+    ${imgSrc ? `<img src="${imgSrc}" alt="">` : `<div class="image-empty">이미지 없음</div>`}
+  </div>
 </div>
 </body>
 </html>`
