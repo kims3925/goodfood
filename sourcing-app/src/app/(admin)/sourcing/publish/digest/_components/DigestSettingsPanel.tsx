@@ -3,12 +3,16 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Settings2 } from 'lucide-react'
 
-export type GridSize = '3x4' | '3x3' | '2x3'
+export type GridSize = '3x4' | '3x3' | '2x3' | 'custom'
 
 export interface CollageSettingsValue {
   collageTitle: string
   topBadgeText: string
   gridSize: GridSize
+  /** gridSize === 'custom'일 때만 사용 (1~5). */
+  customCols?: number
+  /** gridSize === 'custom'일 때만 사용 (1~5). */
+  customRows?: number
   removeBackground: boolean
 }
 
@@ -22,19 +26,56 @@ interface Props {
   onToggle?: (open: boolean) => void
 }
 
-const GRID_OPTIONS: Array<{ value: GridSize; label: string; count: number }> = [
+const GRID_OPTIONS: Array<{ value: Exclude<GridSize, 'custom'>; label: string; count: number }> = [
   { value: '3x4', label: '3 × 4 (12개)', count: 12 },
   { value: '3x3', label: '3 × 3 (9개)', count: 9 },
   { value: '2x3', label: '2 × 3 (6개)', count: 6 },
 ]
 
+// 직접 입력 제약 — 각 축 1~5, 총 셀 2~20 (Band 첨부 제약, 렌더러 메모리 고려)
+export const CUSTOM_MIN_AXIS = 1
+export const CUSTOM_MAX_AXIS = 5
+export const CUSTOM_MIN_CELLS = 2
+export const CUSTOM_MAX_CELLS = 20
+
+function clampAxis(n: number): number {
+  if (!Number.isFinite(n)) return 3
+  return Math.max(CUSTOM_MIN_AXIS, Math.min(CUSTOM_MAX_AXIS, Math.floor(n)))
+}
+
+/**
+ * 설정값에서 실제 (cols, rows, count)를 해석.
+ * gridSize === 'custom'이면 customCols/customRows를 사용, 없으면 3×3로 폴백.
+ */
+export function getGridDims(value: CollageSettingsValue): {
+  cols: number
+  rows: number
+  count: number
+} {
+  if (value.gridSize === 'custom') {
+    const cols = clampAxis(value.customCols ?? 3)
+    const rows = clampAxis(value.customRows ?? 3)
+    return { cols, rows, count: cols * rows }
+  }
+  const preset = GRID_OPTIONS.find((o) => o.value === value.gridSize)
+  if (preset) {
+    if (preset.value === '3x3') return { cols: 3, rows: 3, count: 9 }
+    if (preset.value === '2x3') return { cols: 2, rows: 3, count: 6 }
+    return { cols: 3, rows: 4, count: 12 }
+  }
+  return { cols: 3, rows: 4, count: 12 }
+}
+
+// Deprecated: 레거시 사용처(콜 사이트 없으면 추후 제거). getGridDims 사용 권장.
 export function gridSizeToCount(size: GridSize): number {
+  if (size === 'custom') return 9
   return GRID_OPTIONS.find((o) => o.value === size)?.count ?? 12
 }
 
 export function gridSizeToColsRows(size: GridSize): { cols: number; rows: number } {
   if (size === '3x3') return { cols: 3, rows: 3 }
   if (size === '2x3') return { cols: 2, rows: 3 }
+  if (size === 'custom') return { cols: 3, rows: 3 }
   return { cols: 3, rows: 4 }
 }
 
@@ -124,9 +165,72 @@ export default function DigestSettingsPanel({
                   {opt.label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...value,
+                    gridSize: 'custom',
+                    customCols: value.customCols ?? 3,
+                    customRows: value.customRows ?? 3,
+                  })
+                }
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  value.gridSize === 'custom'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                ✏️ 직접 입력
+              </button>
             </div>
+
+            {value.gridSize === 'custom' && (
+              <div className="mt-2 flex items-center gap-2 flex-wrap bg-white border border-gray-200 rounded-md px-3 py-2">
+                <span className="text-[11px] text-gray-500">가로</span>
+                <input
+                  type="number"
+                  min={CUSTOM_MIN_AXIS}
+                  max={CUSTOM_MAX_AXIS}
+                  value={value.customCols ?? 3}
+                  onChange={(e) =>
+                    update('customCols', clampAxis(parseInt(e.target.value, 10)))
+                  }
+                  className="w-16 text-sm border border-gray-300 rounded px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-xs text-gray-400">×</span>
+                <span className="text-[11px] text-gray-500">세로</span>
+                <input
+                  type="number"
+                  min={CUSTOM_MIN_AXIS}
+                  max={CUSTOM_MAX_AXIS}
+                  value={value.customRows ?? 3}
+                  onChange={(e) =>
+                    update('customRows', clampAxis(parseInt(e.target.value, 10)))
+                  }
+                  className="w-16 text-sm border border-gray-300 rounded px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {(() => {
+                  const dims = getGridDims(value)
+                  const warn =
+                    dims.count < CUSTOM_MIN_CELLS || dims.count > CUSTOM_MAX_CELLS
+                  return (
+                    <span
+                      className={`text-xs font-semibold ${
+                        warn ? 'text-red-600' : 'text-blue-600'
+                      }`}
+                    >
+                      = {dims.count}개
+                      {warn && ` (${CUSTOM_MIN_CELLS}~${CUSTOM_MAX_CELLS} 범위)`}
+                    </span>
+                  )
+                })()}
+              </div>
+            )}
+
             <p className="mt-1 text-[11px] text-gray-500">
               선택한 그리드와 정확히 같은 수의 상품을 선택해야 콜라주 발행이 활성화됩니다.
+              직접 입력은 가로·세로 각 {CUSTOM_MIN_AXIS}~{CUSTOM_MAX_AXIS}, 총 {CUSTOM_MIN_CELLS}~{CUSTOM_MAX_CELLS}셀까지.
             </p>
           </div>
 

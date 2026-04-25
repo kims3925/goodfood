@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const categoryParam = searchParams.get('categoryId') // all | SEA | AGR | ...
     const daysWithin = searchParams.get('daysWithin')
+    const channelIdParam = searchParams.get('channelId')
 
     const where: any = {
       userId: user.userId,
@@ -63,6 +64,14 @@ export async function GET(request: NextRequest) {
         cutoff.setDate(cutoff.getDate() - days)
         cutoff.setHours(0, 0, 0, 0)
         where.createdAt = { gte: cutoff }
+      }
+    }
+
+    // 도매방(도매 채널) 필터 — 광고 페이지에서 특정 도매방에서 소싱한 상품만 필터
+    if (channelIdParam) {
+      const cid = parseInt(channelIdParam)
+      if (!isNaN(cid) && cid > 0) {
+        where.channelId = cid
       }
     }
 

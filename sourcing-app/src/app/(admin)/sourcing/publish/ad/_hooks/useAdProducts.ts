@@ -18,9 +18,14 @@ export interface AdFetchedProduct {
   shopProducts: { id: number; shopId: number | null; shopName?: string | null; shopSubdomain?: string | null }[]
 }
 
+export interface WholesaleChannel {
+  id: number
+  name: string
+}
+
 /**
  * 광고/콜라주 페이지에서 공유하는 상품 로드 훅.
- * /api/publish/digest GET을 재활용 (categoryId + daysWithin 필터).
+ * /api/publish/digest GET을 재활용 (categoryId + daysWithin + channelId 필터).
  */
 export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
   const [activeCategory, setActiveCategory] = useState<CategoryCode>(initialCategory)
@@ -31,14 +36,44 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
   const [isLoading, setIsLoading] = useState(false)
   const [dateFilter, setDateFilter] = useState<'today' | '3d' | '7d' | 'all'>('today')
 
+  // 도매방(도매 채널) 필터 — null이면 전체
+  const [wholesaleChannels, setWholesaleChannels] = useState<WholesaleChannel[]>([])
+  const [wholesaleChannelId, setWholesaleChannelId] = useState<number | null>(null)
+
+  // 도매 채널 목록 1회 로드
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/channel?kind=WHOLESALE&limit=100')
+        const data = await res.json()
+        if (!cancelled && data.success) {
+          setWholesaleChannels(
+            (data.data || []).map((ch: any) => ({ id: ch.id, name: ch.name }))
+          )
+        }
+      } catch (err) {
+        console.warn('[useAdProducts] 도매 채널 로드 실패', err)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const reload = useCallback(
-    async (code: CategoryCode = activeCategory, df: typeof dateFilter = dateFilter) => {
+    async (
+      code: CategoryCode = activeCategory,
+      df: typeof dateFilter = dateFilter,
+      chId: number | null = wholesaleChannelId
+    ) => {
       setIsLoading(true)
       try {
         const qs = new URLSearchParams({ categoryId: code })
         if (df === 'today') qs.set('daysWithin', '1')
         else if (df === '3d') qs.set('daysWithin', '3')
         else if (df === '7d') qs.set('daysWithin', '7')
+        if (chId != null) qs.set('channelId', String(chId))
         const res = await fetch(`/api/publish/digest?${qs.toString()}`)
         const data = await res.json()
         if (data.success) {
@@ -49,12 +84,12 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
         setIsLoading(false)
       }
     },
-    [activeCategory, dateFilter]
+    [activeCategory, dateFilter, wholesaleChannelId]
   )
 
   useEffect(() => {
-    reload(activeCategory, dateFilter)
-  }, [activeCategory, dateFilter, reload])
+    reload(activeCategory, dateFilter, wholesaleChannelId)
+  }, [activeCategory, dateFilter, wholesaleChannelId, reload])
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
 
@@ -68,5 +103,8 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
     productMap,
     isLoading,
     reload,
+    wholesaleChannels,
+    wholesaleChannelId,
+    setWholesaleChannelId,
   }
 }

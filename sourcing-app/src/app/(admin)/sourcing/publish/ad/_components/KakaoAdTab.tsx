@@ -26,6 +26,9 @@ export default function KakaoAdTab() {
     categories,
     products,
     isLoading,
+    wholesaleChannels,
+    wholesaleChannelId,
+    setWholesaleChannelId,
   } = useAdProducts('SEA')
 
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -127,6 +130,20 @@ export default function KakaoAdTab() {
             {opt === 'today' ? '🔥 오늘 상품' : opt === '3d' ? '최근 3일' : opt === '7d' ? '최근 7일' : '전체'}
           </button>
         ))}
+        <span className="mx-2 h-4 w-px bg-gray-200" aria-hidden="true" />
+        <span className="text-xs text-gray-500">🛒 도매방:</span>
+        <select
+          value={wholesaleChannelId ?? ''}
+          onChange={(e) => setWholesaleChannelId(e.target.value ? Number(e.target.value) : null)}
+          className="text-xs border border-gray-300 rounded-md px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">전체 ({wholesaleChannels.length}개)</option>
+          {wholesaleChannels.map((ch) => (
+            <option key={ch.id} value={ch.id}>
+              {ch.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="mb-4 bg-white border border-gray-200 rounded-lg p-3">

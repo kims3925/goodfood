@@ -8,8 +8,9 @@ import { CATEGORY_MAP, type CategoryCode } from '@/modules/category/category.key
 import CategoryTabs from '../../digest/_components/CategoryTabs'
 import DigestProductList from '../../digest/_components/DigestProductList'
 import DigestSettingsPanel, {
-  gridSizeToCount,
-  gridSizeToColsRows,
+  getGridDims,
+  CUSTOM_MIN_CELLS,
+  CUSTOM_MAX_CELLS,
   type CollageSettingsValue,
 } from '../../digest/_components/DigestSettingsPanel'
 import DigestProgressModal, {
@@ -35,6 +36,9 @@ export default function CollageTab() {
     products,
     productMap,
     isLoading,
+    wholesaleChannels,
+    wholesaleChannelId,
+    setWholesaleChannelId,
   } = useAdProducts('SEA')
 
   // 다중 카테고리 상태 — 체크박스로 선택, 카테고리별 상품 선택을 별도 Map으로 유지.
@@ -64,7 +68,10 @@ export default function CollageTab() {
   const [progressItems, setProgressItems] = useState<DigestProgressItem[]>([])
   const [progressOpen, setProgressOpen] = useState(false)
 
-  const expectedCount = gridSizeToCount(collageSettings.gridSize)
+  const { cols: gridCols, rows: gridRows, count: expectedCount } = getGridDims(collageSettings)
+  const customOutOfRange =
+    collageSettings.gridSize === 'custom' &&
+    (expectedCount < CUSTOM_MIN_CELLS || expectedCount > CUSTOM_MAX_CELLS)
   const collageDefaultTitle = `오늘의${CATEGORY_MAP[activeCategory].name}추천`
 
   // 발행 대상 카테고리 요약 (체크된 것들의 선택 진행도)
@@ -82,7 +89,7 @@ export default function CollageTab() {
   }, [checkedCategories, selectedByCategory, expectedCount])
 
   const allCategoriesReady =
-    categorySummary.length > 0 && categorySummary.every((c) => c.ok)
+    !customOutOfRange && categorySummary.length > 0 && categorySummary.every((c) => c.ok)
 
   // 현재 탭의 쇼핑몰 카테고리 링크 (설정 패널 미리보기용)
   const shopCategoryUrl = useMemo(() => {
@@ -193,7 +200,8 @@ export default function CollageTab() {
     setIsPublishing(true)
 
     try {
-      const { cols, rows } = gridSizeToColsRows(collageSettings.gridSize)
+      const cols = gridCols
+      const rows = gridRows
 
       for (let catIdx = 0; catIdx < categorySummary.length; catIdx++) {
         const cat = categorySummary[catIdx]
@@ -294,6 +302,20 @@ export default function CollageTab() {
             {opt === 'today' ? '🔥 오늘 상품' : opt === '3d' ? '최근 3일' : opt === '7d' ? '최근 7일' : '전체'}
           </button>
         ))}
+        <span className="mx-2 h-4 w-px bg-gray-200" aria-hidden="true" />
+        <span className="text-xs text-gray-500">🛒 도매방:</span>
+        <select
+          value={wholesaleChannelId ?? ''}
+          onChange={(e) => setWholesaleChannelId(e.target.value ? Number(e.target.value) : null)}
+          className="text-xs border border-gray-300 rounded-md px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">전체 ({wholesaleChannels.length}개)</option>
+          {wholesaleChannels.map((ch) => (
+            <option key={ch.id} value={ch.id}>
+              {ch.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <DigestSettingsPanel
