@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     const categoryParam = searchParams.get('categoryId') // all | SEA | AGR | ...
     const daysWithin = searchParams.get('daysWithin')
     const channelIdParam = searchParams.get('channelId')
+    const searchParam = searchParams.get('search')
 
     const where: any = {
       userId: user.userId,
@@ -73,6 +74,15 @@ export async function GET(request: NextRequest) {
       if (!isNaN(cid) && cid > 0) {
         where.channelId = cid
       }
+    }
+
+    // 상품 검색 — 이름 또는 설명에 부분 일치 (MariaDB 기본 collation은 case-insensitive)
+    if (searchParam && searchParam.trim()) {
+      const q = searchParam.trim()
+      where.OR = [
+        { name: { contains: q } },
+        { description: { contains: q } },
+      ]
     }
 
     const products = await prisma.product.findMany({

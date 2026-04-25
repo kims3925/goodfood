@@ -55,6 +55,8 @@ export default function CollageTab() {
     wholesaleChannels,
     wholesaleChannelId,
     setWholesaleChannelId,
+    searchQuery,
+    setSearchQuery,
   } = useAdProducts('SEA')
 
   // 다중 카테고리 체크박스 — 발행 풀에 포함시킬 카테고리들
@@ -394,6 +396,27 @@ export default function CollageTab() {
             </option>
           ))}
         </select>
+        <span className="mx-2 h-4 w-px bg-gray-200" aria-hidden="true" />
+        <label className="text-xs text-gray-500 flex items-center gap-1">
+          🔍
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="상품명 또는 설명 검색"
+            className="text-xs border border-gray-300 rounded-md px-2 py-1.5 bg-white text-gray-700 w-40 sm:w-56 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </label>
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="text-xs text-gray-500 hover:text-gray-700 px-1"
+            title="검색어 지우기"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <DigestSettingsPanel

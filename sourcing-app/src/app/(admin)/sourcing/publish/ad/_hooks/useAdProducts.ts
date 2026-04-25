@@ -40,6 +40,14 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
   const [wholesaleChannels, setWholesaleChannels] = useState<WholesaleChannel[]>([])
   const [wholesaleChannelId, setWholesaleChannelId] = useState<number | null>(null)
 
+  // 상품 검색 — 입력은 즉시, 실제 fetch는 디바운싱(300ms)으로 호출 횟수 제한
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300)
+    return () => clearTimeout(t)
+  }, [searchQuery])
+
   // 도매 채널 목록 1회 로드
   useEffect(() => {
     let cancelled = false
@@ -65,7 +73,8 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
     async (
       code: CategoryCode = activeCategory,
       df: typeof dateFilter = dateFilter,
-      chId: number | null = wholesaleChannelId
+      chId: number | null = wholesaleChannelId,
+      q: string = debouncedSearch
     ) => {
       setIsLoading(true)
       try {
@@ -74,6 +83,7 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
         else if (df === '3d') qs.set('daysWithin', '3')
         else if (df === '7d') qs.set('daysWithin', '7')
         if (chId != null) qs.set('channelId', String(chId))
+        if (q) qs.set('search', q)
         const res = await fetch(`/api/publish/digest?${qs.toString()}`)
         const data = await res.json()
         if (data.success) {
@@ -84,12 +94,12 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
         setIsLoading(false)
       }
     },
-    [activeCategory, dateFilter, wholesaleChannelId]
+    [activeCategory, dateFilter, wholesaleChannelId, debouncedSearch]
   )
 
   useEffect(() => {
-    reload(activeCategory, dateFilter, wholesaleChannelId)
-  }, [activeCategory, dateFilter, wholesaleChannelId, reload])
+    reload(activeCategory, dateFilter, wholesaleChannelId, debouncedSearch)
+  }, [activeCategory, dateFilter, wholesaleChannelId, debouncedSearch, reload])
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
 
@@ -106,5 +116,7 @@ export function useAdProducts(initialCategory: CategoryCode = 'SEA') {
     wholesaleChannels,
     wholesaleChannelId,
     setWholesaleChannelId,
+    searchQuery,
+    setSearchQuery,
   }
 }
