@@ -9,8 +9,8 @@ import CategoryTabs from '../../digest/_components/CategoryTabs'
 import DigestProductList from '../../digest/_components/DigestProductList'
 import DigestSettingsPanel, {
   getGridDims,
-  CUSTOM_MIN_CELLS,
-  CUSTOM_MAX_CELLS,
+  TARGET_MIN,
+  TARGET_MAX,
   type CollageSettingsValue,
 } from '../../digest/_components/DigestSettingsPanel'
 import DigestProgressModal, {
@@ -41,8 +41,9 @@ export default function CollageTab() {
     setWholesaleChannelId,
   } = useAdProducts('SEA')
 
-  // 다중 카테고리 상태 — 체크박스로 선택, 카테고리별 상품 선택을 별도 Map으로 유지.
-  // 탭을 전환해도 다른 카테고리의 선택 상태가 유지된다.
+  // 다중 카테고리 — 체크박스로 발행 풀에 포함할 카테고리들 선택.
+  // 각 카테고리 상품을 활성 탭에서 체크해 누적 선택하고, 최종적으로 모든 체크된
+  // 카테고리 선택분을 합쳐 targetCount개로 **통합 포스터 1장**을 만든다.
   const [checkedCategories, setCheckedCategories] = useState<Set<CategoryCode>>(new Set(['SEA']))
   const [selectedByCategory, setSelectedByCategory] = useState<Map<CategoryCode, number[]>>(
     new Map()
@@ -54,51 +55,58 @@ export default function CollageTab() {
     [selectedByCategory, activeCategory]
   )
 
+  // 체크된 모든 카테고리 상품 선택을 합친 통합 선택 리스트 (카테고리 순, 그 안에서 추가 순)
+  const totalSelectedIds = useMemo(() => {
+    const ids: number[] = []
+    for (const cat of checkedCategories) {
+      for (const id of selectedByCategory.get(cat) ?? []) ids.push(id)
+    }
+    return ids
+  }, [checkedCategories, selectedByCategory])
+
   const [collageSettings, setCollageSettings] = useState<CollageSettingsValue>({
     collageTitle: '',
     topBadgeText: '',
     gridSize: '3x4',
+    targetCount: 12,
     removeBackground: true,
   })
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannels, setSelectedChannels] = useState<number[]>([])
   const [isPublishing, setIsPublishing] = useState(false)
 
-  // 진행 모달 — (카테고리 × 채널) 각 발행의 실시간 상태
+  // 진행 모달 — 채널별 발행 실시간 상태
   const [progressItems, setProgressItems] = useState<DigestProgressItem[]>([])
   const [progressOpen, setProgressOpen] = useState(false)
 
   const { cols: gridCols, rows: gridRows, count: expectedCount } = getGridDims(collageSettings)
-  const customOutOfRange =
-    collageSettings.gridSize === 'custom' &&
-    (expectedCount < CUSTOM_MIN_CELLS || expectedCount > CUSTOM_MAX_CELLS)
+  const outOfRange = expectedCount < TARGET_MIN || expectedCount > TARGET_MAX
+  const totalCount = totalSelectedIds.length
+  const countMatches = totalCount === expectedCount
+
   const collageDefaultTitle = `오늘의${CATEGORY_MAP[activeCategory].name}추천`
 
-  // 발행 대상 카테고리 요약 (체크된 것들의 선택 진행도)
+  // 체크된 카테고리 요약 (카운트만 표시 — 카테고리별 정원 강제 없음)
   const categorySummary = useMemo(() => {
-    return Array.from(checkedCategories).map((code) => {
-      const count = selectedByCategory.get(code)?.length ?? 0
-      return {
-        code,
-        name: CATEGORY_MAP[code].name,
-        emoji: CATEGORY_MAP[code].emoji,
-        count,
-        ok: count === expectedCount,
-      }
-    })
-  }, [checkedCategories, selectedByCategory, expectedCount])
+    return Array.from(checkedCategories).map((code) => ({
+      code,
+      name: CATEGORY_MAP[code].name,
+      emoji: CATEGORY_MAP[code].emoji,
+      count: selectedByCategory.get(code)?.length ?? 0,
+    }))
+  }, [checkedCategories, selectedByCategory])
 
-  const allCategoriesReady =
-    !customOutOfRange && categorySummary.length > 0 && categorySummary.every((c) => c.ok)
+  const canPublish =
+    !outOfRange && countMatches && totalCount > 0 && selectedChannels.length > 0
 
-  // 현재 탭의 쇼핑몰 카테고리 링크 (설정 패널 미리보기용)
+  // 현재 활성 카테고리 기준 쇼핑몰 URL (설정 패널 미리보기용)
   const shopCategoryUrl = useMemo(() => {
     const firstSelected = selectedIds.map((id) => productMap.get(id)).find(Boolean)
     const subdomain = firstSelected?.shopProducts[0]?.shopSubdomain
     return subdomain ? `https://${SHOP_DOMAIN}/${subdomain}/category/${activeCategory}` : undefined
   }, [selectedIds, productMap, activeCategory])
 
-  // 채널 로드
+  // 소매 밴드(발행 대상 채널) 로드
   useEffect(() => {
     ;(async () => {
       try {
@@ -117,7 +125,20 @@ export default function CollageTab() {
     setSelectedByCategory((prev) => {
       const next = new Map(prev)
       const cur = next.get(activeCategory) ?? []
-      next.set(activeCategory, cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id])
+      if (cur.includes(id)) {
+        next.set(activeCategory, cur.filter((x) => x !== id))
+        return next
+      }
+      // 합산 상한(expectedCount) 체크
+      let total = 0
+      for (const cat of checkedCategories) {
+        total += cat === activeCategory ? cur.length : (prev.get(cat)?.length ?? 0)
+      }
+      if (total >= expectedCount) {
+        toast.error(`최대 ${expectedCount}개까지 선택할 수 있습니다 (현재 ${total}개).`)
+        return prev
+      }
+      next.set(activeCategory, [...cur, id])
       return next
     })
   }
@@ -125,7 +146,13 @@ export default function CollageTab() {
   const setAllSelectedForActive = (ids: number[]) => {
     setSelectedByCategory((prev) => {
       const next = new Map(prev)
-      next.set(activeCategory, ids)
+      let totalExcludingActive = 0
+      for (const cat of checkedCategories) {
+        if (cat === activeCategory) continue
+        totalExcludingActive += prev.get(cat)?.length ?? 0
+      }
+      const remaining = Math.max(0, expectedCount - totalExcludingActive)
+      next.set(activeCategory, ids.slice(0, remaining))
       return next
     })
   }
@@ -159,115 +186,102 @@ export default function CollageTab() {
   }))
 
   const handlePublish = async () => {
-    if (!allCategoriesReady) {
-      const failing = categorySummary
-        .filter((c) => !c.ok)
-        .map((c) => `${c.name}(${c.count}/${expectedCount})`)
-        .join(', ')
-      toast.error(`선택 부족: ${failing || '체크된 카테고리 없음'}`)
+    if (!canPublish) {
+      if (totalCount === 0) toast.error('상품을 선택하세요.')
+      else if (totalCount < expectedCount)
+        toast.error(`선택 부족: ${totalCount}/${expectedCount}개`)
+      else if (totalCount > expectedCount)
+        toast.error(`선택 초과: ${totalCount}/${expectedCount}개`)
+      else if (selectedChannels.length === 0) toast.error('발행할 소매밴드를 선택하세요.')
       return
     }
-    if (selectedChannels.length === 0) {
-      toast.error('발행할 소매밴드를 선택하세요.')
-      return
-    }
-    const totalPublish = categorySummary.length * selectedChannels.length
     if (
       !window.confirm(
-        `카테고리 ${categorySummary.length}개 × 밴드 ${selectedChannels.length}개 = ${totalPublish}건을 발행합니다.\n각 카테고리는 개별 콜라주 포스터 1장으로 발행됩니다.\n계속할까요?`
+        `상품 ${totalCount}개를 콜라주 포스터 1장으로 밴드 ${selectedChannels.length}개에 발행합니다.\n계속할까요?`
       )
     ) {
       return
     }
 
     const activeChannels = channels.filter((c) => selectedChannels.includes(c.id))
+    // 통합 포스터의 주 카테고리 — 첫 번째 체크된 카테고리를 메타용으로 사용
+    const primaryCategory =
+      Array.from(checkedCategories)[0] ?? activeCategory
 
-    // 진행 모달 초기화: (카테고리 × 채널) 모든 조합을 pending 상태로
-    const initialItems: DigestProgressItem[] = []
-    for (const cat of categorySummary) {
-      for (const ch of activeChannels) {
-        initialItems.push({
-          channelId: ch.id,
-          channelName: ch.name,
-          categoryCode: cat.code,
-          categoryLabel: `${cat.emoji} ${cat.name}`,
-          status: 'pending',
-        })
-      }
-    }
+    // 진행 모달 초기화 (채널별 1행)
+    const initialItems: DigestProgressItem[] = activeChannels.map((ch) => ({
+      channelId: ch.id,
+      channelName: ch.name,
+      categoryCode: primaryCategory,
+      categoryLabel:
+        categorySummary.length > 1
+          ? `${categorySummary.map((c) => c.emoji).join('')} 혼합`
+          : `${CATEGORY_MAP[primaryCategory].emoji} ${CATEGORY_MAP[primaryCategory].name}`,
+      status: 'pending',
+    }))
     setProgressItems(initialItems)
     setProgressOpen(true)
     setIsPublishing(true)
 
     try {
-      const cols = gridCols
-      const rows = gridRows
+      for (let i = 0; i < activeChannels.length; i++) {
+        const channelId = activeChannels[i].id
 
-      for (let catIdx = 0; catIdx < categorySummary.length; catIdx++) {
-        const cat = categorySummary[catIdx]
-        const productIds = selectedByCategory.get(cat.code) ?? []
+        setProgressItems((prev) => {
+          const next = [...prev]
+          next[i] = { ...next[i], status: 'publishing' }
+          return next
+        })
 
-        for (let chIdx = 0; chIdx < activeChannels.length; chIdx++) {
-          const channelId = activeChannels[chIdx].id
-          const itemIdx = catIdx * activeChannels.length + chIdx
-
-          // publishing 상태로 표시
+        try {
+          const res = await fetch('/api/publish/digest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              categoryId: primaryCategory,
+              productIds: totalSelectedIds,
+              channelId,
+              publishMode: 'collage',
+              collageOptions: {
+                title: collageSettings.collageTitle.trim() || undefined,
+                gridCols,
+                gridRows,
+                removeBackground: collageSettings.removeBackground,
+                topBadgeText: collageSettings.topBadgeText.trim() || undefined,
+              },
+            }),
+          })
+          const data = await res.json()
+          const ok = data.result?.status === 'SUCCESS'
           setProgressItems((prev) => {
             const next = [...prev]
-            next[itemIdx] = { ...next[itemIdx], status: 'publishing' }
+            next[i] = {
+              ...next[i],
+              status: ok ? 'success' : 'failed',
+              message: data.result?.message || data.error,
+            }
             return next
           })
-
-          try {
-            const res = await fetch('/api/publish/digest', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                categoryId: cat.code,
-                productIds,
-                channelId,
-                publishMode: 'collage',
-                collageOptions: {
-                  title: collageSettings.collageTitle.trim() || undefined,
-                  gridCols: cols,
-                  gridRows: rows,
-                  removeBackground: collageSettings.removeBackground,
-                  topBadgeText: collageSettings.topBadgeText.trim() || undefined,
-                },
-              }),
-            })
-            const data = await res.json()
-            const ok = data.result?.status === 'SUCCESS'
-            setProgressItems((prev) => {
-              const next = [...prev]
-              next[itemIdx] = {
-                ...next[itemIdx],
-                status: ok ? 'success' : 'failed',
-                message: data.result?.message || data.error,
-              }
-              return next
-            })
-          } catch (err: any) {
-            setProgressItems((prev) => {
-              const next = [...prev]
-              next[itemIdx] = {
-                ...next[itemIdx],
-                status: 'failed',
-                message: err?.message || '요청 오류',
-              }
-              return next
-            })
-          }
+        } catch (err: any) {
+          setProgressItems((prev) => {
+            const next = [...prev]
+            next[i] = {
+              ...next[i],
+              status: 'failed',
+              message: err?.message || '요청 오류',
+            }
+            return next
+          })
         }
       }
 
-      // 발행 완료 후 선택만 초기화. 진행 모달은 사용자가 닫을 때까지 유지.
       setSelectedByCategory(new Map())
       setSelectedChannels([])
 
-      const successCount = initialItems.length
-      const finalFailed = progressItems.filter((i) => i.status === 'failed').length
-      if (finalFailed === 0) toast.success(`${successCount}건 발행 완료`)
+      const finalFailed = initialItems.length > 0
+        ? progressItems.filter((it) => it.status === 'failed').length
+        : 0
+      if (finalFailed === 0) toast.success(`${activeChannels.length}건 발행 완료`)
     } finally {
       setIsPublishing(false)
     }
@@ -284,7 +298,7 @@ export default function CollageTab() {
           onToggleChecked={toggleCategoryChecked}
         />
         <p className="mt-1 text-[11px] text-gray-500">
-          💡 카테고리 버튼의 체크박스로 발행 대상을 선택하고, 탭 클릭으로 해당 카테고리 상품을 고르세요.
+          💡 카테고리 버튼 체크박스로 여러 카테고리를 한 포스터에 섞을 수 있고, 탭 클릭으로 해당 카테고리 상품을 선택합니다.
         </p>
       </div>
 
@@ -323,13 +337,14 @@ export default function CollageTab() {
         onChange={setCollageSettings}
         shopCategoryUrl={shopCategoryUrl}
         defaultTitle={collageDefaultTitle}
+        mode="count"
       />
 
       {/* 발행 대상 요약 */}
       {categorySummary.length > 0 && (
         <div className="mb-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
           <div className="text-xs font-semibold text-blue-900 mb-2">
-            📌 발행 대상 카테고리 ({categorySummary.length}개) · 각 {expectedCount}개 선택 필요
+            📌 발행 대상 카테고리 ({categorySummary.length}개) · 합산 {totalCount}/{expectedCount}개
           </div>
           <div className="flex flex-wrap gap-2">
             {categorySummary.map((c) => (
@@ -338,12 +353,12 @@ export default function CollageTab() {
                 type="button"
                 onClick={() => setActiveCategory(c.code)}
                 className={`text-xs px-2 py-1 rounded-md transition-colors ${
-                  c.ok
+                  c.count > 0
                     ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                    : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 } ${c.code === activeCategory ? 'ring-2 ring-blue-400' : ''}`}
               >
-                {c.emoji} {c.name} {c.count}/{expectedCount}
+                {c.emoji} {c.name} {c.count}개
               </button>
             ))}
           </div>
@@ -367,17 +382,19 @@ export default function CollageTab() {
 
       <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg px-4 py-3 -mx-4 sm:-mx-6 lg:-mx-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 z-30">
         <div className="text-sm text-gray-700">
-          <span className={`font-bold ${allCategoriesReady ? 'text-blue-600' : 'text-amber-600'}`}>
-            {categorySummary.length}개 카테고리
-          </span>
+          현재 탭 <span className="font-bold text-gray-800">{selectedIds.length}개</span>
           <span className="mx-2">·</span>
-          현재 탭{' '}
+          합산 선택:{' '}
           <span
             className={`font-bold ${
-              selectedIds.length === expectedCount ? 'text-emerald-600' : 'text-gray-700'
+              countMatches ? 'text-emerald-600' : totalCount > expectedCount ? 'text-red-600' : 'text-amber-600'
             }`}
           >
-            {selectedIds.length}/{expectedCount}
+            {totalCount}
+          </span>
+          <span className="text-gray-400">/{expectedCount}</span>
+          <span className="ml-2 text-xs text-gray-500">
+            (자동 {gridCols}×{gridRows})
           </span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -401,15 +418,19 @@ export default function CollageTab() {
           })}
           <Button
             variant="primary"
-            disabled={!allCategoriesReady || selectedChannels.length === 0 || isPublishing}
+            disabled={!canPublish || isPublishing}
             loading={isPublishing}
             onClick={handlePublish}
             className="ml-2"
           >
             🖼️{' '}
-            {allCategoriesReady
-              ? `콜라주 발행 (${categorySummary.length}×${selectedChannels.length}건)`
-              : `선택 부족`}
+            {canPublish
+              ? `콜라주 발행 (${totalCount}개 → 포스터 1장 × ${selectedChannels.length}밴드)`
+              : totalCount < expectedCount
+              ? `선택 부족 (${totalCount}/${expectedCount})`
+              : totalCount > expectedCount
+              ? `선택 초과 (${totalCount}/${expectedCount})`
+              : '밴드 선택 필요'}
           </Button>
         </div>
       </div>
@@ -419,12 +440,12 @@ export default function CollageTab() {
         items={progressItems}
         digestTitle={
           collageSettings.collageTitle.trim() ||
-          (categorySummary.length > 0
-            ? categorySummary.map((c) => `오늘의${c.name}추천`).join(' · ')
+          (categorySummary.length > 1
+            ? categorySummary.map((c) => c.name).join(' · ') + ' 추천'
             : collageDefaultTitle)
         }
-        productCount={categorySummary.reduce((sum, c) => sum + c.count, 0)}
-        imageCount={categorySummary.length}
+        productCount={totalCount}
+        imageCount={1}
         onClose={() => setProgressOpen(false)}
         canClose={!isPublishing}
       />

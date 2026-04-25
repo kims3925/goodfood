@@ -165,6 +165,11 @@ function buildPosterHtml(opts: {
   const nameMinH = Math.round(70 * cellScale)
   const cellsHtml = cells
     .map((c) => {
+      // 빈 셀 판단: 상품 정보가 없고 이미지도 없음 → placeholder만 자리 차지
+      const isEmpty = !c.name && !c.priceText && !c.imgDataUri
+      if (isEmpty) {
+        return `<div class="cell cell-empty" aria-hidden="true"></div>`
+      }
       const img = c.imgDataUri
         ? `<img src="${c.imgDataUri}" alt="">`
         : `<div class="img-placeholder">이미지 없음</div>`
@@ -214,6 +219,11 @@ html, body { background: #ffffff; font-family: 'Pretendard', -apple-system, syst
   grid-template-rows: repeat(${gridRows}, 1fr);
   gap: 28px;
   margin-top: 36px;
+}
+.cell-empty {
+  background: transparent;
+  border: none;
+  visibility: hidden;
 }
 .cell {
   background: rgba(255,255,255,0.55);
@@ -297,11 +307,15 @@ export async function renderCollagePoster(
   } = options
 
   const expected = gridCols * gridRows
-  if (products.length !== expected) {
+  if (products.length === 0) {
+    throw new Error('콜라주 렌더러: 상품 수가 0입니다.')
+  }
+  if (products.length > expected) {
     throw new Error(
-      `콜라주 렌더러: 상품 수(${products.length})와 그리드 크기(${gridCols}×${gridRows}=${expected})가 일치해야 합니다.`
+      `콜라주 렌더러: 상품 수(${products.length})가 그리드 크기(${gridCols}×${gridRows}=${expected})보다 많습니다.`
     )
   }
+  const emptySlots = expected - products.length // 부족 셀은 빈 placeholder로 렌더
 
   // 1) 각 이미지 처리 — fetch → (옵션) 배경 제거 → data URI
   // 메모리 보호를 위해 순차 처리. 12장 기준 1-2분 예상.
@@ -339,6 +353,11 @@ export async function renderCollagePoster(
       priceText: p.priceText,
       imgDataUri,
     })
+  }
+
+  // 빈 셀 placeholder — grid 레이아웃은 유지하되 내용은 visibility:hidden
+  for (let i = 0; i < emptySlots; i++) {
+    cellData.push({ spec: '', name: '', priceText: '', imgDataUri: null })
   }
 
   // 2) HTML 합성 + Playwright 스크린샷

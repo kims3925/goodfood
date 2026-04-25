@@ -312,11 +312,18 @@ export async function POST(request: NextRequest) {
       const gridRows = collageOptions?.gridRows ?? 4
       const expected = gridCols * gridRows
 
-      if (orderedProducts.length !== expected) {
+      // 콜라주 모드: 상품 수는 1 ~ cols*rows 사이여야 함. 부족분은 렌더러가 빈 셀로 처리.
+      if (orderedProducts.length === 0) {
+        return NextResponse.json(
+          { success: false, error: '콜라주 발행에는 최소 1개 상품이 필요합니다.' },
+          { status: 400 }
+        )
+      }
+      if (orderedProducts.length > expected) {
         return NextResponse.json(
           {
             success: false,
-            error: `콜라주 모드는 정확히 ${expected}개 상품이 필요합니다 (현재 ${orderedProducts.length}개).`,
+            error: `콜라주 상품 수(${orderedProducts.length})가 그리드(${gridCols}×${gridRows}=${expected})를 초과합니다.`,
           },
           { status: 400 }
         )
