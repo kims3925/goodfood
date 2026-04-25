@@ -174,8 +174,10 @@ export class SettingsService {
       throw new Error('지원하지 않는 AI 제공업체입니다.')
     }
 
+    // apiKey는 복붙 시 앞뒤 공백/개행이 섞이는 일이 잦다. 저장 시점에 정규화해
+    // 런타임에서 "API 키가 설정되지 않았습니다" 같은 오해 에러 방지.
     const configData = {
-      apiKey: settings.apiKey,
+      apiKey: (settings.apiKey || '').trim(),
       model: settings.model,
       config: JSON.stringify({
         temperature: settings.temperature || 0.7,

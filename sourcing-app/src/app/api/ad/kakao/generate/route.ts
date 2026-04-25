@@ -64,13 +64,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: '한 번에 최대 10개까지 생성할 수 있습니다.' }, { status: 400 })
   }
 
-  // Claude API 키 조회
+  // Claude API 키 + 모델 조회
+  // 사용자가 설정 > AI/API에서 저장한 Claude 모델을 그대로 사용한다
+  // (이전엔 /haiku/i로 필터링해 Sonnet 선택 시에도 Haiku로 강제되던 결함).
   let apiKey = ''
   let model = 'claude-haiku-4-5-20251001'
   try {
     const ai = await settingsService.getAiSettings(user.userId)
-    apiKey = ai.claude?.apiKey || ''
-    if (ai.claude?.model && /haiku/i.test(ai.claude.model)) {
+    apiKey = (ai.claude?.apiKey || '').trim()
+    if (ai.claude?.model && /^claude-/i.test(ai.claude.model)) {
       model = ai.claude.model
     }
   } catch (err) {
@@ -78,7 +80,11 @@ export async function POST(request: NextRequest) {
   }
   if (!apiKey) {
     return NextResponse.json(
-      { success: false, error: 'Claude API 키가 설정되지 않았습니다. 설정 > AI/API에서 등록하세요.' },
+      {
+        success: false,
+        error:
+          'Claude API 키가 설정되지 않았습니다. 설정 > AI/API 페이지에서 Claude 탭 선택 → 키 입력 → 연결 테스트 → "저장" 버튼까지 누르셨는지 확인하세요.',
+      },
       { status: 400 }
     )
   }

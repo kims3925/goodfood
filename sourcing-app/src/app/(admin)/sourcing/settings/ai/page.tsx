@@ -110,7 +110,11 @@ export default function AISettingsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setTestResult({ success: true, message: '설정이 저장되었습니다.' })
+        const base = '설정이 저장되었습니다.'
+        const msg = data.automationConfigWarning
+          ? `${base} (자동화 설정 동기화는 실패했지만 AI 키는 정상 저장됨: ${data.automationConfigWarning})`
+          : base
+        setTestResult({ success: true, message: msg })
         await loadSettings()
       } else {
         setTestResult({ success: false, message: data.error || '설정 저장에 실패했습니다.' })

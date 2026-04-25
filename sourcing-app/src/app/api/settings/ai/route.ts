@@ -197,20 +197,36 @@ export async function POST(request: NextRequest) {
     const aiConfig = await settingsService.saveAiSettings(currentUser.userId, provider.toLowerCase(), settings)
 
     // 자동화 설정의 aiProvider도 함께 업데이트 (마지막 저장된 AI를 사용하도록)
-    await prisma.automationConfig.upsert({
-      where: { userId: currentUser.userId },
-      create: {
-        userId: currentUser.userId,
-        aiProvider: provider.toUpperCase(),
-        isEnabled: false,
-      },
-      update: {
-        aiProvider: provider.toUpperCase(),
-      },
-    })
-    console.log('[AI 설정 저장] automationConfig.aiProvider도 업데이트:', provider.toUpperCase())
+    // 여기서 실패해도 AI 설정 저장은 유지되어야 한다. 과거 로컬 DB에 digest_mode 등
+    // 신규 컬럼이 마이그레이션 안 된 환경에서 이 upsert가 터지며 전체 500으로 번져
+    // "Claude API 키가 설정되지 않았습니다"처럼 보이는 사용자 혼란을 유발한 사례가 있음.
+    let automationConfigWarning: string | undefined
+    try {
+      await prisma.automationConfig.upsert({
+        where: { userId: currentUser.userId },
+        create: {
+          userId: currentUser.userId,
+          aiProvider: provider.toUpperCase(),
+          isEnabled: false,
+        },
+        update: {
+          aiProvider: provider.toUpperCase(),
+        },
+      })
+      console.log('[AI 설정 저장] automationConfig.aiProvider도 업데이트:', provider.toUpperCase())
+    } catch (err: any) {
+      automationConfigWarning = err?.message || String(err)
+      console.warn(
+        '[AI 설정 저장] automationConfig upsert 실패 (AI 저장은 정상):',
+        automationConfigWarning
+      )
+    }
 
-    return NextResponse.json({ success: true, data: aiConfig })
+    return NextResponse.json({
+      success: true,
+      data: aiConfig,
+      ...(automationConfigWarning ? { automationConfigWarning } : {}),
+    })
   } catch (error: any) {
     console.error('AI 설정 저장 실패:', error)
     console.error('Error code:', error.code)
