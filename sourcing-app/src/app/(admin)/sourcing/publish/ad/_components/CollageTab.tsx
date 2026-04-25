@@ -21,6 +21,25 @@ import { useAdProducts, type AdFetchedProduct } from '../_hooks/useAdProducts'
 
 const SHOP_DOMAIN = (process.env.NEXT_PUBLIC_SHOP_DOMAIN || 'shop.abcpharm.net').replace(/\/$/, '')
 
+/**
+ * fetch 응답이 JSON이 아닐 때(예: 라우트 5xx HTML, nginx 504 타임아웃) 클라이언트가
+ * 'Unexpected token <' 만 보고 무엇이 일어났는지 모르는 상황을 방지.
+ * 서버가 보낸 본문 일부와 status를 그대로 노출.
+ */
+async function safeJson(res: Response): Promise<any> {
+  const ct = res.headers.get('content-type') || ''
+  if (ct.includes('application/json')) {
+    return res.json()
+  }
+  const text = await res.text().catch(() => '')
+  const snippet = text.slice(0, 200).replace(/\s+/g, ' ').trim()
+  throw new Error(
+    `서버가 JSON 대신 HTML/텍스트를 응답했습니다 (status ${res.status}${
+      res.statusText ? ' ' + res.statusText : ''
+    }). 응답 시작: ${snippet || '(빈 응답)'}`
+  )
+}
+
 interface Channel {
   id: number
   name: string
@@ -78,6 +97,7 @@ export default function CollageTab() {
     gridSize: '3x4',
     targetCount: 12,
     removeBackground: true,
+    shopLinkMode: 'auto',
   })
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannels, setSelectedChannels] = useState<number[]>([])
@@ -128,11 +148,43 @@ export default function CollageTab() {
     })
   }, [products])
 
+  // 미리보기 URL — 실제 발행은 서버가 채널별 shop을 사용해 다시 계산하지만,
+  // 패널에 보여줄 1건 미리보기 용도. 첫 선택 상품의 shop subdomain을 기준.
   const shopCategoryUrl = useMemo(() => {
-    const firstSelected = selectedIds.map((id) => productInfoCache.get(id)).find(Boolean)
-    const subdomain = firstSelected?.shopProducts[0]?.shopSubdomain
-    return subdomain ? `https://${SHOP_DOMAIN}/${subdomain}/category/${activeCategory}` : undefined
-  }, [selectedIds, productInfoCache, activeCategory])
+    const firstSelectedAcrossCats = orderedSelected
+      .map((s) => productInfoCache.get(s.id))
+      .find(Boolean)
+    const subdomain = firstSelectedAcrossCats?.shopProducts[0]?.shopSubdomain
+    if (!subdomain) return undefined
+    const linkMode = collageSettings.shopLinkMode || 'auto'
+    const useMain =
+      linkMode === 'main' ||
+      (linkMode === 'auto' && checkedCategories.size >= 2)
+    if (useMain) return `https://${SHOP_DOMAIN}/${subdomain}`
+    const targetCat =
+      collageSettings.linkCategoryCode ||
+      Array.from(checkedCategories)[0] ||
+      activeCategory
+    return `https://${SHOP_DOMAIN}/${subdomain}/category/${targetCat}`
+  }, [
+    orderedSelected,
+    productInfoCache,
+    collageSettings.shopLinkMode,
+    collageSettings.linkCategoryCode,
+    checkedCategories,
+    activeCategory,
+  ])
+
+  // 'category' 모드 dropdown용 — 사용자가 체크한 카테고리들
+  const linkCategoryOptions = useMemo(
+    () =>
+      Array.from(checkedCategories).map((code) => ({
+        code,
+        name: CATEGORY_MAP[code].name,
+        emoji: CATEGORY_MAP[code].emoji,
+      })),
+    [checkedCategories]
+  )
 
   // 소매 채널 로드 (발행 대상)
   useEffect(() => {
@@ -306,10 +358,13 @@ export default function CollageTab() {
                 removeBackground: collageSettings.removeBackground,
                 topBadgeText: collageSettings.topBadgeText.trim() || undefined,
                 cellOverrides: cellOverrides.length > 0 ? cellOverrides : undefined,
+                shopLinkMode: collageSettings.shopLinkMode || 'auto',
+                categoryCodes: Array.from(checkedCategories),
+                linkCategoryCode: collageSettings.linkCategoryCode,
               },
             }),
           })
-          const data = await res.json()
+          const data = await safeJson(res)
           const ok = data.result?.status === 'SUCCESS'
           setProgressItems((prev) => {
             const next = [...prev]
@@ -425,6 +480,7 @@ export default function CollageTab() {
         shopCategoryUrl={shopCategoryUrl}
         defaultTitle={collageDefaultTitle}
         mode="count"
+        linkCategoryOptions={linkCategoryOptions}
       />
 
       {/* 발행 대상 요약 */}

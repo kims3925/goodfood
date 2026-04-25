@@ -16,6 +16,8 @@ export type GridSize = '3x4' | '3x3' | '2x3' | 'custom'
  *
  * `getGridDims(value)`는 targetCount가 정의되어 있으면 1번보다 우선한다.
  */
+export type ShopLinkMode = 'auto' | 'main' | 'category'
+
 export interface CollageSettingsValue {
   collageTitle: string
   topBadgeText: string
@@ -30,6 +32,15 @@ export interface CollageSettingsValue {
    */
   targetCount?: number
   removeBackground: boolean
+  /**
+   * 쇼핑몰 링크 모드 (콜라주 본문 하단 URL).
+   * - 'auto'(기본): 단일 카테고리는 카테고리 페이지, 2개 이상이면 쇼핑몰 메인.
+   * - 'main': 항상 쇼핑몰 메인.
+   * - 'category': 항상 카테고리 페이지(linkCategoryCode 사용).
+   */
+  shopLinkMode?: ShopLinkMode
+  /** category 모드에서 사용할 카테고리 코드. */
+  linkCategoryCode?: string
 }
 
 interface Props {
@@ -43,6 +54,11 @@ interface Props {
    * - 'count': 목표 개수만 입력 + 자동 레이아웃 (신규 광고 페이지 CollageTab)
    */
   mode?: 'grid' | 'count'
+  /**
+   * 'category' 링크 모드 dropdown 옵션.
+   * 보통 사용자가 체크한 카테고리 목록을 전달.
+   */
+  linkCategoryOptions?: Array<{ code: string; name: string; emoji: string }>
   /** 펼침 상태를 외부 제어. 미지정 시 내부 상태 사용 */
   open?: boolean
   onToggle?: (open: boolean) => void
@@ -139,6 +155,7 @@ export default function DigestSettingsPanel({
   shopCategoryUrl,
   defaultTitle,
   mode = 'grid',
+  linkCategoryOptions,
   open: openProp,
   onToggle,
 }: Props) {
@@ -353,19 +370,67 @@ export default function DigestSettingsPanel({
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
-              쇼핑몰 카테고리 링크 (자동)
+              쇼핑몰 링크
             </label>
-            <div className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-md text-gray-700 break-all">
+            <div className="flex gap-2 flex-wrap items-center">
+              {(
+                [
+                  { v: 'auto', label: '자동' },
+                  { v: 'main', label: '쇼핑몰 메인' },
+                  { v: 'category', label: '카테고리 페이지' },
+                ] as const
+              ).map((opt) => {
+                const active = (value.shopLinkMode || 'auto') === opt.v
+                return (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => update('shopLinkMode', opt.v)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      active
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+              {value.shopLinkMode === 'category' &&
+                linkCategoryOptions &&
+                linkCategoryOptions.length > 0 && (
+                  <select
+                    value={value.linkCategoryCode || linkCategoryOptions[0].code}
+                    onChange={(e) => update('linkCategoryCode', e.target.value)}
+                    className="text-xs border border-gray-300 rounded-md px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {linkCategoryOptions.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.emoji} {c.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+            </div>
+            <div className="mt-2 px-3 py-2 text-xs bg-white border border-gray-200 rounded-md text-gray-700 break-all">
               {shopCategoryUrl ? (
-                <a href={shopCategoryUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                <a
+                  href={shopCategoryUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
                   {shopCategoryUrl}
                 </a>
               ) : (
-                <span className="text-gray-400">현재 카테고리에 연결된 쇼핑몰이 없습니다 (subdomain 없음)</span>
+                <span className="text-gray-400">
+                  연결된 쇼핑몰이 없습니다 (밴드의 매핑 또는 첫 상품 subdomain 필요).
+                </span>
               )}
             </div>
             <p className="mt-1 text-[11px] text-gray-500">
-              밴드 본문에 위 링크 1줄만 들어갑니다. 상품별 링크는 표시되지 않습니다.
+              자동: 1개 카테고리 발행 시 카테고리 페이지, 2개 이상은 쇼핑몰 메인.
+              실제 도메인은 발행 대상 밴드와 매핑된 쇼핑몰을 우선 사용합니다 (각 밴드별로 다를 수 있음).
             </p>
           </div>
         </div>

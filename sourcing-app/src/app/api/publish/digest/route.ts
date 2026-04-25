@@ -25,6 +25,9 @@ import { shiftDeadlineEarlier } from '@/modules/publish/deadline-utils'
 import { CATEGORY_MAP, CATEGORY_CODES, CATEGORY_LIST, type CategoryCode } from '@/modules/category/category.keywords'
 
 export const dynamic = 'force-dynamic'
+// 콜라주 발행은 6~12장 배경 제거(@imgly U2-Net) + Playwright 합성으로 1~3분
+// 걸릴 수 있다. Next.js 기본(Vercel 30s, self-hosted는 노드 기본)을 풀어둔다.
+export const maxDuration = 300
 
 // ───────────────────────────────────────────────────────────
 // GET — 카테고리별 발행 후보 상품 조회
@@ -215,6 +218,17 @@ interface DigestPublishRequest {
       overlayText?: string
       overlayColor?: 'red' | 'yellow' | 'blue'
     }>
+    /**
+     * 쇼핑몰 링크 모드:
+     * - 'auto'(기본): categoryCodes.length === 1 ? 카테고리 페이지 : 쇼핑몰 메인
+     * - 'main': 항상 쇼핑몰 메인
+     * - 'category': 항상 카테고리 페이지 (linkCategoryCode 사용)
+     */
+    shopLinkMode?: 'auto' | 'main' | 'category'
+    /** auto 모드 판정용. 사용자가 체크한 카테고리들 (다중 선택 시 2개 이상). */
+    categoryCodes?: string[]
+    /** category 모드일 때 사용할 카테고리 코드. 미지정 시 첫 번째 categoryCodes 또는 categoryId. */
+    linkCategoryCode?: string
   }
 }
 
@@ -296,7 +310,8 @@ export async function POST(request: NextRequest) {
       maxImagesPerProduct: typeof maxImagesPerProduct === 'number' ? maxImagesPerProduct : 1,
     })
 
-    // 채널 조회 (단일)
+    // 채널 조회 (단일) — 콜라주 본문에 들어가는 쇼핑몰 링크는 채널에 매핑된
+    // 쇼핑몰 subdomain을 우선 사용해서 "밴드별로 다른 URL"을 보내게 한다.
     const channel = await prisma.channel.findFirst({
       where: {
         id: channelId,
@@ -304,7 +319,12 @@ export async function POST(request: NextRequest) {
         kind: ChannelKind.RETAIL,
         isActive: true,
       },
-      select: { id: true, name: true, channelKey: true },
+      select: {
+        id: true,
+        name: true,
+        channelKey: true,
+        shop: { select: { id: true, subdomain: true, name: true } },
+      },
     })
 
     if (!channel) {
@@ -382,12 +402,27 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // 쇼핑몰 카테고리 링크 (첫 상품의 shop subdomain 기준)
-      const firstShopProduct = orderedProducts[0]?.shopProducts[0]
-      const subdomain = firstShopProduct?.shop?.subdomain
-      const shopCategoryUrl = subdomain
-        ? `https://${shopDomain}/${subdomain}/category/${categoryId}`
-        : undefined
+      // 쇼핑몰 링크 — 채널(밴드)에 매핑된 shop을 우선, 미매핑 시 첫 상품 shop으로 폴백
+      const channelSubdomain = channel.shop?.subdomain
+      const fallbackSubdomain = orderedProducts[0]?.shopProducts[0]?.shop?.subdomain
+      const subdomain = channelSubdomain || fallbackSubdomain
+
+      const linkMode = collageOptions?.shopLinkMode || 'auto'
+      const userCategoryCodes =
+        collageOptions?.categoryCodes && collageOptions.categoryCodes.length > 0
+          ? collageOptions.categoryCodes
+          : [categoryId]
+      const linkCategoryCode =
+        collageOptions?.linkCategoryCode || userCategoryCodes[0] || categoryId
+
+      let shopCategoryUrl: string | undefined
+      if (subdomain) {
+        const useMain =
+          linkMode === 'main' || (linkMode === 'auto' && userCategoryCodes.length >= 2)
+        shopCategoryUrl = useMain
+          ? `https://${shopDomain}/${subdomain}`
+          : `https://${shopDomain}/${subdomain}/category/${linkCategoryCode}`
+      }
 
       const cat = CATEGORY_MAP[categoryId]
       const defaultTitle = `오늘의${cat.name}추천`
@@ -414,11 +449,9 @@ export async function POST(request: NextRequest) {
         bgRemovedCount = result.bgRemovedCount
         bgFailedCount = result.bgFailedCount
 
-        // 본문: 제목 + 카테고리 링크 1줄 (상품별 링크 없음)
+        // 본문: 제목 + 쇼핑몰 링크 1줄 (상품 수/신선 직송 문구는 사용자 요청으로 제거)
         const contentLines: string[] = []
         contentLines.push(`${cat.emoji} ${titleText}`)
-        contentLines.push('')
-        contentLines.push(`총 ${expected}개 상품 | 신선 직송`)
         if (shopCategoryUrl) {
           contentLines.push('')
           contentLines.push('🛒 전체 상품 보기 👇')
