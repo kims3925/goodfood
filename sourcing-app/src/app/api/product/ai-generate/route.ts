@@ -116,11 +116,25 @@ const OPENAI_RATE_LIMITS: Record<string, ModelRateLimit> = {
   'default': { rpm: 60, tpm: 150000, rpd: 10000 },
 }
 
+// Claude는 Anthropic API의 tier 기반 사용량 제어를 따른다(분당/토큰 한도가 실질 제약).
+// 우리 앱이 인위적으로 RPD를 좁히면 사용자 등록한 키의 가용량이 무력화되므로
+// OpenAI와 유사한 수준으로 lenient하게 설정.
+const CLAUDE_RATE_LIMITS: Record<string, ModelRateLimit> = {
+  'claude-haiku-4-5-20251001': { rpm: 60, tpm: 200000, rpd: 10000 },
+  'claude-haiku-4-5': { rpm: 60, tpm: 200000, rpd: 10000 },
+  'claude-sonnet-4-6': { rpm: 60, tpm: 200000, rpd: 5000 },
+  'claude-opus-4-7': { rpm: 50, tpm: 200000, rpd: 2000 },
+  // 레거시/비공식 모델 ID도 고려해 default 자체를 충분히 넓게
+  'default': { rpm: 60, tpm: 200000, rpd: 5000 },
+}
+
 function getModelRateLimit(provider: AiProvider, model: string): ModelRateLimit {
   if (provider === AiProvider.GEMINI) {
     return GEMINI_RATE_LIMITS[model] || GEMINI_RATE_LIMITS['default']
   } else if (provider === AiProvider.OPENAI) {
     return OPENAI_RATE_LIMITS[model] || OPENAI_RATE_LIMITS['default']
+  } else if (provider === AiProvider.CLAUDE) {
+    return CLAUDE_RATE_LIMITS[model] || CLAUDE_RATE_LIMITS['default']
   }
   return { rpm: 5, tpm: 250000, rpd: 20 }
 }
