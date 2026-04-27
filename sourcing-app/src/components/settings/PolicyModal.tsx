@@ -95,9 +95,11 @@ function serializeContent(
   }
   const shipLabel = shippingType === 'included' ? '포함' : '별도'
   lines.push('배송비: ' + shipLabel)
-  const baseNote = policyType === 'SD_FOOD_SPECIAL' ? '공급가' : '도매가'
-  if (shippingType === 'separate') {
-    lines.push(`기준가: ${baseNote} + 배송비 합산`)
+  // 주의: 배송비 합산은 시스템(calculateSellingPrice)이 자동 처리하므로
+  // AI 프롬프트에는 기준가 합산 지시를 넣지 않음 (이중 합산 방지)
+  // SD푸드는 공급가+배송비로 마진 구간 판단이 필요하므로 예외적으로 유지
+  if (shippingType === 'separate' && policyType === 'SD_FOOD_SPECIAL') {
+    lines.push('기준가: 공급가 + 배송비 합산')
   }
   return prefix + lines.join('\n')
 }
@@ -519,16 +521,26 @@ export default function PolicyModal({
                 </div>
               ))}
 
-              {/* 소싱 제외 */}
-              <div className="flex items-center gap-2 mt-3">
-                <label className="text-sm text-gray-600 whitespace-nowrap">소싱 제외:</label>
-                <input
-                  className="input-sm w-32"
-                  placeholder="40001"
-                  value={excludeAbove}
-                  onChange={(e) => setExcludeAbove(e.target.value)}
-                />
-                <span className="text-xs text-gray-500">원 이상 제외 (비워두면 없음)</span>
+              {/* 가격 제한 (이전: '소싱 제외') — 지침서 Phase 2: 의도 명확화 라벨 변경 */}
+              <div className="mt-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600 whitespace-nowrap">
+                    가격 제한:
+                  </label>
+                  <input
+                    className="input-sm w-32"
+                    placeholder="40001"
+                    value={excludeAbove}
+                    onChange={(e) => setExcludeAbove(e.target.value)}
+                  />
+                  <span className="text-xs text-gray-500">
+                    원 이상 옵션 자동 제외 (비워두면 없음)
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1 ml-1">
+                  💡 AI 가공 시 이 가격 이상의 옵션이 결과에서 제거됩니다. 글로벌 상한
+                  100,000원과 함께 적용됩니다 (도매방별 상한이 더 작으면 그 값이 우선).
+                </p>
               </div>
             </div>
           )}
