@@ -99,6 +99,9 @@ export default function PostsManagePage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  // 게시물 목록 날짜 필터 (KST). 빈 문자열이면 미적용. "YYYY-MM-DD" 형식.
+  const [listStartDate, setListStartDate] = useState<string>('')
+  const [listEndDate, setListEndDate] = useState<string>('')
   const [showAddModal, setShowAddModal] = useState(false)
 
   // 채널(소싱처) 필터 관련 상태
@@ -236,6 +239,8 @@ export default function PostsManagePage() {
       if (selectedChannelId) {
         params.set('channelId', selectedChannelId.toString())
       }
+      if (listStartDate) params.set('startDate', listStartDate)
+      if (listEndDate) params.set('endDate', listEndDate)
       const response = await fetch(`/api/post?${params}`)
       const data = await response.json()
 
@@ -257,7 +262,7 @@ export default function PostsManagePage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentPage, selectedChannelId, searchTerm, itemsPerPage])
+  }, [currentPage, selectedChannelId, searchTerm, itemsPerPage, listStartDate, listEndDate])
 
   useEffect(() => {
     setSelectedPostIds([])
@@ -1210,16 +1215,59 @@ export default function PostsManagePage() {
                 )}
               </div>
 
-              {/* 오른쪽: 검색 */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <Input
-                  type="text"
-                  placeholder="제목으로 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
-                />
+              {/* 오른쪽: 날짜 + 검색 */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* 날짜 범위 필터 */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-gray-500 whitespace-nowrap">📅</span>
+                  <input
+                    type="date"
+                    value={listStartDate}
+                    onChange={(e) => {
+                      setListStartDate(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                    className="px-2 py-1.5 border border-gray-300 rounded-md text-xs"
+                    aria-label="시작 날짜"
+                  />
+                  <span className="text-gray-400">~</span>
+                  <input
+                    type="date"
+                    value={listEndDate}
+                    onChange={(e) => {
+                      setListEndDate(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                    className="px-2 py-1.5 border border-gray-300 rounded-md text-xs"
+                    aria-label="종료 날짜"
+                  />
+                  {(listStartDate || listEndDate) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setListStartDate('')
+                        setListEndDate('')
+                        setCurrentPage(1)
+                      }}
+                      className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-md hover:bg-gray-50"
+                      title="날짜 필터 해제"
+                    >
+                      초기화
+                    </button>
+                  )}
+                </div>
+
+                {/* 검색 */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                  <Input
+                    type="text"
+                    placeholder="제목으로 검색..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 w-64"
+                  />
+                </div>
               </div>
             </div>
           </div>

@@ -5,6 +5,10 @@ export interface PostListParams {
   page?: number
   limit?: number
   todayOnly?: boolean // 오늘 날짜 게시물만 조회 (KST 기준)
+  // 날짜 범위 필터 (KST 기준). datetime-local "YYYY-MM-DDTHH:mm" 또는 date "YYYY-MM-DD".
+  // 둘 다 지정 가능. 한쪽만 있으면 단방향 필터.
+  startDate?: string
+  endDate?: string
 }
 
 export interface PostCreateInput {

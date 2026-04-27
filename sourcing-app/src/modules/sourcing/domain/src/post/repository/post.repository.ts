@@ -3,27 +3,51 @@ import type { PostListParams, PostUpdateInput, SavedPostImage } from '../types/p
 
 export class CollectedPostRepository {
   async findMany(params: PostListParams) {
-    const { userId, search = '', channelId, page = 1, limit = 10, todayOnly = false } = params
+    const { userId, search = '', channelId, page = 1, limit = 10, todayOnly = false, startDate, endDate } = params
 
-    // 오늘 날짜 필터 (KST 기준)
-    let createdAtFilter = {}
-    if (todayOnly) {
-      const now = new Date()
-      // KST (UTC+9) 기준으로 오늘 날짜 문자열 추출
-      const kstDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }) // 'YYYY-MM-DD' format
-      const [year, month, day] = kstDateStr.split('-').map(Number)
+    // KST 자정 변환 헬퍼 — "YYYY-MM-DD" 또는 "YYYY-MM-DDTHH:mm" 입력 (사용자가 KST 로컬로 입력한다고 가정).
+    const kstStringToUTC = (s: string): Date | null => {
+      if (!s) return null
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/)
+      if (!m) return null
+      const [, y, mo, d, hh, mm] = m
+      const kstOffsetMs = 9 * 60 * 60 * 1000
+      const kstMs = Date.UTC(
+        parseInt(y, 10),
+        parseInt(mo, 10) - 1,
+        parseInt(d, 10),
+        parseInt(hh || '0', 10),
+        parseInt(mm || '0', 10)
+      )
+      return new Date(kstMs - kstOffsetMs)
+    }
 
-      // KST 자정을 UTC 타임스탬프로 변환 (KST 00:00 = UTC 15:00 전날)
-      const kstOffset = 9 * 60 * 60 * 1000
-      const kstMidnightUTC = Date.UTC(year, month - 1, day) - kstOffset
+    // 날짜 필터: startDate/endDate 가 있으면 우선, 없을 때 todayOnly fallback.
+    let createdAtFilter: { createdAt?: { gte?: Date; lt?: Date } } = {}
+    const startDt = kstStringToUTC(startDate || '')
+    const endDtRaw = kstStringToUTC(endDate || '')
+    // endDate가 "YYYY-MM-DD" 형식(시간 없음)이면 그날 끝까지 포함하도록 +1일
+    const endDt = endDtRaw && /^\d{4}-\d{2}-\d{2}$/.test(endDate || '')
+      ? new Date(endDtRaw.getTime() + 24 * 60 * 60 * 1000)
+      : endDtRaw
 
-      const todayStartUTC = new Date(kstMidnightUTC)
-      const todayEndUTC = new Date(kstMidnightUTC + 24 * 60 * 60 * 1000)
-
+    if (startDt || endDt) {
       createdAtFilter = {
         createdAt: {
-          gte: todayStartUTC,
-          lt: todayEndUTC,
+          ...(startDt && { gte: startDt }),
+          ...(endDt && { lt: endDt }),
+        },
+      }
+    } else if (todayOnly) {
+      const now = new Date()
+      const kstDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
+      const [year, month, day] = kstDateStr.split('-').map(Number)
+      const kstOffset = 9 * 60 * 60 * 1000
+      const kstMidnightUTC = Date.UTC(year, month - 1, day) - kstOffset
+      createdAtFilter = {
+        createdAt: {
+          gte: new Date(kstMidnightUTC),
+          lt: new Date(kstMidnightUTC + 24 * 60 * 60 * 1000),
         },
       }
     }
