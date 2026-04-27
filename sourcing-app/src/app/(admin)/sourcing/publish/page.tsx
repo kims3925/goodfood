@@ -1297,6 +1297,9 @@ function PublishPageContent() {
   const [republishAvailableShops, setRepublishAvailableShops] = useState<{ id: number; name: string }[]>([])
   const [republishSelectedChannelIds, setRepublishSelectedChannelIds] = useState<Set<number>>(new Set())
   const [republishSelectedShopIds, setRepublishSelectedShopIds] = useState<Set<number>>(new Set())
+  // 자동발행 경로 사용 — 기본 ON. 켜면 /api/automation/execute (자동발행 cron과 동일한
+  // runPublishPipeline 경로) 호출, 끄면 기존 per-channel template/publish 루프.
+  const [useAutoPath, setUseAutoPath] = useState(true)
 
   // 재발행 버튼 클릭 → 채널/쇼핑몰 목록 가져와 선택 모달 열기
   const handleRepublishSelected = async () => {
@@ -1358,7 +1361,77 @@ function PublishPageContent() {
     let successCount = 0
     let failCount = 0
 
+    // 🚀 자동발행 경로 사용: /api/automation/execute(type=publish)로 단일 호출.
+    // 이 경로는 자동발행 cron이 사용하는 runPublishPipeline → publishService.publishBatch
+    // 와 100% 동일하므로 포맷(폰트/이미지 순서)이 자동발행과 일치.
+    if (useAutoPath && retailChannels.length > 0) {
+      try {
+        const res = await fetch('/api/automation/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            type: 'publish',
+            config: {
+              channelIds: retailChannels.map((c) => c.id),
+              productIds: targetIds,
+              publishReadyOnly: false, // 재발행이므로 이미 발행된 채널도 다시 발행
+            },
+          }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          const stage = data.data?.stages?.publish
+          successCount += stage?.successCount || 0
+          failCount += stage?.failedCount || 0
+        } else {
+          failCount += targetIds.length
+          toast.error(`자동발행 경로 발행 실패: ${data.error || '알 수 없음'}`)
+        }
+      } catch (err: any) {
+        failCount += targetIds.length
+        toast.error(`자동발행 경로 발행 오류: ${err?.message || '네트워크'}`)
+      } finally {
+        // 쇼핑몰만 자동발행 경로 외에 별도 처리 (auto execute는 automationConfig.shopIds만 사용)
+        if (activeShops.length > 0) {
+          for (const productId of targetIds) {
+            for (const shop of activeShops) {
+              try {
+                await fetch('/api/shop/publish', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
+                })
+              } catch (e) {
+                console.warn(`재발행(자동경로) - 쇼핑몰 발행 실패 (shopId=${shop.id})`, e)
+              }
+            }
+          }
+        }
+        // republish-mark
+        for (const productId of targetIds) {
+          try {
+            await fetch(`/api/product/${productId}/republish-mark`, {
+              method: 'POST',
+              credentials: 'include',
+            })
+          } catch (e) {
+            console.warn(`재발행(자동경로) - republish-mark 실패 (productId=${productId})`, e)
+          }
+        }
+        setIsPublishing(false)
+        setRepublishingIds(new Set())
+        setRepublishProgress({ current: 0, total: 0, success: 0, failed: 0 })
+        if (successCount > 0) toast.success(`${successCount}개 재발행 완료 (자동발행 경로)`)
+        if (failCount > 0) toast.error(`${failCount}개 재발행 실패`)
+        loadProducts()
+      }
+      return
+    }
+
     try {
+      // 기존 폴백 경로 — 자동발행 경로 OFF 시 사용
       // 자동발행과 동일한 순서로 발행: 각 상품마다 밴드 먼저 → 쇼핑몰 나중
       for (let i = 0; i < targetIds.length; i++) {
         const productId = targetIds[i]
@@ -2274,6 +2347,21 @@ function PublishPageContent() {
                 선택한 <strong>{selectedProductIds.length}개</strong> 상품을 어디에 재발행할지 고르세요.
                 밴드/쇼핑몰 각각 다중 선택 가능. 1개 이상 선택해야 발행됩니다.
               </p>
+              <label className="mt-2 flex items-start gap-2 text-xs cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={useAutoPath}
+                  onChange={(e) => setUseAutoPath(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600"
+                />
+                <span>
+                  <strong className="text-blue-700">자동발행 경로 사용 (권장)</strong>
+                  <span className="ml-1 text-gray-600">
+                    — 자동발행 cron과 동일한 runPublishPipeline 호출. 폰트/이미지 첨부 등 포맷이
+                    자동발행 결과와 일치. 끄면 기존 template/publish 경로(폴백) 사용.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
