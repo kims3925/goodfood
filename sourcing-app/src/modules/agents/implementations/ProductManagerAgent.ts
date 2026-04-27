@@ -361,6 +361,18 @@ export class ProductManagerAgent extends AgentBase {
     channelProducts: { found: number; softDeleted: number }
     shopProducts: { found: number; softDeleted: number }
     bandPosts: { attempted: number; deleted: number; failed: number; sessionMissing: number }
+    /** 채널별 분해 — "47개 어디서 지워졌나?" 답변용 */
+    byChannel: Array<{
+      channelId: number
+      channelName: string
+      found: number
+      attempted: number
+      deleted: number
+      failed: number
+      sessionMissing: number
+    }>
+    /** 쇼핑몰별 분해 */
+    byShop: Array<{ shopId: number; shopName: string; deleted: number }>
     productsAffected: number
     errors: { id: number; error: string; type: 'channel' | 'shop' | 'band' }[]
     dryRun: boolean
@@ -378,11 +390,13 @@ export class ProductManagerAgent extends AgentBase {
     )
 
     // 만료된 ChannelProduct: 일반 7일, COM 30일.
-    // OR로 두 조건 중 하나라도 매칭되면 만료.
+    // ⚠️ 활성 RETAIL 채널만 대상 — 비활성 채널 글은 자동 삭제하지 않음 (사용자 의도
+    // 로 비활성된 채널에 임의로 손대면 안 되고, 세션도 없을 가능성).
     const expiredChannelProducts = await prisma.channelProduct.findMany({
       where: {
         deletedAt: null,
         publishedAt: { not: null, lt: cutoff7 }, // 1차 게이트: 최소 7일은 지나야 함
+        channel: { is: { isActive: true, kind: 'RETAIL' } },
         OR: [
           // 비-COM: publishedAt이 7일 초과 (cutoff7 게이트로 이미 만족)
           { product: { is: { categoryId: { not: 'COM' } } } },
@@ -398,17 +412,18 @@ export class ProductManagerAgent extends AgentBase {
         postKey: true,
         publishedAt: true,
         product: { select: { id: true, categoryId: true, name: true } },
-        channel: { select: { id: true, channelKey: true, name: true } },
+        channel: { select: { id: true, channelKey: true, name: true, isActive: true } },
       },
       take: limit,
       orderBy: { publishedAt: 'asc' },
     })
 
-    // 만료된 ShopProduct: 동일 규칙
+    // 만료된 ShopProduct: 활성 쇼핑몰만 대상.
     const expiredShopProducts = await prisma.shopProduct.findMany({
       where: {
         deletedAt: null,
         publishedAt: { not: null, lt: cutoff7 },
+        shop: { is: { isActive: true } },
         OR: [
           { product: { is: { categoryId: { not: 'COM' } } } },
           { product: { is: { categoryId: null } } },
@@ -421,16 +436,64 @@ export class ProductManagerAgent extends AgentBase {
         shopId: true,
         publishedAt: true,
         product: { select: { id: true, categoryId: true, name: true } },
+        shop: { select: { id: true, name: true } },
       },
       take: limit,
       orderBy: { publishedAt: 'asc' },
     })
+
+    // 채널별 / 쇼핑몰별 누적 카운터 — Map으로 모았다가 배열로 변환해 응답.
+    const channelStatsMap = new Map<
+      number,
+      {
+        channelId: number
+        channelName: string
+        found: number
+        attempted: number
+        deleted: number
+        failed: number
+        sessionMissing: number
+      }
+    >()
+    for (const cp of expiredChannelProducts) {
+      const cur = channelStatsMap.get(cp.channelId) ?? {
+        channelId: cp.channelId,
+        channelName: cp.channel?.name || `Ch#${cp.channelId}`,
+        found: 0,
+        attempted: 0,
+        deleted: 0,
+        failed: 0,
+        sessionMissing: 0,
+      }
+      cur.found++
+      channelStatsMap.set(cp.channelId, cur)
+    }
+
+    const shopStatsMap = new Map<number, { shopId: number; shopName: string; deleted: number }>()
+    for (const sp of expiredShopProducts) {
+      const cur = shopStatsMap.get(sp.shopId) ?? {
+        shopId: sp.shopId,
+        shopName: sp.shop?.name || `Shop#${sp.shopId}`,
+        deleted: 0,
+      }
+      shopStatsMap.set(sp.shopId, cur)
+    }
 
     const result = {
       cutoffDays: { default: 7, com: 30 },
       channelProducts: { found: expiredChannelProducts.length, softDeleted: 0 },
       shopProducts: { found: expiredShopProducts.length, softDeleted: 0 },
       bandPosts: { attempted: 0, deleted: 0, failed: 0, sessionMissing: 0 },
+      byChannel: [] as Array<{
+        channelId: number
+        channelName: string
+        found: number
+        attempted: number
+        deleted: number
+        failed: number
+        sessionMissing: number
+      }>,
+      byShop: [] as Array<{ shopId: number; shopName: string; deleted: number }>,
       productsAffected: 0,
       errors: [] as { id: number; error: string; type: 'channel' | 'shop' | 'band' }[],
       dryRun,
@@ -441,9 +504,13 @@ export class ProductManagerAgent extends AgentBase {
       for (const cp of expiredChannelProducts) if (cp.productId) affected.add(cp.productId)
       for (const sp of expiredShopProducts) if (sp.productId) affected.add(sp.productId)
       result.productsAffected = affected.size
+      result.byChannel = Array.from(channelStatsMap.values()).sort(
+        (a, b) => b.found - a.found
+      )
+      result.byShop = Array.from(shopStatsMap.values()).sort((a, b) => a.shopId - b.shopId)
       await this.log(
         'INFO',
-        `[dryRun] ChannelProduct 만료 ${result.channelProducts.found}건, ShopProduct 만료 ${result.shopProducts.found}건, 영향 상품 ${result.productsAffected}개`
+        `[dryRun] ChannelProduct 만료 ${result.channelProducts.found}건 (${result.byChannel.length}개 채널), ShopProduct 만료 ${result.shopProducts.found}건 (${result.byShop.length}개 쇼핑몰), 영향 상품 ${result.productsAffected}개`
       )
       return result
     }
@@ -481,6 +548,8 @@ export class ProductManagerAgent extends AgentBase {
       // (c) Playwright 실 삭제 — 가격 변동/품절 노출 방지를 위한 핵심 단계
       if (!skipPlaywright && cp.postKey && cp.channel?.channelKey) {
         result.bandPosts.attempted++
+        const chStats = channelStatsMap.get(cp.channelId)!
+        chStats.attempted++
         try {
           const r = await bandPlaywrightService.deletePost({
             channelId: cp.channelId,
@@ -490,33 +559,39 @@ export class ProductManagerAgent extends AgentBase {
           })
           if (r.success) {
             result.bandPosts.deleted++
+            chStats.deleted++
           } else {
             result.bandPosts.failed++
+            chStats.failed++
             const isSession =
               !!r.error &&
               (r.error.includes('세션') ||
                 r.error.includes('session') ||
                 r.error.includes('쿠키'))
-            if (isSession) result.bandPosts.sessionMissing++
+            if (isSession) {
+              result.bandPosts.sessionMissing++
+              chStats.sessionMissing++
+            }
             await this.log(
               'WARN',
-              `Band 게시글 삭제 실패 (channel=${cp.channelId} post=${cp.postKey}): ${r.error}`
+              `Band 게시글 삭제 실패 (${cp.channel.name} post=${cp.postKey}): ${r.error}`
             )
             result.errors.push({
               id: cp.id,
-              error: r.error || '실패',
+              error: `[${cp.channel.name}] ${r.error || '실패'}`,
               type: 'band',
             })
           }
         } catch (err: any) {
           result.bandPosts.failed++
+          chStats.failed++
           await this.log(
             'ERROR',
-            `Band 게시글 삭제 예외 (channel=${cp.channelId} post=${cp.postKey}): ${err.message || err}`
+            `Band 게시글 삭제 예외 (${cp.channel.name} post=${cp.postKey}): ${err.message || err}`
           )
           result.errors.push({
             id: cp.id,
-            error: err.message || String(err),
+            error: `[${cp.channel.name}] ${err.message || String(err)}`,
             type: 'band',
           })
         }
@@ -532,6 +607,8 @@ export class ProductManagerAgent extends AgentBase {
           data: { deletedAt: now },
         })
         result.shopProducts.softDeleted++
+        const shopStats = shopStatsMap.get(sp.shopId)
+        if (shopStats) shopStats.deleted++
       } catch (err: any) {
         result.errors.push({ id: sp.id, error: err.message || String(err), type: 'shop' })
       }
@@ -542,9 +619,18 @@ export class ProductManagerAgent extends AgentBase {
     for (const sp of expiredShopProducts) if (sp.productId) affected.add(sp.productId)
     result.productsAffected = affected.size
 
+    // 분해 통계를 응답 배열로 변환 (found 많은 채널 먼저 노출)
+    result.byChannel = Array.from(channelStatsMap.values()).sort((a, b) => b.found - a.found)
+    result.byShop = Array.from(shopStatsMap.values()).sort((a, b) => a.shopId - b.shopId)
+
+    // 운영 로그에 채널별 분해도 한 줄로 요약
+    const channelSummaryLine = result.byChannel
+      .map((c) => `${c.channelName} ${c.deleted}/${c.attempted}`)
+      .join(', ')
+
     await this.log(
       'INFO',
-      `이전글 정리 완료: 채널 DB ${result.channelProducts.softDeleted}/${result.channelProducts.found}, 쇼핑몰 DB ${result.shopProducts.softDeleted}/${result.shopProducts.found}, Band 실삭제 ${result.bandPosts.deleted}/${result.bandPosts.attempted} (실패 ${result.bandPosts.failed}, 세션부재 ${result.bandPosts.sessionMissing})`
+      `이전글 정리 완료: 채널 DB ${result.channelProducts.softDeleted}/${result.channelProducts.found}, 쇼핑몰 DB ${result.shopProducts.softDeleted}/${result.shopProducts.found}, Band 실삭제 ${result.bandPosts.deleted}/${result.bandPosts.attempted} (실패 ${result.bandPosts.failed}, 세션부재 ${result.bandPosts.sessionMissing}). 분해: ${channelSummaryLine}`
     )
     await this.recordKpi('content_expiry_channel_deleted', result.channelProducts.softDeleted)
     await this.recordKpi('content_expiry_shop_deleted', result.shopProducts.softDeleted)
