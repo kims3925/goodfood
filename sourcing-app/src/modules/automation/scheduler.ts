@@ -17,24 +17,32 @@ const activeSchedulers: Map<number, cron.ScheduledTask[]> = new Map()
  */
 export async function initializeScheduler(): Promise<void> {
   try {
-    // 활성화된 모든 자동화 설정 조회
+    // ⚠️ 명시적 select 사용 — Prisma 기본 findMany는 모든 컬럼을 SELECT한다.
+    // 운영 DB에 신규 컬럼(digest_mode/digest_products_per_post/digest_images_per_product
+    // 등)이 아직 db push 되지 않은 환경에서는 P2022 (column does not exist) 예외로
+    // 전체 스케줄러 등록이 실패하고, 사용자가 설정한 cron(예: 10:30)이 동작하지 않는
+    // 사고가 발생함. cron 등록 자체에는 cronExpression / userId / pipelineSteps 만
+    // 필요하므로 그것만 명시 — 스키마 드리프트가 있어도 내성 확보.
     const configs = await prisma.automationConfig.findMany({
       where: { isEnabled: true },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        isEnabled: true,
+        cronExpression: true,
+        pipelineSteps: true,
         user: {
           select: { id: true, email: true },
         },
       },
     })
 
-    // 각 설정에 대해 스케줄러 등록 (로그 없이)
     for (const config of configs) {
       if (config.cronExpression) {
         registerSchedulerSilent(config.user.id, config.cronExpression)
       }
     }
 
-    // 활성 스케줄러가 있을 때만 로그 출력
     if (configs.length > 0) {
       console.log(`[Scheduler] ${configs.length}개의 자동화 스케줄러 시작됨`)
     }
@@ -58,8 +66,17 @@ function createCronTask(userId: number, singleCron: string): cron.ScheduledTask 
 
   return cron.schedule(singleCron, async () => {
     try {
+      // 매 cron 실행마다 활성화 여부 + pipelineSteps만 다시 확인.
+      // 신규 digest_* 컬럼은 cron 실행 자체에 불필요하므로 select에서 제외 — 스키마
+      // 드리프트가 있는 환경에서도 자동발행 cron이 멈추지 않도록.
       const config = await prisma.automationConfig.findUnique({
         where: { userId },
+        select: {
+          id: true,
+          userId: true,
+          isEnabled: true,
+          pipelineSteps: true,
+        },
       })
 
       if (!config?.isEnabled) {
@@ -168,8 +185,13 @@ export function unregisterScheduler(userId: number): void {
  * 스케줄러 업데이트 (설정 변경 시 호출)
  */
 export async function updateScheduler(userId: number): Promise<void> {
+  // 동일하게 명시적 select — 신규 컬럼 의존 제거 (스키마 드리프트 내성)
   const config = await prisma.automationConfig.findUnique({
     where: { userId },
+    select: {
+      isEnabled: true,
+      cronExpression: true,
+    },
   })
 
   if (!config || !config.isEnabled || !config.cronExpression) {
