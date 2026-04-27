@@ -108,7 +108,7 @@ export class SettingsService {
       },
       claude: {
         apiKey: '',
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-5-20251001',
         temperature: 0.7,
       },
     }
@@ -153,7 +153,7 @@ export class SettingsService {
       }
       settings.claude = {
         apiKey: claudeConfig.apiKey || '',
-        model: claudeConfig.model || 'claude-sonnet-4-20250514',
+        model: claudeConfig.model || 'claude-haiku-4-5-20251001',
         temperature: config?.temperature || 0.7,
       }
     }
