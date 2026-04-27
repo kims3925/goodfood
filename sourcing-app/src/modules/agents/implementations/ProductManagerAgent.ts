@@ -328,6 +328,161 @@ export class ProductManagerAgent extends AgentBase {
   }
 
   // ══════════════════════════════════════════════════
+  //  SKILL: 이전글 자동 삭제 (Content Expiry)
+  // ══════════════════════════════════════════════════
+
+  /**
+   * 만료된 발행 레코드를 정리합니다.
+   *
+   * 규칙:
+   *  - 카테고리 'COM'(상시상품): publishedAt이 30일 초과면 만료
+   *  - 그 외 카테고리: publishedAt이 7일 초과면 만료
+   *  - 만료된 ChannelProduct(소매밴드 발행)는 soft-delete + band.post.delete.requested
+   *    이벤트 emit (실 Band 게시글 삭제는 별도 listener가 처리해야 함 — Phase 2)
+   *  - 만료된 ShopProduct(쇼핑몰 발행)는 soft-delete (deletedAt = now)
+   *
+   * dryRun=true: DB 변경 없이 대상 카운트만 반환 (사전 확인용)
+   *
+   * @param options.dryRun  true면 실제 변경 없이 카운트만
+   * @param options.limit   한 번 실행 시 조회 최대 레코드 수 (기본 1000, 보호용)
+   */
+  async runContentExpiry(options: { dryRun?: boolean; limit?: number } = {}): Promise<{
+    cutoffDays: { default: number; com: number }
+    channelProducts: { found: number; softDeleted: number }
+    shopProducts: { found: number; softDeleted: number }
+    productsAffected: number
+    errors: { id: number; error: string; type: 'channel' | 'shop' }[]
+    dryRun: boolean
+  }> {
+    const dryRun = options.dryRun ?? false
+    const limit = options.limit ?? 1000
+    const now = new Date()
+    const cutoff7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const cutoff30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    await this.log(
+      'INFO',
+      `이전글 정리 시작 (dryRun=${dryRun}, 일반=${cutoff7.toISOString()} 이전, 상시상품=${cutoff30.toISOString()} 이전)`
+    )
+
+    // 만료된 ChannelProduct: 일반 7일, COM 30일.
+    // OR로 두 조건 중 하나라도 매칭되면 만료.
+    const expiredChannelProducts = await prisma.channelProduct.findMany({
+      where: {
+        deletedAt: null,
+        publishedAt: { not: null, lt: cutoff7 }, // 1차 게이트: 최소 7일은 지나야 함
+        OR: [
+          // 비-COM: publishedAt이 7일 초과 (cutoff7 게이트로 이미 만족)
+          { product: { is: { categoryId: { not: 'COM' } } } },
+          { product: { is: { categoryId: null } } },
+          // COM: publishedAt이 30일 초과
+          { AND: [{ product: { is: { categoryId: 'COM' } } }, { publishedAt: { lt: cutoff30 } }] },
+        ],
+      },
+      select: {
+        id: true,
+        productId: true,
+        channelId: true,
+        postKey: true,
+        publishedAt: true,
+        product: { select: { id: true, categoryId: true, name: true } },
+      },
+      take: limit,
+      orderBy: { publishedAt: 'asc' },
+    })
+
+    // 만료된 ShopProduct: 동일 규칙
+    const expiredShopProducts = await prisma.shopProduct.findMany({
+      where: {
+        deletedAt: null,
+        publishedAt: { not: null, lt: cutoff7 },
+        OR: [
+          { product: { is: { categoryId: { not: 'COM' } } } },
+          { product: { is: { categoryId: null } } },
+          { AND: [{ product: { is: { categoryId: 'COM' } } }, { publishedAt: { lt: cutoff30 } }] },
+        ],
+      },
+      select: {
+        id: true,
+        productId: true,
+        shopId: true,
+        publishedAt: true,
+        product: { select: { id: true, categoryId: true, name: true } },
+      },
+      take: limit,
+      orderBy: { publishedAt: 'asc' },
+    })
+
+    const result = {
+      cutoffDays: { default: 7, com: 30 },
+      channelProducts: { found: expiredChannelProducts.length, softDeleted: 0 },
+      shopProducts: { found: expiredShopProducts.length, softDeleted: 0 },
+      productsAffected: 0,
+      errors: [] as { id: number; error: string; type: 'channel' | 'shop' }[],
+      dryRun,
+    }
+
+    if (dryRun) {
+      const affected = new Set<number>()
+      for (const cp of expiredChannelProducts) if (cp.productId) affected.add(cp.productId)
+      for (const sp of expiredShopProducts) if (sp.productId) affected.add(sp.productId)
+      result.productsAffected = affected.size
+      await this.log(
+        'INFO',
+        `[dryRun] ChannelProduct 만료 ${result.channelProducts.found}건, ShopProduct 만료 ${result.shopProducts.found}건, 영향 상품 ${result.productsAffected}개`
+      )
+      return result
+    }
+
+    // 실 삭제 — ChannelProduct 소프트 삭제 + Band 게시물 삭제 이벤트 emit
+    for (const cp of expiredChannelProducts) {
+      try {
+        await prisma.channelProduct.update({
+          where: { id: cp.id },
+          data: { deletedAt: now, isActive: false },
+        })
+        if (cp.postKey) {
+          await this.emitEvent(
+            'band.post.delete.requested',
+            { channelId: cp.channelId, postKey: cp.postKey, productId: cp.productId, reason: 'content_expiry' },
+            'NORMAL'
+          )
+        }
+        result.channelProducts.softDeleted++
+      } catch (err: any) {
+        result.errors.push({ id: cp.id, error: err.message || String(err), type: 'channel' })
+      }
+    }
+
+    // 실 삭제 — ShopProduct 소프트 삭제
+    for (const sp of expiredShopProducts) {
+      try {
+        await prisma.shopProduct.update({
+          where: { id: sp.id },
+          data: { deletedAt: now },
+        })
+        result.shopProducts.softDeleted++
+      } catch (err: any) {
+        result.errors.push({ id: sp.id, error: err.message || String(err), type: 'shop' })
+      }
+    }
+
+    const affected = new Set<number>()
+    for (const cp of expiredChannelProducts) if (cp.productId) affected.add(cp.productId)
+    for (const sp of expiredShopProducts) if (sp.productId) affected.add(sp.productId)
+    result.productsAffected = affected.size
+
+    await this.log(
+      'INFO',
+      `이전글 정리 완료: 채널 ${result.channelProducts.softDeleted}/${result.channelProducts.found}건, 쇼핑몰 ${result.shopProducts.softDeleted}/${result.shopProducts.found}건 (오류 ${result.errors.length})`
+    )
+    await this.recordKpi('content_expiry_channel_deleted', result.channelProducts.softDeleted)
+    await this.recordKpi('content_expiry_shop_deleted', result.shopProducts.softDeleted)
+
+    return result
+  }
+
+  // ══════════════════════════════════════════════════
   //  PUBLIC SKILL: 전체 감사
   // ══════════════════════════════════════════════════
 

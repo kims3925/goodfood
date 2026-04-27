@@ -96,6 +96,27 @@ export async function register() {
       }
     )
 
+    // ── 이전글 자동 정리: 매일 03:00 KST (cron timezone은 Asia/Seoul) ──
+    // 일반 카테고리 7일 초과, COM(상시상품) 30일 초과 발행분의 ChannelProduct/
+    // ShopProduct를 소프트 삭제. 사용자 명시 요청 "에이전트를 동원해서 모두 시행".
+    // 실제 Band 게시글 삭제는 emit된 band.post.delete.requested 이벤트의 listener가
+    // 추후 처리 (Phase 2). DB 정리만 우선.
+    scheduler.register(
+      `${productManagerAgent.name}:content-expiry`,
+      '0 3 * * *',
+      async () => {
+        try {
+          console.log('[Instrumentation] 이전글 정리 시작 (dryRun=false)')
+          const summary = await productManagerAgent.runContentExpiry({ dryRun: false })
+          console.log(
+            `[Instrumentation] 이전글 정리 완료: 채널 ${summary.channelProducts.softDeleted}/${summary.channelProducts.found}, 쇼핑몰 ${summary.shopProducts.softDeleted}/${summary.shopProducts.found}, 오류 ${summary.errors.length}`
+          )
+        } catch (err) {
+          console.error('[Instrumentation] 이전글 정리 실패:', err)
+        }
+      }
+    )
+
     scheduler.startAll()
     console.log(`[Instrumentation] AgentScheduler 시작 완료: ${scheduler.size}개 cron 등록`)
 
