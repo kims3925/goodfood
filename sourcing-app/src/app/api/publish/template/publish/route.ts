@@ -175,14 +175,22 @@ export async function POST(request: NextRequest) {
     // 5. 게시글 본문 생성 (간단 버전)
     const postContent = buildPostContent(product, { orderLink })
 
-    // 6. Band에 발행 (템플릿 이미지 + 상품 이미지)
+    // 6. Band에 발행 (템플릿 카드 PNG + 상품 이미지)
+    // bandPlaywrightService.publishWithImages는 imageUrls에 file path/URL 모두 처리한다
+    // (digest API에서 동일 패턴으로 카드 PNG를 file path로 첨부 중). 외부 이미지 호스팅
+    // 서비스 없이 임시 파일을 그대로 업로드 가능.
+    //
+    // ⚠️ 변경 이력: 이전엔 templateImagePath를 렌더만 하고 imageUrls에 넣지 않아 폐기했고,
+    // 그 결과 본문은 plain 텍스트만 + raw 상품 이미지만 첨부되어 자동발행(digest 모드)과
+    // 시각 차이가 컸음. 이제 카드 PNG를 첫 이미지로 첨부해 자동/수동/재발행이 모두 동일한
+    // 포맷의 카드 + 상품 이미지를 갖도록 통일.
     const imageUrls: string[] = []
 
-    // 템플릿 이미지를 base64로 변환하여 URL로 사용 (또는 업로드 서비스 활용)
-    // 여기서는 상품 이미지만 사용하고, 템플릿은 본문으로 대체
-    // 실제로는 이미지 호스팅 서비스에 업로드 후 URL 사용 필요
+    if (templateImagePath && fs.existsSync(templateImagePath)) {
+      imageUrls.push(templateImagePath)
+    }
 
-    // 상품 이미지 추가
+    // 상품 원본 이미지 (최대 4장 — Product.images.take:4)
     if (product.images) {
       imageUrls.push(...product.images.map((img) => img.url))
     }
