@@ -137,6 +137,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. 템플릿 이미지 생성
+    // ⚠️ 사용자 요청 (2026-04-27): 카드는 "제목 배너"만 표시. 인사말/가격/배송/
+    // 주문링크는 본문(buildPostContent)에 동일 정보가 이미 들어가므로 카드에 중복
+    // 표시할 필요가 없다. customIntro / showOrderLink / templateType의 부가 영역은
+    // generateTemplateHTML 내부에서 모두 비활성.
     const title = customTitle || product.name
     const html = generateTemplateHTML({
       product,
@@ -318,10 +322,13 @@ interface GenerateHTMLParams {
 }
 
 function generateTemplateHTML(params: GenerateHTMLParams): string {
-  const { product, title, intro, showOrderLink, orderLink, templateType } = params
+  // 사용자 요청(2026-04-27): 카드는 "제목 배너"만 표시.
+  // 인사말/가격/배송/주문링크는 본문 텍스트(buildPostContent)에 들어가므로 카드에 중복 X.
+  // intro/showOrderLink/templateType은 시그니처 호환성을 위해 받기만 하고 미사용.
+  const { product, title, templateType } = params
 
-  const formatPrice = (price: number) => price.toLocaleString() + '원'
-  const titleFontSize = title.length > 25 ? '24px' : '36px'
+  // 길이별 자동 줄바꿈/축소
+  const titleFontSize = title.length > 30 ? 56 : title.length > 20 ? 72 : 88
 
   const headerBgColor =
     templateType === 'premium'
@@ -329,59 +336,6 @@ function generateTemplateHTML(params: GenerateHTMLParams): string {
       : templateType === 'simple'
       ? '#E3F2FD'
       : '#C8E6C9'
-
-  // 공통 모듈로 판매가 계산 (배송비 타입에 따라 자동 처리)
-  const shippingFee = product.shippingFee || 0
-  const bundleShippingType = product.bundleShippingType || null
-
-  const priceHTML =
-    product.variants.length > 0
-      ? `
-      <div style="margin-bottom: 16px;">
-        <h3 style="font-weight: 700; color: #1f2937; margin-bottom: 8px; font-size: 16px;">💰 판매가</h3>
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          ${product.variants
-            .slice(0, 5)
-            .map(
-              (v) => {
-                const sellingPrice = calculateSellingPrice(v.price, shippingFee, bundleShippingType)
-                return `
-            <div style="display: flex; justify-content: space-between; font-size: 14px;">
-              <span style="color: #6b7280;">${v.optionSummary || '기본'}</span>
-              <span style="font-weight: 600; color: #1f2937;">${formatPrice(sellingPrice)}</span>
-            </div>
-          `
-              }
-            )
-            .join('')}
-          ${product.variants.length > 5 ? `<p style="font-size: 12px; color: #9ca3af;">외 ${product.variants.length - 5}개 옵션</p>` : ''}
-        </div>
-      </div>
-    `
-      : ''
-
-  const shippingHTML =
-    product.shippingFee || (product.bundleMaxQty && product.bundleMaxQty > 1)
-      ? `
-      <div style="border-top: 1px solid #e5e7eb; padding-top: 12px;">
-        <h3 style="font-weight: 700; color: #1f2937; margin-bottom: 8px; font-size: 16px;">🚚 배송정보</h3>
-        <div style="font-size: 14px; color: #6b7280;">
-          ${product.shippingFee ? `<p>배송비: ${formatPrice(product.shippingFee)}</p>` : ''}
-          ${product.bundleMaxQty && product.bundleMaxQty > 1 ? `<p>합배송: ${product.bundleMaxQty}개까지 묶음배송</p>` : ''}
-        </div>
-      </div>
-    `
-      : ''
-
-  const orderLinkHTML = showOrderLink
-    ? `
-      <div style="background: #EBF5FF; border-radius: 8px; padding: 12px; text-align: center; margin-top: 16px;">
-        <p style="color: #2563eb; font-weight: 600; font-size: 14px;">
-          🛒 주문하기 👉 ${orderLink || '[쇼핑몰에서 확인]'}
-        </p>
-      </div>
-    `
-    : ''
 
   return `
 <!DOCTYPE html>
@@ -391,74 +345,41 @@ function generateTemplateHTML(params: GenerateHTMLParams): string {
   <style>
     ${FONT_CSS}
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-      background: #f3f4f6;
+      background: #ffffff;
       padding: 20px;
     }
 
     #template-content {
-      width: 500px;
-      background: white;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    .header {
+      width: 600px;
+      min-height: 240px;
       background: ${headerBgColor};
-      padding: 20px 24px;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 56px 36px;
+      text-align: center;
     }
 
-    .header h1 {
-      font-size: ${titleFontSize};
-      font-weight: 800;
-      color: #1f2937;
-      line-height: 1.3;
-    }
-
-    .content {
-      padding: 20px 24px;
-    }
-
-    .intro {
-      color: #4b5563;
-      font-size: 15px;
-      line-height: 1.6;
-      margin-bottom: 16px;
-      white-space: pre-line;
-    }
-
-    .info-box {
-      background: #f9fafb;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 16px;
+    #template-content h1 {
+      font-size: ${titleFontSize}px;
+      font-weight: 900;
+      color: #111827;
+      line-height: 1.18;
+      letter-spacing: -1.5px;
+      word-break: keep-all;
     }
   </style>
 </head>
 <body>
   <div id="template-content">
-    <div class="header">
-      <h1>${escapeHtml(title)}</h1>
-    </div>
-
-    <div class="content">
-      ${intro ? `<p class="intro">${escapeHtml(intro)}</p>` : ''}
-
-      <div class="info-box">
-        ${priceHTML}
-        ${shippingHTML}
-      </div>
-
-      ${orderLinkHTML}
-    </div>
+    <h1>${escapeHtml(title)}</h1>
   </div>
 </body>
 </html>

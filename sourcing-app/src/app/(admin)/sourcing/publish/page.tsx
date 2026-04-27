@@ -1291,16 +1291,64 @@ function PublishPageContent() {
   const [republishProgress, setRepublishProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 })
   const [republishingIds, setRepublishingIds] = useState<Set<number>>(new Set())
 
+  // 재발행 대상 선택 모달
+  const [republishModalOpen, setRepublishModalOpen] = useState(false)
+  const [republishAvailableChannels, setRepublishAvailableChannels] = useState<{ id: number; name: string }[]>([])
+  const [republishAvailableShops, setRepublishAvailableShops] = useState<{ id: number; name: string }[]>([])
+  const [republishSelectedChannelIds, setRepublishSelectedChannelIds] = useState<Set<number>>(new Set())
+  const [republishSelectedShopIds, setRepublishSelectedShopIds] = useState<Set<number>>(new Set())
+
+  // 재발행 버튼 클릭 → 채널/쇼핑몰 목록 가져와 선택 모달 열기
   const handleRepublishSelected = async () => {
     if (selectedProductIds.length === 0) {
       toast.error('재발행할 상품을 선택해주세요.')
       return
     }
-    if (!confirm(`선택한 ${selectedProductIds.length}개 상품을 재발행합니다.\n\n자동발행과 동일한 경로로 모든 소매밴드와 활성 쇼핑몰에 신규 발행됩니다.`)) {
+    try {
+      const [channelRes, shopRes] = await Promise.all([
+        fetch('/api/channel?kind=RETAIL&limit=100', { credentials: 'include' }),
+        fetch('/api/shop?isActive=true&limit=100', { credentials: 'include' }),
+      ])
+      const channelData = await channelRes.json()
+      const shopData = await shopRes.json()
+      const retailChannels: { id: number; name: string }[] = channelData.success ? channelData.data : []
+      const allShops: { id: number; name: string; isActive: boolean }[] = shopData.success ? (shopData.data || []) : []
+      const activeShops = allShops.filter((s) => s.isActive !== false)
+
+      if (retailChannels.length === 0 && activeShops.length === 0) {
+        toast.error('등록된 소매밴드 또는 쇼핑몰이 없습니다.')
+        return
+      }
+
+      setRepublishAvailableChannels(retailChannels)
+      setRepublishAvailableShops(activeShops.map((s) => ({ id: s.id, name: s.name })))
+      // 기본값: 전부 미선택 — 사용자가 명시적으로 1개 이상 골라야 발행되도록.
+      // (이전엔 confirm() 후 무조건 모든 채널·쇼핑몰에 발행 → 의도치 않은 일괄 발행 사고).
+      setRepublishSelectedChannelIds(new Set())
+      setRepublishSelectedShopIds(new Set())
+      setRepublishModalOpen(true)
+    } catch (err: any) {
+      toast.error(`채널/쇼핑몰 조회 실패: ${err?.message || '알 수 없음'}`)
+    }
+  }
+
+  // 모달에서 "재발행 시작" 클릭 → 선택된 채널/쇼핑몰만 발행
+  const confirmRepublish = async () => {
+    setRepublishModalOpen(false)
+
+    const targetIds = [...selectedProductIds]
+    const retailChannels = republishAvailableChannels.filter((c) =>
+      republishSelectedChannelIds.has(c.id)
+    )
+    const activeShops = republishAvailableShops.filter((s) =>
+      republishSelectedShopIds.has(s.id)
+    )
+
+    if (retailChannels.length === 0 && activeShops.length === 0) {
+      toast.error('발행할 대상(소매밴드 또는 쇼핑몰)을 1개 이상 선택해주세요.')
       return
     }
 
-    const targetIds = [...selectedProductIds]
     setIsPublishing(true)
     setRepublishingIds(new Set(targetIds))
     setRepublishProgress({ current: 0, total: targetIds.length, success: 0, failed: 0 })
@@ -1311,24 +1359,7 @@ function PublishPageContent() {
     let failCount = 0
 
     try {
-      // 1) 소매밴드 채널 + 쇼핑몰 목록 fresh 조회 (자동발행과 동일)
-      const [channelRes, shopRes] = await Promise.all([
-        fetch('/api/channel?kind=RETAIL&limit=100', { credentials: 'include' }),
-        fetch('/api/shop?isActive=true&limit=100', { credentials: 'include' }),
-      ])
-      const channelData = await channelRes.json()
-      const shopData = await shopRes.json()
-      const retailChannels: { id: number; name: string }[] = channelData.success ? channelData.data : []
-      const allShops: { id: number; name: string; isActive: boolean }[] = shopData.success ? (shopData.data || []) : []
-      const activeShops = allShops.filter(s => s.isActive !== false)
-
-      if (retailChannels.length === 0 && activeShops.length === 0) {
-        toast.error('등록된 소매밴드 또는 쇼핑몰이 없습니다.')
-        return
-      }
-
-      // 2) 자동발행과 동일한 순서로 발행: 각 상품마다 밴드 먼저 → 쇼핑몰 나중
-      //    (기존의 Playwright DELETE/쇼핑몰 먼저 순서는 Band 세션/레이아웃을 깨뜨리므로 제거)
+      // 자동발행과 동일한 순서로 발행: 각 상품마다 밴드 먼저 → 쇼핑몰 나중
       for (let i = 0; i < targetIds.length; i++) {
         const productId = targetIds[i]
         setRepublishProgress(prev => ({ ...prev, current: i + 1 }))
@@ -2228,6 +2259,179 @@ function PublishPageContent() {
           )}
         </div>
       </div>
+
+      {/* 재발행 대상 선택 모달 */}
+      {republishModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setRepublishModalOpen(false)}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-200 bg-blue-50">
+              <h3 className="text-lg font-bold text-gray-900">🔁 재발행 대상 선택</h3>
+              <p className="text-xs text-gray-600 mt-1">
+                선택한 <strong>{selectedProductIds.length}개</strong> 상품을 어디에 재발행할지 고르세요.
+                밴드/쇼핑몰 각각 다중 선택 가능. 1개 이상 선택해야 발행됩니다.
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              {/* 소매밴드 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-800">
+                    🟦 소매밴드 ({republishSelectedChannelIds.size}/{republishAvailableChannels.length})
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRepublishSelectedChannelIds(
+                          new Set(republishAvailableChannels.map((c) => c.id))
+                        )
+                      }
+                      className="text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700"
+                    >
+                      전체 선택
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRepublishSelectedChannelIds(new Set())}
+                      className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700"
+                    >
+                      선택 취소
+                    </button>
+                  </div>
+                </div>
+                {republishAvailableChannels.length === 0 ? (
+                  <div className="text-xs text-gray-400 py-2">등록된 소매밴드가 없습니다.</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {republishAvailableChannels.map((ch) => {
+                      const checked = republishSelectedChannelIds.has(ch.id)
+                      return (
+                        <label
+                          key={ch.id}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer text-sm transition-colors ${
+                            checked
+                              ? 'bg-blue-50 border-blue-400 text-blue-900'
+                              : 'bg-white border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setRepublishSelectedChannelIds((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(ch.id)) next.delete(ch.id)
+                                else next.add(ch.id)
+                                return next
+                              })
+                            }
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                          />
+                          <span className="truncate">{ch.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 쇼핑몰 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-800">
+                    🛍️ 쇼핑몰 ({republishSelectedShopIds.size}/{republishAvailableShops.length})
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRepublishSelectedShopIds(
+                          new Set(republishAvailableShops.map((s) => s.id))
+                        )
+                      }
+                      className="text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700"
+                    >
+                      전체 선택
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRepublishSelectedShopIds(new Set())}
+                      className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700"
+                    >
+                      선택 취소
+                    </button>
+                  </div>
+                </div>
+                {republishAvailableShops.length === 0 ? (
+                  <div className="text-xs text-gray-400 py-2">활성 쇼핑몰이 없습니다.</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {republishAvailableShops.map((sh) => {
+                      const checked = republishSelectedShopIds.has(sh.id)
+                      return (
+                        <label
+                          key={sh.id}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer text-sm transition-colors ${
+                            checked
+                              ? 'bg-emerald-50 border-emerald-400 text-emerald-900'
+                              : 'bg-white border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setRepublishSelectedShopIds((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(sh.id)) next.delete(sh.id)
+                                else next.add(sh.id)
+                                return next
+                              })
+                            }
+                            className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+                          />
+                          <span className="truncate">{sh.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between gap-2 bg-gray-50">
+              <span className="text-xs text-gray-600">
+                예정: 밴드 {republishSelectedChannelIds.size}개 + 쇼핑몰 {republishSelectedShopIds.size}개
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRepublishModalOpen(false)}
+                  className="px-4 py-2 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 text-sm"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmRepublish}
+                  disabled={
+                    republishSelectedChannelIds.size === 0 &&
+                    republishSelectedShopIds.size === 0
+                  }
+                  className="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  재발행 시작
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 가격 미설정 경고 모달 */}
       {showPriceWarning && warningProduct && (
