@@ -278,9 +278,9 @@ export default function AISettingsPage() {
                   <select
                     value={settings.openaiModel}
                     onChange={(e) => {
+                      // 모델 변경은 isTestSuccess를 리셋하지 않음 — API 키가 같으면 같은 인증으로
+                      // 다른 모델 호출 가능. 모델 호환성 문제는 실제 사용 시 surfacing.
                       setSettings(prev => ({ ...prev, openaiModel: e.target.value }))
-                      setIsTestSuccess(false)
-                      setTestResult(null)
                     }}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
@@ -354,9 +354,8 @@ export default function AISettingsPage() {
                   <select
                     value={settings.geminiModel}
                     onChange={(e) => {
+                      // 모델 변경은 isTestSuccess를 리셋하지 않음 — API 키 검증과 분리.
                       setSettings(prev => ({ ...prev, geminiModel: e.target.value }))
-                      setIsTestSuccess(false)
-                      setTestResult(null)
                     }}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
@@ -421,9 +420,9 @@ export default function AISettingsPage() {
                   <select
                     value={settings.claudeModel}
                     onChange={(e) => {
+                      // 모델 변경은 isTestSuccess를 리셋하지 않음 — API 키 검증과 분리해
+                      // "Sonnet으로 테스트 통과 → Haiku로 변경 → 저장 비활성"의 함정 방지.
                       setSettings(prev => ({ ...prev, claudeModel: e.target.value }))
-                      setIsTestSuccess(false)
-                      setTestResult(null)
                     }}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   >
