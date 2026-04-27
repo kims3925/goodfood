@@ -17,6 +17,7 @@ import { AgentBase } from '../AgentBase'
 import { AgentLayer, type AgentEvent, type AgentResult } from '../types'
 import { GeminiClient, type AiImagePart } from '@/modules/transformation/ai.client'
 import { AiProvider } from '@bandauto/db'
+import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
 
 // ─── 감사 결과 타입 ───
 
@@ -337,32 +338,43 @@ export class ProductManagerAgent extends AgentBase {
    * 규칙:
    *  - 카테고리 'COM'(상시상품): publishedAt이 30일 초과면 만료
    *  - 그 외 카테고리: publishedAt이 7일 초과면 만료
-   *  - 만료된 ChannelProduct(소매밴드 발행)는 soft-delete + band.post.delete.requested
-   *    이벤트 emit (실 Band 게시글 삭제는 별도 listener가 처리해야 함 — Phase 2)
-   *  - 만료된 ShopProduct(쇼핑몰 발행)는 soft-delete (deletedAt = now)
+   *  - 만료된 ChannelProduct(소매밴드 발행):
+   *      1. DB soft-delete (deletedAt + isActive=false)
+   *      2. Playwright로 Band 페이지에서 실제 게시글 삭제 (skipPlaywright=true면 생략)
+   *      3. band.post.delete.requested 이벤트 emit (다른 청자가 있으면 추가 처리)
+   *  - 만료된 ShopProduct(쇼핑몰 발행)는 DB soft-delete (deletedAt = now)
    *
    * dryRun=true: DB 변경 없이 대상 카운트만 반환 (사전 확인용)
    *
-   * @param options.dryRun  true면 실제 변경 없이 카운트만
-   * @param options.limit   한 번 실행 시 조회 최대 레코드 수 (기본 1000, 보호용)
+   * @param options.dryRun         true면 실제 변경 없이 카운트만
+   * @param options.limit          한 번 실행 시 조회 최대 레코드 수 (기본 100). Playwright
+   *                               삭제는 1건당 ~10-15초 소요되므로 너무 크게 잡으면 cron이
+   *                               다음 실행과 겹칠 수 있다.
+   * @param options.skipPlaywright DB만 정리하고 Band 실제 삭제는 건너뜀 (백필 마이그레이션용)
    */
-  async runContentExpiry(options: { dryRun?: boolean; limit?: number } = {}): Promise<{
+  async runContentExpiry(options: {
+    dryRun?: boolean
+    limit?: number
+    skipPlaywright?: boolean
+  } = {}): Promise<{
     cutoffDays: { default: number; com: number }
     channelProducts: { found: number; softDeleted: number }
     shopProducts: { found: number; softDeleted: number }
+    bandPosts: { attempted: number; deleted: number; failed: number; sessionMissing: number }
     productsAffected: number
-    errors: { id: number; error: string; type: 'channel' | 'shop' }[]
+    errors: { id: number; error: string; type: 'channel' | 'shop' | 'band' }[]
     dryRun: boolean
   }> {
     const dryRun = options.dryRun ?? false
-    const limit = options.limit ?? 1000
+    const limit = options.limit ?? 100
+    const skipPlaywright = options.skipPlaywright ?? false
     const now = new Date()
     const cutoff7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const cutoff30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
     await this.log(
       'INFO',
-      `이전글 정리 시작 (dryRun=${dryRun}, 일반=${cutoff7.toISOString()} 이전, 상시상품=${cutoff30.toISOString()} 이전)`
+      `이전글 정리 시작 (dryRun=${dryRun}, skipPlaywright=${skipPlaywright}, limit=${limit}, 일반=${cutoff7.toISOString()} 이전, 상시상품=${cutoff30.toISOString()} 이전)`
     )
 
     // 만료된 ChannelProduct: 일반 7일, COM 30일.
@@ -386,6 +398,7 @@ export class ProductManagerAgent extends AgentBase {
         postKey: true,
         publishedAt: true,
         product: { select: { id: true, categoryId: true, name: true } },
+        channel: { select: { id: true, channelKey: true, name: true } },
       },
       take: limit,
       orderBy: { publishedAt: 'asc' },
@@ -417,8 +430,9 @@ export class ProductManagerAgent extends AgentBase {
       cutoffDays: { default: 7, com: 30 },
       channelProducts: { found: expiredChannelProducts.length, softDeleted: 0 },
       shopProducts: { found: expiredShopProducts.length, softDeleted: 0 },
+      bandPosts: { attempted: 0, deleted: 0, failed: 0, sessionMissing: 0 },
       productsAffected: 0,
-      errors: [] as { id: number; error: string; type: 'channel' | 'shop' }[],
+      errors: [] as { id: number; error: string; type: 'channel' | 'shop' | 'band' }[],
       dryRun,
     }
 
@@ -434,27 +448,83 @@ export class ProductManagerAgent extends AgentBase {
       return result
     }
 
-    // 실 삭제 — ChannelProduct 소프트 삭제 + Band 게시물 삭제 이벤트 emit
+    // ── 1) ChannelProduct 처리 ──
+    // 각 레코드: DB 소프트 삭제 → Playwright 실 삭제 (best-effort) → 이벤트 emit
+    // Playwright 호출은 1건당 ~10-15초 — 채널별로 직렬 처리. 실패해도 다음 진행.
     for (const cp of expiredChannelProducts) {
+      // (a) DB 소프트 삭제 (Band 삭제 실패해도 DB 상태는 일관)
       try {
         await prisma.channelProduct.update({
           where: { id: cp.id },
           data: { deletedAt: now, isActive: false },
         })
-        if (cp.postKey) {
-          await this.emitEvent(
-            'band.post.delete.requested',
-            { channelId: cp.channelId, postKey: cp.postKey, productId: cp.productId, reason: 'content_expiry' },
-            'NORMAL'
-          )
-        }
         result.channelProducts.softDeleted++
       } catch (err: any) {
         result.errors.push({ id: cp.id, error: err.message || String(err), type: 'channel' })
+        continue // DB 실패면 Playwright 시도 무의미
+      }
+
+      // (b) 이벤트 emit (다른 청자가 후속 처리할 여지)
+      if (cp.postKey) {
+        await this.emitEvent(
+          'band.post.delete.requested',
+          {
+            channelId: cp.channelId,
+            postKey: cp.postKey,
+            productId: cp.productId,
+            reason: 'content_expiry',
+          },
+          'NORMAL'
+        )
+      }
+
+      // (c) Playwright 실 삭제 — 가격 변동/품절 노출 방지를 위한 핵심 단계
+      if (!skipPlaywright && cp.postKey && cp.channel?.channelKey) {
+        result.bandPosts.attempted++
+        try {
+          const r = await bandPlaywrightService.deletePost({
+            channelId: cp.channelId,
+            bandKey: cp.channel.channelKey,
+            bandName: cp.channel.name,
+            postKey: cp.postKey,
+          })
+          if (r.success) {
+            result.bandPosts.deleted++
+          } else {
+            result.bandPosts.failed++
+            const isSession =
+              !!r.error &&
+              (r.error.includes('세션') ||
+                r.error.includes('session') ||
+                r.error.includes('쿠키'))
+            if (isSession) result.bandPosts.sessionMissing++
+            await this.log(
+              'WARN',
+              `Band 게시글 삭제 실패 (channel=${cp.channelId} post=${cp.postKey}): ${r.error}`
+            )
+            result.errors.push({
+              id: cp.id,
+              error: r.error || '실패',
+              type: 'band',
+            })
+          }
+        } catch (err: any) {
+          result.bandPosts.failed++
+          await this.log(
+            'ERROR',
+            `Band 게시글 삭제 예외 (channel=${cp.channelId} post=${cp.postKey}): ${err.message || err}`
+          )
+          result.errors.push({
+            id: cp.id,
+            error: err.message || String(err),
+            type: 'band',
+          })
+        }
       }
     }
 
-    // 실 삭제 — ShopProduct 소프트 삭제
+    // ── 2) ShopProduct 처리: DB 소프트 삭제만 (쇼핑몰은 우리 시스템이 직접 운영하므로
+    //    별도 Playwright 호출 불필요) ──
     for (const sp of expiredShopProducts) {
       try {
         await prisma.shopProduct.update({
@@ -474,10 +544,11 @@ export class ProductManagerAgent extends AgentBase {
 
     await this.log(
       'INFO',
-      `이전글 정리 완료: 채널 ${result.channelProducts.softDeleted}/${result.channelProducts.found}건, 쇼핑몰 ${result.shopProducts.softDeleted}/${result.shopProducts.found}건 (오류 ${result.errors.length})`
+      `이전글 정리 완료: 채널 DB ${result.channelProducts.softDeleted}/${result.channelProducts.found}, 쇼핑몰 DB ${result.shopProducts.softDeleted}/${result.shopProducts.found}, Band 실삭제 ${result.bandPosts.deleted}/${result.bandPosts.attempted} (실패 ${result.bandPosts.failed}, 세션부재 ${result.bandPosts.sessionMissing})`
     )
     await this.recordKpi('content_expiry_channel_deleted', result.channelProducts.softDeleted)
     await this.recordKpi('content_expiry_shop_deleted', result.shopProducts.softDeleted)
+    await this.recordKpi('content_expiry_band_deleted', result.bandPosts.deleted)
 
     return result
   }
