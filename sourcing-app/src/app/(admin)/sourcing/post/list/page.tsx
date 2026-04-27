@@ -125,7 +125,12 @@ export default function PostsManagePage() {
   const [isAiProcessing, setIsAiProcessing] = useState(false)
   const [aiProgress, setAiProgress] = useState({ current: 0, total: 0, failed: 0 })
   const [showAiConfirm, setShowAiConfirm] = useState(false)
-  const [aiCompleteModal, setAiCompleteModal] = useState<{ show: boolean; success: number; failed: number }>({ show: false, success: 0, failed: 0 })
+  const [aiCompleteModal, setAiCompleteModal] = useState<{
+    show: boolean
+    success: number
+    failed: number
+    errors: string[]
+  }>({ show: false, success: 0, failed: 0, errors: [] })
 
   // 2단계 뷰: 'collecting' = 수집 게시물, 'processed' = 가공 완료 상품
   const [viewMode, setViewMode] = useState<'collecting' | 'processed'>('collecting')
@@ -758,6 +763,12 @@ export default function PostsManagePage() {
     let successCount = 0
     let failCount = 0
     const createdProductIds: number[] = []
+    // 실패 사유 수집 — 모달에 top 3 빈도순 표시. RPD 한도/API 키 누락 등 진단용.
+    const errorCounts = new Map<string, number>()
+    const collectError = (msg: string | undefined) => {
+      const key = (msg || '알 수 없는 오류').toString().slice(0, 200)
+      errorCounts.set(key, (errorCounts.get(key) ?? 0) + 1)
+    }
 
     // 1) 채널별 가격 정책 로드
     const policyMap = new Map<number, string>()
@@ -792,6 +803,7 @@ export default function PostsManagePage() {
 
         if (!aiData.success || !aiData.draft) {
           failCount++
+          collectError(aiData.error || aiData.message || `HTTP ${aiRes.status}`)
           setAiProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
           continue
         }
@@ -830,13 +842,21 @@ export default function PostsManagePage() {
           createdProductIds.push(productData.data.id)
         } else {
           failCount++
+          collectError(`상품 생성 실패: ${productData.error || productData.message || `HTTP ${productRes.status}`}`)
           setAiProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
         }
-      } catch {
+      } catch (err: any) {
         failCount++
+        collectError(`네트워크/예외: ${err?.message || '알 수 없음'}`)
         setAiProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
       }
     }
+
+    // top N 빈도순으로 정리 (실패 사유 진단용)
+    const topErrors = Array.from(errorCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([msg, count]) => `(${count}건) ${msg}`)
 
     setIsAiProcessing(false)
     setSelectedPostIds([])
@@ -848,9 +868,9 @@ export default function PostsManagePage() {
       await loadProcessedProducts(createdProductIds)
       setViewMode('processed')
     }
-    // 완료 팝업 표시 (성공/실패 요약 + 가공상품 페이지로 이동 제안)
+    // 완료 팝업 표시 (성공/실패 요약 + 실패 사유 top 3 + 가공상품 페이지로 이동 제안)
     if (successCount > 0 || failCount > 0) {
-      setAiCompleteModal({ show: true, success: successCount, failed: failCount })
+      setAiCompleteModal({ show: true, success: successCount, failed: failCount, errors: topErrors })
     }
   }
 
@@ -2315,9 +2335,9 @@ export default function PostsManagePage() {
       {/* AI 가공 완료 모달 — 가공상품 페이지로 이동 */}
       <ConfirmModal
         isOpen={aiCompleteModal.show}
-        onClose={() => setAiCompleteModal({ show: false, success: 0, failed: 0 })}
+        onClose={() => setAiCompleteModal({ show: false, success: 0, failed: 0, errors: [] })}
         onConfirm={() => {
-          setAiCompleteModal({ show: false, success: 0, failed: 0 })
+          setAiCompleteModal({ show: false, success: 0, failed: 0, errors: [] })
           router.push('/sourcing/product/list?tab=unpublished')
         }}
         title="AI 가공 완료"
@@ -2334,6 +2354,14 @@ export default function PostsManagePage() {
                 <span className="text-red-600">{aiCompleteModal.failed}개 가공 실패</span>
                 <br />
               </>
+            )}
+            {aiCompleteModal.errors.length > 0 && (
+              <span className="mt-2 block text-xs text-gray-700 bg-red-50 border border-red-200 rounded p-2">
+                <strong className="block mb-1">실패 사유 (빈도순):</strong>
+                {aiCompleteModal.errors.map((e, i) => (
+                  <span key={i} className="block break-words">• {e}</span>
+                ))}
+              </span>
             )}
             <span className="mt-2 block text-gray-600">가공상품 페이지로 이동하시겠습니까?</span>
           </span>
