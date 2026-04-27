@@ -16,6 +16,7 @@ import ProductFormModal from '@/components/product/ProductFormModal'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
 import ThumbnailImage from '@/components/ui/ThumbnailImage'
+import { scheduleDelayedPublish, formatScheduledTime } from '@/lib/delayed-publish'
 
 interface Channel {
   id: number
@@ -182,6 +183,13 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
     individual: true,
     digest: false,
   })
+  // 자동발행 지연 (분). 0 = 즉시.
+  const [autoPublishDelayMinutes, setAutoPublishDelayMinutes] = useState<number>(0)
+  // 예약된 자동발행 취소 핸들러. 예약이 활성 동안 set.
+  const [pendingAutoPublishCancel, setPendingAutoPublishCancel] = useState<{
+    cancel: () => void
+    scheduledAt: number
+  } | null>(null)
 
   // 발행 방식 선택 모달
   const [showPublishMethodModal, setShowPublishMethodModal] = useState(false)
@@ -1158,6 +1166,30 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
       return
     }
 
+    // 지연 발행 분기: delayMinutes > 0 → setTimeout 으로 예약
+    const delay = Math.max(0, Math.floor(autoPublishDelayMinutes || 0))
+    if (delay > 0) {
+      const scheduledAt = Date.now() + delay * 60 * 1000
+      const summary = `${selectedProductIds.length}개 상품`
+      const cancel = scheduleDelayedPublish(
+        delay,
+        () => {
+          setPendingAutoPublishCancel(null)
+          void runAutoPublishNow()
+        },
+        { jobKey: 'auto-publish', jobLabel: '자동발행', payloadSummary: summary }
+      )
+      setPendingAutoPublishCancel({ cancel, scheduledAt })
+      toast.success(
+        `${delay}분 후 자동발행 예약됨 (${formatScheduledTime(scheduledAt)}) — 탭을 닫으면 취소됩니다.`
+      )
+      return
+    }
+
+    await runAutoPublishNow()
+  }
+
+  const runAutoPublishNow = async () => {
     setIsAutoPublishing(true)
 
     let bandSuccessCount = 0
@@ -1653,6 +1685,26 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
             </div>
           )}
         </div>
+
+        {/* 자동발행 예약 안내 (대기 중) */}
+        {pendingAutoPublishCancel && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 flex items-center justify-between">
+            <span className="text-sm text-amber-900">
+              ⏳ <strong>{formatScheduledTime(pendingAutoPublishCancel.scheduledAt)}</strong> 에 자동발행 예약됨
+              <span className="ml-2 text-xs text-amber-700">(탭 닫으면 취소)</span>
+            </span>
+            <button
+              onClick={() => {
+                pendingAutoPublishCancel.cancel()
+                setPendingAutoPublishCancel(null)
+                toast.success('예약된 자동발행이 취소되었습니다.')
+              }}
+              className="px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded-md font-medium"
+            >
+              예약 취소
+            </button>
+          </div>
+        )}
 
         {/* 액션 바 (고정) */}
         <div className="bg-gray-900 rounded-2xl px-5 py-3 mb-6 flex items-center gap-3 flex-wrap">
@@ -2198,6 +2250,28 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
                 ℹ️ 둘 다 선택하면 <b>개별발행 → 종합발행</b> 순서로 실행됩니다. 시간이 오래 걸릴 수 있습니다.
               </div>
             )}
+
+            {/* 발행 지연 입력 */}
+            <div className="mb-4 p-3 rounded-lg border border-gray-200 bg-gray-50">
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-gray-700">⏱️</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={autoPublishDelayMinutes}
+                  onChange={(e) => setAutoPublishDelayMinutes(parseInt(e.target.value || '0', 10) || 0)}
+                  className="w-16 px-2 py-1 text-sm text-right border border-gray-300 rounded"
+                />
+                <span className="text-gray-700">분 후 자동발행</span>
+                <span className="text-xs text-gray-400">(0 = 즉시)</span>
+              </label>
+              {autoPublishDelayMinutes > 0 && (
+                <p className="mt-1.5 text-[11px] text-amber-700">
+                  ⚠️ 탭을 닫으면 예약이 취소됩니다 (서버 영속화 미구현).
+                </p>
+              )}
+            </div>
 
             <div className="flex gap-3">
               <button

@@ -28,6 +28,7 @@ import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
+import { scheduleDelayedPublish, formatScheduledTime } from '@/lib/delayed-publish'
 import { CATEGORY_LIST } from '@/modules/category/category.keywords'
 
 const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
@@ -1300,6 +1301,13 @@ function PublishPageContent() {
   // 자동발행 경로 사용 — 기본 ON. 켜면 /api/automation/execute (자동발행 cron과 동일한
   // runPublishPipeline 경로) 호출, 끄면 기존 per-channel template/publish 루프.
   const [useAutoPath, setUseAutoPath] = useState(true)
+  // 재발행 지연 (분). 0 = 즉시.
+  const [republishDelayMinutes, setRepublishDelayMinutes] = useState<number>(0)
+  // 예약된 재발행 취소 핸들러.
+  const [pendingRepublishCancel, setPendingRepublishCancel] = useState<{
+    cancel: () => void
+    scheduledAt: number
+  } | null>(null)
 
   // 재발행 버튼 클릭 → 채널/쇼핑몰 목록 가져와 선택 모달 열기
   const handleRepublishSelected = async () => {
@@ -1352,6 +1360,35 @@ function PublishPageContent() {
       return
     }
 
+    // 지연 발행 분기: delayMinutes > 0 → setTimeout 으로 예약
+    const delay = Math.max(0, Math.floor(republishDelayMinutes || 0))
+    if (delay > 0) {
+      const scheduledAt = Date.now() + delay * 60 * 1000
+      const summary = `${targetIds.length}개 상품 / 밴드 ${retailChannels.length} + 쇼핑몰 ${activeShops.length}`
+      const cancel = scheduleDelayedPublish(
+        delay,
+        () => {
+          setPendingRepublishCancel(null)
+          void runRepublishNow(targetIds, retailChannels, activeShops)
+        },
+        { jobKey: 'republish', jobLabel: '재발행', payloadSummary: summary }
+      )
+      setPendingRepublishCancel({ cancel, scheduledAt })
+      toast.success(
+        `${delay}분 후 재발행 예약됨 (${formatScheduledTime(scheduledAt)}) — 탭을 닫으면 취소됩니다.`
+      )
+      return
+    }
+
+    await runRepublishNow(targetIds, retailChannels, activeShops)
+  }
+
+  // 실제 재발행 실행 (즉시 또는 지연 후 호출)
+  const runRepublishNow = async (
+    targetIds: number[],
+    retailChannels: { id: number; name: string }[],
+    activeShops: { id: number; name: string }[]
+  ) => {
     setIsPublishing(true)
     setRepublishingIds(new Set(targetIds))
     setRepublishProgress({ current: 0, total: targetIds.length, success: 0, failed: 0 })
@@ -1609,6 +1646,26 @@ function PublishPageContent() {
             <span className="text-sm text-blue-600 font-medium">
               {selectedProductIds.length}개 선택됨
             </span>
+          )}
+
+          {/* 재발행 예약 안내 (대기 중) */}
+          {pendingRepublishCancel && (
+            <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-md">
+              <span className="text-xs text-amber-900">
+                ⏳ <strong>{formatScheduledTime(pendingRepublishCancel.scheduledAt)}</strong> 재발행 예약됨
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  pendingRepublishCancel.cancel()
+                  setPendingRepublishCancel(null)
+                  toast.success('예약된 재발행이 취소되었습니다.')
+                }}
+                className="px-2 py-0.5 text-[11px] bg-amber-600 hover:bg-amber-700 text-white rounded"
+              >
+                취소
+              </button>
+            </div>
           )}
 
           {/* 재발행 버튼 + 진행률 */}
@@ -2492,29 +2549,53 @@ function PublishPageContent() {
               </div>
             </div>
 
-            <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between gap-2 bg-gray-50">
-              <span className="text-xs text-gray-600">
-                예정: 밴드 {republishSelectedChannelIds.size}개 + 쇼핑몰 {republishSelectedShopIds.size}개
-              </span>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRepublishModalOpen(false)}
-                  className="px-4 py-2 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 text-sm"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmRepublish}
-                  disabled={
-                    republishSelectedChannelIds.size === 0 &&
-                    republishSelectedShopIds.size === 0
+            <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 space-y-3">
+              {/* 발행 지연 입력 */}
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-gray-700">⏱️</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={republishDelayMinutes}
+                  onChange={(e) =>
+                    setRepublishDelayMinutes(parseInt(e.target.value || '0', 10) || 0)
                   }
-                  className="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
-                >
-                  재발행 시작
-                </button>
+                  className="w-16 px-2 py-1 text-sm text-right border border-gray-300 rounded"
+                />
+                <span className="text-gray-700">분 후 자동발행</span>
+                <span className="text-xs text-gray-400">(0 = 즉시)</span>
+                {republishDelayMinutes > 0 && (
+                  <span className="ml-auto text-[11px] text-amber-700">
+                    ⚠️ 탭 닫으면 예약 취소
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-gray-600">
+                  예정: 밴드 {republishSelectedChannelIds.size}개 + 쇼핑몰 {republishSelectedShopIds.size}개
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRepublishModalOpen(false)}
+                    className="px-4 py-2 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 text-sm"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmRepublish}
+                    disabled={
+                      republishSelectedChannelIds.size === 0 &&
+                      republishSelectedShopIds.size === 0
+                    }
+                    className="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+                  >
+                    {republishDelayMinutes > 0 ? `${republishDelayMinutes}분 후 발행 예약` : '재발행 시작'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
