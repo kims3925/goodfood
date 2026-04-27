@@ -44,19 +44,22 @@ const FAMILY_BRACKETS: BracketRow[] = [
   { from: '29901', to: '40000', margin: '2000' },
 ]
 
-// 나은도매 / VIP도매 / SD푸드 (10행 + 1 동적행)
+// 나은도매 / VIP도매 / SD푸드 (9행 + 1 동적행)
+// v4 → 사용자 요청 1000원씩 밀림 적용 (2026-04-27):
+//  - 1~19,900 첫 구간 통합 (+4,000원)
+//  - 이후 모든 구간 마진 -1,000원씩 (예: 19,901~29,900: +6,000 → +5,000)
+//  - 동적 구간 시작 마진도 +13,000 → +12,000
 const NAUN_BRACKETS: BracketRow[] = [
-  { from: '1', to: '9900', margin: '4000' },
-  { from: '9901', to: '19900', margin: '5000' },
-  { from: '19901', to: '29900', margin: '6000' },
-  { from: '29901', to: '39900', margin: '7000' },
-  { from: '39901', to: '49900', margin: '8000' },
-  { from: '49901', to: '59900', margin: '9000' },
-  { from: '59901', to: '69900', margin: '10000' },
-  { from: '69901', to: '79900', margin: '11000' },
-  { from: '79901', to: '89900', margin: '12000' },
-  { from: '89901', to: '99900', margin: '13000' },
-  { from: '99901', to: '', margin: '13000', isDynamic: true, dynBracketSize: '1', dynPerBracket: '1000' },
+  { from: '1', to: '19900', margin: '4000' },
+  { from: '19901', to: '29900', margin: '5000' },
+  { from: '29901', to: '39900', margin: '6000' },
+  { from: '39901', to: '49900', margin: '7000' },
+  { from: '49901', to: '59900', margin: '8000' },
+  { from: '59901', to: '69900', margin: '9000' },
+  { from: '69901', to: '79900', margin: '10000' },
+  { from: '79901', to: '89900', margin: '11000' },
+  { from: '89901', to: '99900', margin: '12000' },
+  { from: '99901', to: '', margin: '12000', isDynamic: true, dynBracketSize: '1', dynPerBracket: '1000' },
 ]
 
 interface ChannelSpec {

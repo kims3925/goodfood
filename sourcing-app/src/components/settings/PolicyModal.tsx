@@ -40,19 +40,22 @@ interface PolicyModalProps {
   mode: 'create' | 'edit'
 }
 
-// ── 나은/SD푸드/VIP도매 공통 구간 (10+1행) ──
+// ── 나은/SD푸드/VIP도매 공통 구간 (9+1행) ──
+// v4 → 사용자 요청 1000원씩 밀림 적용 (2026-04-27):
+//  - 1~19,900 첫 구간 통합 (이전 1~9,900 / 9,901~19,900 두 구간을 +4,000원으로 병합)
+//  - 이후 모든 구간 마진 -1,000원씩 (예: 19,901~29,900은 +6,000 → +5,000)
+//  - 동적 구간 시작도 +13,000 → +12,000
 const NAUN_BRACKETS: BracketRow[] = [
-  { id: '1', from: '1', to: '9900', margin: '4000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
-  { id: '2', from: '9901', to: '19900', margin: '5000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
-  { id: '3', from: '19901', to: '29900', margin: '6000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
-  { id: '4', from: '29901', to: '39900', margin: '7000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
-  { id: '5', from: '39901', to: '49900', margin: '8000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
-  { id: '6', from: '49901', to: '59900', margin: '9000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
-  { id: '7', from: '59901', to: '69900', margin: '10000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
-  { id: '8', from: '69901', to: '79900', margin: '11000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
-  { id: '9', from: '79901', to: '89900', margin: '12000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
-  { id: '10', from: '89901', to: '99900', margin: '13000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
-  { id: '11', from: '99901', to: '', margin: '13000', isDynamic: true, dynBracketSize: '1', dynPerBracket: '1000' },
+  { id: '1', from: '1', to: '19900', margin: '4000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
+  { id: '2', from: '19901', to: '29900', margin: '5000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
+  { id: '3', from: '29901', to: '39900', margin: '6000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
+  { id: '4', from: '39901', to: '49900', margin: '7000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
+  { id: '5', from: '49901', to: '59900', margin: '8000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
+  { id: '6', from: '59901', to: '69900', margin: '9000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
+  { id: '7', from: '69901', to: '79900', margin: '10000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
+  { id: '8', from: '79901', to: '89900', margin: '11000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
+  { id: '9', from: '89901', to: '99900', margin: '12000', isDynamic: false, dynBracketSize: '1', dynPerBracket: '1000' },
+  { id: '10', from: '99901', to: '', margin: '12000', isDynamic: true, dynBracketSize: '1', dynPerBracket: '1000' },
 ]
 
 // ── 가족도매방/초록이네 공통 구간 (3행) ──
