@@ -190,6 +190,11 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
     cancel: () => void
     scheduledAt: number
   } | null>(null)
+  // 자동발행 — 발행 대상(소매밴드/쇼핑몰) 다중선택. 재발행 모달과 동일 패턴.
+  const [autoPublishAvailableChannels, setAutoPublishAvailableChannels] = useState<{ id: number; name: string }[]>([])
+  const [autoPublishAvailableShops, setAutoPublishAvailableShops] = useState<{ id: number; name: string }[]>([])
+  const [autoPublishSelectedChannelIds, setAutoPublishSelectedChannelIds] = useState<Set<number>>(new Set())
+  const [autoPublishSelectedShopIds, setAutoPublishSelectedShopIds] = useState<Set<number>>(new Set())
 
   // 발행 방식 선택 모달
   const [showPublishMethodModal, setShowPublishMethodModal] = useState(false)
@@ -1152,10 +1157,34 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
     setShowDeleteConfirm(true)
   }
 
-  // 선택 상품 자동발행 (등록된 소매채널 전체에 발행)
-  const handleAutoPublish = () => {
+  // 선택 상품 자동발행 — 재발행 모달과 동일하게 채널/쇼핑몰 목록을 먼저 조회 후 모달 오픈
+  const handleAutoPublish = async () => {
     if (selectedProductIds.length === 0) return
-    setShowAutoPublishConfirm(true)
+    try {
+      const [channelRes, shopRes] = await Promise.all([
+        fetch('/api/channel?kind=RETAIL&limit=100', { credentials: 'include' }),
+        fetch('/api/shop?isActive=true&limit=100', { credentials: 'include' }),
+      ])
+      const channelData = await channelRes.json()
+      const shopData = await shopRes.json()
+      const retailChannels: { id: number; name: string }[] = channelData.success ? channelData.data : []
+      const allShops: { id: number; name: string; isActive: boolean }[] = shopData.success ? (shopData.data || []) : []
+      const activeShops = allShops.filter((s) => s.isActive !== false)
+
+      if (retailChannels.length === 0 && activeShops.length === 0) {
+        toast.error('등록된 소매밴드 또는 쇼핑몰이 없습니다.')
+        return
+      }
+
+      setAutoPublishAvailableChannels(retailChannels)
+      setAutoPublishAvailableShops(activeShops.map((s) => ({ id: s.id, name: s.name })))
+      // 기본값: 전체 선택 (자동발행은 통상 모든 채널에 발행하는 게 의도이므로)
+      setAutoPublishSelectedChannelIds(new Set(retailChannels.map((c) => c.id)))
+      setAutoPublishSelectedShopIds(new Set(activeShops.map((s) => s.id)))
+      setShowAutoPublishConfirm(true)
+    } catch (err: any) {
+      toast.error(`채널/쇼핑몰 조회 실패: ${err?.message || '알 수 없음'}`)
+    }
   }
 
   const confirmAutoPublish = async () => {
@@ -1205,21 +1234,19 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
     let digestPostCount = 0 // 생성된 게시글 수
 
     try {
-      // 1) 소매밴드 채널 + 쇼핑몰 목록 동시 조회
-      const [channelRes, shopRes] = await Promise.all([
-        fetch('/api/channel?kind=RETAIL&limit=100'),
-        fetch('/api/shop?isActive=true&limit=100'),
-      ])
-      const channelData = await channelRes.json()
-      const shopData = await shopRes.json()
-      const retailChannels: { id: number; name: string }[] = channelData.success ? channelData.data : []
-      const allShops: { id: number; name: string; isActive: boolean }[] = shopData.success ? (shopData.data || []) : []
-      const activeShops = allShops.filter(s => s.isActive !== false)
+      // 1) 모달에서 사용자가 체크한 채널/쇼핑몰만 대상 (재발행 모달과 동일 패턴).
+      // handleAutoPublish 시점에 fetched된 목록을 그대로 사용.
+      const retailChannels = autoPublishAvailableChannels.filter((c) =>
+        autoPublishSelectedChannelIds.has(c.id)
+      )
+      const activeShops = autoPublishAvailableShops.filter((s) =>
+        autoPublishSelectedShopIds.has(s.id)
+      )
 
-      console.log('[자동발행] 채널:', retailChannels.length, '쇼핑몰:', activeShops.length)
+      console.log('[자동발행] 선택된 채널:', retailChannels.length, '쇼핑몰:', activeShops.length)
 
       if (retailChannels.length === 0 && activeShops.length === 0) {
-        toast.error('등록된 소매밴드 또는 쇼핑몰이 없습니다.')
+        toast.error('발행할 대상(소매밴드 또는 쇼핑몰)을 1개 이상 선택해주세요.')
         setIsAutoPublishing(false)
         return
       }
@@ -2195,65 +2222,203 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
         </div>
       )}
 
-      {/* 자동발행 모드 선택 모달 */}
+      {/* 자동발행 대상 선택 모달 — 재발행 대상 선택과 동일 레이아웃 */}
       {showAutoPublishConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">자동발행 모드 선택</h3>
-            <p className="text-sm text-gray-500 mb-5">
-              선택한 <span className="font-semibold text-gray-900">{selectedProductIds.length}개</span> 상품의 발행 방식을 선택하세요.
-            </p>
-
-            <div className="space-y-3 mb-5">
-              <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
-                autoPublishMode.individual ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-              }`}>
-                <input
-                  type="checkbox"
-                  checked={autoPublishMode.individual}
-                  onChange={(e) => setAutoPublishMode((prev) => ({ ...prev, individual: e.target.checked }))}
-                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600"
-                />
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900 text-sm">개별발행</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    각 상품별로 독립된 게시글 작성. 모든 소매밴드 + 쇼핑몰 대상.
-                  </p>
-                </div>
-              </label>
-
-              <label className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
-                autoPublishMode.digest ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'
-              }`}>
-                <input
-                  type="checkbox"
-                  checked={autoPublishMode.digest}
-                  onChange={(e) => setAutoPublishMode((prev) => ({ ...prev, digest: e.target.checked }))}
-                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-emerald-600"
-                />
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900 text-sm">
-                    종합발행
-                    <span className="ml-2 text-xs font-normal text-gray-500">
-                      (카테고리별 20개씩 묶어 1게시글 / {selectedProductIds.length > 0 ? Math.ceil(selectedProductIds.length / 20) : 0}개 게시글 예상)
-                    </span>
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    SEA/AGR/... 카테고리별로 자동 분류 후 20개 단위로 카드 이미지 게시글 발행.
-                  </p>
-                </div>
-              </label>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowAutoPublishConfirm(false)}
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-200 bg-blue-50">
+              <h3 className="text-lg font-bold text-gray-900">🚀 발행 대상 선택</h3>
+              <p className="text-xs text-gray-600 mt-1">
+                선택한 <strong>{selectedProductIds.length}개</strong> 상품을 어디에 발행할지 고르세요.
+                밴드/쇼핑몰 각각 다중 선택 가능. 1개 이상 선택해야 발행됩니다.
+              </p>
             </div>
 
-            {autoPublishMode.individual && autoPublishMode.digest && (
-              <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-                ℹ️ 둘 다 선택하면 <b>개별발행 → 종합발행</b> 순서로 실행됩니다. 시간이 오래 걸릴 수 있습니다.
-              </div>
-            )}
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              {/* 발행 모드 (개별/종합) */}
+              <div>
+                <span className="text-sm font-semibold text-gray-800 mb-2 block">📦 발행 모드</span>
+                <div className="space-y-2">
+                  <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    autoPublishMode.individual ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={autoPublishMode.individual}
+                      onChange={(e) => setAutoPublishMode((prev) => ({ ...prev, individual: e.target.checked }))}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600"
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900 text-sm">개별발행</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        각 상품별로 독립된 게시글 작성.
+                      </p>
+                    </div>
+                  </label>
 
-            {/* 발행 지연 입력 */}
-            <div className="mb-4 p-3 rounded-lg border border-gray-200 bg-gray-50">
-              <label className="flex items-center gap-2 text-sm">
+                  <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    autoPublishMode.digest ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={autoPublishMode.digest}
+                      onChange={(e) => setAutoPublishMode((prev) => ({ ...prev, digest: e.target.checked }))}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-emerald-600"
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900 text-sm">
+                        종합발행
+                        <span className="ml-2 text-xs font-normal text-gray-500">
+                          (카테고리별 20개씩 묶어 1게시글 / {selectedProductIds.length > 0 ? Math.ceil(selectedProductIds.length / 20) : 0}개 예상)
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        SEA/AGR/... 카테고리별로 자동 분류 후 20개 단위로 카드 이미지 게시글 발행.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+                {autoPublishMode.individual && autoPublishMode.digest && (
+                  <div className="mt-2 p-2 rounded-md bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
+                    ℹ️ 둘 다 선택하면 <b>개별발행 → 종합발행</b> 순서로 실행됩니다.
+                  </div>
+                )}
+              </div>
+
+              {/* 소매밴드 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-800">
+                    🟦 소매밴드 ({autoPublishSelectedChannelIds.size}/{autoPublishAvailableChannels.length})
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAutoPublishSelectedChannelIds(
+                          new Set(autoPublishAvailableChannels.map((c) => c.id))
+                        )
+                      }
+                      className="text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700"
+                    >
+                      전체 선택
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAutoPublishSelectedChannelIds(new Set())}
+                      className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700"
+                    >
+                      선택 취소
+                    </button>
+                  </div>
+                </div>
+                {autoPublishAvailableChannels.length === 0 ? (
+                  <div className="text-xs text-gray-400 py-2">등록된 소매밴드가 없습니다.</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {autoPublishAvailableChannels.map((ch) => {
+                      const checked = autoPublishSelectedChannelIds.has(ch.id)
+                      return (
+                        <label
+                          key={ch.id}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer text-sm transition-colors ${
+                            checked
+                              ? 'bg-blue-50 border-blue-400 text-blue-900'
+                              : 'bg-white border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setAutoPublishSelectedChannelIds((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(ch.id)) next.delete(ch.id)
+                                else next.add(ch.id)
+                                return next
+                              })
+                            }
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                          />
+                          <span className="truncate">{ch.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 쇼핑몰 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-800">
+                    🛍️ 쇼핑몰 ({autoPublishSelectedShopIds.size}/{autoPublishAvailableShops.length})
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAutoPublishSelectedShopIds(
+                          new Set(autoPublishAvailableShops.map((s) => s.id))
+                        )
+                      }
+                      className="text-xs px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700"
+                    >
+                      전체 선택
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAutoPublishSelectedShopIds(new Set())}
+                      className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700"
+                    >
+                      선택 취소
+                    </button>
+                  </div>
+                </div>
+                {autoPublishAvailableShops.length === 0 ? (
+                  <div className="text-xs text-gray-400 py-2">활성 쇼핑몰이 없습니다.</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {autoPublishAvailableShops.map((sh) => {
+                      const checked = autoPublishSelectedShopIds.has(sh.id)
+                      return (
+                        <label
+                          key={sh.id}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer text-sm transition-colors ${
+                            checked
+                              ? 'bg-emerald-50 border-emerald-400 text-emerald-900'
+                              : 'bg-white border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setAutoPublishSelectedShopIds((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(sh.id)) next.delete(sh.id)
+                                else next.add(sh.id)
+                                return next
+                              })
+                            }
+                            className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+                          />
+                          <span className="truncate">{sh.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 space-y-3">
+              {/* 발행 지연 입력 */}
+              <div className="flex items-center gap-2 text-sm">
                 <span className="text-gray-700">⏱️</span>
                 <input
                   type="number"
@@ -2265,28 +2430,38 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
                 />
                 <span className="text-gray-700">분 후 자동발행</span>
                 <span className="text-xs text-gray-400">(0 = 즉시)</span>
-              </label>
-              {autoPublishDelayMinutes > 0 && (
-                <p className="mt-1.5 text-[11px] text-amber-700">
-                  ⚠️ 탭을 닫으면 예약이 취소됩니다 (서버 영속화 미구현).
-                </p>
-              )}
-            </div>
+                {autoPublishDelayMinutes > 0 && (
+                  <span className="ml-auto text-[11px] text-amber-700">
+                    ⚠️ 탭 닫으면 예약 취소
+                  </span>
+                )}
+              </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowAutoPublishConfirm(false)}
-                className="flex-1 py-2.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={confirmAutoPublish}
-                disabled={!autoPublishMode.individual && !autoPublishMode.digest}
-                className="flex-1 py-2.5 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-              >
-                발행 시작
-              </button>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-gray-600">
+                  예정: 밴드 {autoPublishSelectedChannelIds.size}개 + 쇼핑몰 {autoPublishSelectedShopIds.size}개
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAutoPublishConfirm(false)}
+                    className="px-4 py-2 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 text-sm"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmAutoPublish}
+                    disabled={
+                      (!autoPublishMode.individual && !autoPublishMode.digest) ||
+                      (autoPublishSelectedChannelIds.size === 0 && autoPublishSelectedShopIds.size === 0)
+                    }
+                    className="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+                  >
+                    {autoPublishDelayMinutes > 0 ? `${autoPublishDelayMinutes}분 후 발행 예약` : '발행 시작'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
