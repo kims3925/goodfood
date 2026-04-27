@@ -15,6 +15,10 @@ model Channel {
   bandSessionCookie String?          @map("band_session_cookie") @db.Text
   sessionExpiresAt  DateTime?        @map("session_expires_at")
   orderDeadline     String?          @map("order_deadline") @db.VarChar(50) // 도매방 주문 마감시간 (예: "오후 3시", "14:00")
+  // 지침서 Phase 1: 도매방별 취급 가격 범위. 본문에서 추출한 가격이 이 범위 밖이면
+  // collection 파이프라인이 게시글을 스킵. null이면 해당 방향 무제한.
+  minSourcingPrice  Int?             @map("min_sourcing_price")
+  maxSourcingPrice  Int?             @map("max_sourcing_price")
   shop              Shop?            @relation(fields: [shopId], references: [id])
   user              User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   collectedPosts    CollectedPost[]

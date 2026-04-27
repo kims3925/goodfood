@@ -55,13 +55,24 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, isActive, coverUrl, shopId } = body
+    const { name, isActive, coverUrl, shopId, minSourcingPrice, maxSourcingPrice, orderDeadline } = body
+
+    // 가격 범위는 정수만 허용. 빈 문자열/null은 제거(필드 자체 unset).
+    const parsePrice = (v: any): number | null | undefined => {
+      if (v === undefined) return undefined // 필드 미전달 → 변경 없음
+      if (v === null || v === '') return null // 명시적 해제
+      const n = typeof v === 'number' ? v : parseInt(String(v).replace(/[^0-9]/g, ''), 10)
+      return Number.isFinite(n) && n >= 0 ? n : null
+    }
 
     const channel = await channelService.update(id, {
       name,
       isActive,
       coverUrl,
       shopId,
+      minSourcingPrice: parsePrice(minSourcingPrice),
+      maxSourcingPrice: parsePrice(maxSourcingPrice),
+      orderDeadline,
     })
 
     return NextResponse.json({ success: true, data: channel })

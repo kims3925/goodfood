@@ -66,6 +66,7 @@ export interface ChannelCollectionResult {
   failed: number
   errors: string[]
   createdPostIds?: number[]  // 생성된 게시물 ID 목록 (자동화 파이프라인 연계용)
+  skippedByPrice?: number    // 지침서 Phase 1: 가격 범위 밖이라 수집에서 스킵한 게시글 수
 }
 
 /** @deprecated use ChannelCollectionResult instead */

@@ -52,6 +52,10 @@ interface Channel {
   contactPhone: string | null
   contactEmail: string | null
   theme: ChannelTheme | null
+  // 도매방 전용 (지침서 Phase 1) + 주문 마감시간
+  minSourcingPrice: number | null
+  maxSourcingPrice: number | null
+  orderDeadline: string | null
 }
 
 const PLATFORM_LABELS: { [key: string]: string } = {
@@ -103,6 +107,11 @@ export default function ChannelDetailPage({
   const [accountHolder, setAccountHolder] = useState('')
   const [bankAccount, setBankAccount] = useState('')
   const [bankName, setBankName] = useState('')
+
+  // 도매방 전용: 취급 가격 범위 (Phase 1) + 주문 마감시간
+  const [minSourcingPrice, setMinSourcingPrice] = useState<string>('')
+  const [maxSourcingPrice, setMaxSourcingPrice] = useState<string>('')
+  const [orderDeadline, setOrderDeadline] = useState<string>('')
 
   // 도메인 쇼핑몰 필드
   const [subdomain, setSubdomain] = useState('')
@@ -171,6 +180,10 @@ export default function ChannelDetailPage({
         setAccountHolder(ch.accountHolder || '')
         setBankAccount(ch.bankAccount || '')
         setBankName(ch.bankName || '')
+        // Phase 1 / 마감시간
+        setMinSourcingPrice(ch.minSourcingPrice != null ? String(ch.minSourcingPrice) : '')
+        setMaxSourcingPrice(ch.maxSourcingPrice != null ? String(ch.maxSourcingPrice) : '')
+        setOrderDeadline(ch.orderDeadline || '')
         // Shop 연결
         setSelectedShopId(ch.shopId || null)
         // 도메인 쇼핑몰 필드
@@ -233,6 +246,13 @@ export default function ChannelDetailPage({
         accountHolder: accountHolder || null,
         bankAccount: bankAccount || null,
         bankName: bankName || null,
+        orderDeadline: orderDeadline || null,
+      }
+
+      // 도매방(WHOLESALE) 전용: 취급 가격 범위
+      if (channel?.kind === 'WHOLESALE') {
+        updateData.minSourcingPrice = minSourcingPrice === '' ? null : parseInt(minSourcingPrice.replace(/[^0-9]/g, ''), 10) || null
+        updateData.maxSourcingPrice = maxSourcingPrice === '' ? null : parseInt(maxSourcingPrice.replace(/[^0-9]/g, ''), 10) || null
       }
 
       // 소매 채널인 경우 Shop 연결
@@ -638,6 +658,82 @@ export default function ChannelDetailPage({
 
                   {/* 오른쪽: 상세 설정 */}
                   <div className={`lg:col-span-8 flex flex-col gap-6 ${channel.kind === 'WHOLESALE' ? 'justify-center' : ''}`}>
+                    {/* 도매방 전용: 취급 가격 범위 + 주문 마감시간 (Phase 1) */}
+                    {channel.kind === 'WHOLESALE' && (
+                      <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-base">💰</span>
+                          <span className="text-sm font-semibold text-slate-700">취급 가격 범위 (수집 단계 필터)</span>
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                            도매방
+                          </span>
+                        </div>
+                        {isEditMode ? (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs text-slate-600 mb-1">최소 취급가</label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={minSourcingPrice}
+                                  onChange={(e) => setMinSourcingPrice(e.target.value)}
+                                  placeholder="없음"
+                                  className="w-full px-3 py-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-slate-600 mb-1">최대 취급가</label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={maxSourcingPrice}
+                                  onChange={(e) => setMaxSourcingPrice(e.target.value)}
+                                  placeholder="없음"
+                                  className="w-full px-3 py-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                                />
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              본문에서 추출한 가격이 이 범위 밖이면 수집에서 제외됩니다.
+                              빈 값이면 해당 방향 무제한. 가격 추출 실패 시 안전하게 통과.
+                            </p>
+                            <div>
+                              <label className="block text-xs text-slate-600 mb-1">주문 마감시간 (선택)</label>
+                              <input
+                                type="text"
+                                value={orderDeadline}
+                                onChange={(e) => setOrderDeadline(e.target.value)}
+                                placeholder="예: 오후 3시 / 14:00"
+                                className="w-full px-3 py-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">취급 범위</span>
+                              <span className="font-medium text-slate-900">
+                                {channel.minSourcingPrice != null
+                                  ? Number(channel.minSourcingPrice).toLocaleString() + '원'
+                                  : '하한 없음'}
+                                {' ~ '}
+                                {channel.maxSourcingPrice != null
+                                  ? Number(channel.maxSourcingPrice).toLocaleString() + '원'
+                                  : '상한 없음'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">주문 마감</span>
+                              <span className="font-medium text-slate-900">
+                                {channel.orderDeadline || '미설정'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Shop 연결 (소매 채널만) - 맨 위에 배치 */}
                     {channel.kind === 'RETAIL' && (
                       <div className="p-4 bg-indigo-50 rounded-xl">

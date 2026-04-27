@@ -407,7 +407,21 @@ export async function POST(request: NextRequest) {
     if (draft.variants && draft.variants.length > 0) {
       const originalCount = draft.variants.length
       const filteredVariants = draft.variants.filter((v: any) => {
-        const price = typeof v.price === 'number' ? v.price : parseInt(String(v.price ?? '0').replace(/[^0-9]/g, ''), 10) || 0
+        // 지침서 Phase 3: AI가 한도를 무시한 옵션을 코드 단계에서 강제 제거.
+        // sellingPrice(AI 명시 판매가) 우선, price(도매가)와의 max 값으로 비교 —
+        // AI가 sellingPrice만 채우고 price는 0/누락 보내는 케이스 대응.
+        const sellingRaw = (v as any).sellingPrice
+        const sellingNum =
+          typeof sellingRaw === 'number'
+            ? sellingRaw
+            : sellingRaw != null
+            ? parseInt(String(sellingRaw).replace(/[^0-9]/g, ''), 10) || 0
+            : 0
+        const wholesaleNum =
+          typeof v.price === 'number'
+            ? v.price
+            : parseInt(String(v.price ?? '0').replace(/[^0-9]/g, ''), 10) || 0
+        const price = Math.max(sellingNum, wholesaleNum)
         if (price <= 0) return true // 가격 미상 옵션은 통과
         if (price >= GLOBAL_MAX_PRICE) return false
         if (policyExcludeAbove !== null && price >= policyExcludeAbove) return false

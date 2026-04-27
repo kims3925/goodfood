@@ -15,6 +15,7 @@ import {
   PipelineError,
 } from '../types'
 import { postService } from '@/modules/sourcing/domain/src/post/services/post.service'
+import { checkPriceWithinRange } from '../utils/price-extractor'
 
 // =============================================
 // COLLECTION PIPELINE
@@ -135,6 +136,7 @@ export async function runCollectionPipeline(
       failed: 0,
       errors: [],
       createdPostIds: [],  // 생성된 게시물 ID 추적
+      skippedByPrice: 0,   // 지침서 Phase 1: 가격 범위 밖 스킵 카운트
     }
 
     try {
@@ -154,6 +156,27 @@ export async function runCollectionPipeline(
 
       channelResult.fetched = bandPosts.length
 
+      // 지침서 Phase 1: 도매방별 취급 가격 범위 필터.
+      // Channel.minSourcingPrice / maxSourcingPrice 가 설정되어 있으면 본문 가격을
+      // 추출해 범위 밖 게시글은 수집에서 제외 (이전엔 AI 가공 단계에서만 걸러져
+      // 비싼 옵션이 가공된 후 제거되어 토큰 낭비). 가격 추출 실패 시 통과(안전 우선).
+      const minP = (channel as any).minSourcingPrice ?? null
+      const maxP = (channel as any).maxSourcingPrice ?? null
+      let priceFilteredBandPosts = bandPosts
+      if (minP != null || maxP != null) {
+        priceFilteredBandPosts = bandPosts.filter((post: any) => {
+          const r = checkPriceWithinRange(post.content || '', minP, maxP)
+          return r.pass
+        })
+        const skipped = bandPosts.length - priceFilteredBandPosts.length
+        channelResult.skippedByPrice = skipped
+        if (skipped > 0) {
+          console.log(
+            `[Collection] ${channel.name}: 가격 필터로 ${skipped}건 스킵 (범위 ${minP ?? '∞'} ~ ${maxP ?? '∞'}원)`
+          )
+        }
+      }
+
       // PostService.createBatch() 사용 (수동과 동일한 로직)
       // - 중복 체크 (externalId 기준)
       // - 이미지 로컬 다운로드
@@ -161,7 +184,7 @@ export async function runCollectionPipeline(
       const batchResult = await postService.createBatch({
         userId,
         channelId: channel.id,
-        posts: bandPosts.map((post: any) => ({
+        posts: priceFilteredBandPosts.map((post: any) => ({
           externalId: post.post_key,
           title: extractTitle(post.content),
           content: post.content,

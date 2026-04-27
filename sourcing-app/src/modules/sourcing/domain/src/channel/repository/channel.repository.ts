@@ -120,6 +120,10 @@ export class ChannelRepository {
     if (data.isActive !== undefined) channelData.isActive = data.isActive
     if (data.coverUrl !== undefined) channelData.coverUrl = data.coverUrl
     if (data.shopId !== undefined) channelData.shopId = data.shopId
+    // Phase 1: 가격 범위. undefined면 미변경, null이면 명시적 해제(unset).
+    if (data.minSourcingPrice !== undefined) channelData.minSourcingPrice = data.minSourcingPrice
+    if (data.maxSourcingPrice !== undefined) channelData.maxSourcingPrice = data.maxSourcingPrice
+    if (data.orderDeadline !== undefined) channelData.orderDeadline = data.orderDeadline
 
     return prisma.channel.update({
       where: { id },
