@@ -898,7 +898,10 @@ export default function PostsManagePage() {
     }
   }, [])
 
-  // 상품 발행 (Stage 2 → 소매밴드)
+  // 상품 발행 (Stage 2 → 소매밴드 + 활성 쇼핑몰)
+  // 자동발행/재발행과 동일한 /api/automation/execute(type=publish) 단일 호출 경로 사용.
+  // 이전엔 per-product per-channel 로 /api/publish/template/publish 를 호출해 카드 포맷
+  // 깨짐(제목 카드가 본문 사이에 끼임 / 댓글에 쇼핑몰 링크 누락) 사고가 발생했음.
   const handlePublishProducts = async () => {
     if (selectedProductIds.length === 0) {
       toast.error('발행할 상품을 선택해주세요.')
@@ -908,69 +911,109 @@ export default function PostsManagePage() {
     setIsPublishing(true)
     setPublishProgress({ current: 0, total: selectedProductIds.length, failed: 0 })
 
-    let successCount = 0
-    let failCount = 0
+    let bandSuccess = 0
+    let bandFail = 0
+    let shopSuccess = 0
+    let shopFail = 0
+    let shopSkipped = 0
+    const errorMessages: string[] = []
 
-    // 소매밴드 채널 목록 조회
-    let retailChannels: Array<{ id: number; name: string }> = []
     try {
-      const chRes = await fetch('/api/channel?kind=RETAIL&limit=100')
+      // 1) 소매밴드 채널 + 활성 쇼핑몰 동시 조회
+      const [chRes, shopRes] = await Promise.all([
+        fetch('/api/channel?kind=RETAIL&limit=100', { credentials: 'include' }),
+        fetch('/api/shop?isActive=true&limit=100', { credentials: 'include' }),
+      ])
       const chData = await chRes.json()
-      retailChannels = chData.data || []
-    } catch {
-      toast.error('소매밴드 채널 조회에 실패했습니다.')
-      setIsPublishing(false)
-      return
-    }
+      const shopData = await shopRes.json()
+      const retailChannels: Array<{ id: number; name: string }> = chData.success ? (chData.data || []) : []
+      const allShops: Array<{ id: number; name: string; isActive: boolean }> = shopData.success ? (shopData.data || []) : []
+      const activeShops = allShops.filter((s) => s.isActive !== false)
 
-    if (retailChannels.length === 0) {
-      toast.error('등록된 소매밴드 채널이 없습니다. 채널 관리에서 소매밴드를 등록해주세요.')
-      setIsPublishing(false)
-      return
-    }
+      if (retailChannels.length === 0 && activeShops.length === 0) {
+        toast.error('등록된 소매밴드 또는 쇼핑몰이 없습니다.')
+        setIsPublishing(false)
+        return
+      }
 
-    for (let i = 0; i < selectedProductIds.length; i++) {
-      const productId = selectedProductIds[i]
-      setPublishProgress(prev => ({ ...prev, current: i + 1 }))
-
-      let productSuccess = false
-
-      for (const channel of retailChannels) {
+      // 2) 소매밴드 발행 — 단일 자동경로 호출 (자동발행 cron 과 동일 결과)
+      if (retailChannels.length > 0) {
         try {
-          const res = await fetch('/api/publish/template/publish', {
+          const res = await fetch('/api/automation/execute', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
-              productId,
-              channelId: channel.id,
-              templateType: 'standard',
-              showOrderLink: true,
+              type: 'publish',
+              config: {
+                channelIds: retailChannels.map((c) => c.id),
+                productIds: selectedProductIds,
+                publishReadyOnly: false,
+              },
             }),
           })
           const data = await res.json()
-          if (data.success || res.ok) productSuccess = true
-        } catch {
-          // 채널별 실패는 무시하고 다음 채널 시도
+          if (data.success) {
+            const stage = data.data?.stages?.publish
+            bandSuccess += stage?.successCount || 0
+            bandFail += stage?.failedCount || 0
+          } else {
+            bandFail += selectedProductIds.length
+            errorMessages.push(`[밴드 자동경로] ${data.error || '알 수 없음'}`)
+          }
+        } catch (err: any) {
+          bandFail += selectedProductIds.length
+          errorMessages.push(`[밴드 자동경로] ${err?.message || '네트워크 오류'}`)
         }
       }
 
-      if (productSuccess) {
-        successCount++
-      } else {
-        failCount++
-        setPublishProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
+      // 3) 쇼핑몰 발행 — product × shop 루프 (자동/재발행 흐름과 동일)
+      for (const productId of selectedProductIds) {
+        for (const shop of activeShops) {
+          try {
+            const res = await fetch('/api/shop/publish', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
+            })
+            const data = await res.json()
+            if (data.success && data.summary) {
+              shopSuccess += data.summary.success || 0
+              shopSkipped += data.summary.skipped || 0
+              shopFail += data.summary.failed || 0
+              if (data.summary.failed > 0 && data.results) {
+                data.results
+                  .filter((r: any) => r.status === 'FAILED')
+                  .forEach((r: any) => errorMessages.push(`[쇼핑몰:${shop.name}] ${r.message || '발행 실패'}`))
+              }
+            } else {
+              shopFail++
+              errorMessages.push(`[쇼핑몰:${shop.name}] ${data.error || data.message || '알 수 없음'}`)
+            }
+          } catch (err: any) {
+            shopFail++
+            errorMessages.push(`[쇼핑몰:${shop.name}] ${err?.message || '네트워크 오류'}`)
+          }
+        }
       }
-    }
+    } finally {
+      setIsPublishing(false)
+      setSelectedProductIds([])
 
-    setIsPublishing(false)
-    setSelectedProductIds([])
+      const totalSuccess = bandSuccess + shopSuccess
+      const totalFail = bandFail + shopFail
 
-    if (successCount > 0) {
-      toast.success(`${successCount}개 상품이 발행되었습니다.`)
-      router.push('/sourcing/publish')
-    }
-    if (failCount > 0) {
-      toast.error(`${failCount}개 발행에 실패했습니다.`)
+      if (totalSuccess > 0) {
+        const summary = `밴드 ${bandSuccess} + 쇼핑몰 ${shopSuccess}${shopSkipped > 0 ? ` (이미발행 ${shopSkipped})` : ''}`
+        toast.success(`발행 완료: ${summary}`)
+        router.push('/sourcing/publish')
+      }
+      if (totalFail > 0) {
+        const firstError = errorMessages[0] || ''
+        toast.error(`발행 실패 ${totalFail}건: ${firstError}`)
+        console.error('[Stage2 발행] 전체 실패 목록:', errorMessages)
+      }
     }
   }
 
