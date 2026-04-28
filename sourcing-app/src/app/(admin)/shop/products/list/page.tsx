@@ -1,18 +1,17 @@
 'use client'
 
 /**
- * /shop/products/list — 쇼핑몰에 발행된 상품 관리 페이지
+ * /shop/products/list — 쇼핑몰 상품 관리 (카테고리별 + 쇼핑몰별 필터)
  *
  * 기능:
- *  - 쇼핑몰별 필터 (전체 / 특정 쇼핑몰)
- *  - 상품 검색 (이름/설명)
- *  - 변형상품 가격(마진조정가 / 배송비 / 판매가) 한 번에 조회
- *  - 행별 [편집] 버튼 → /sourcing/product/detail/[id] 로 이동 (기존 편집 UI 재사용)
- *  - 행별 [쇼핑몰에서 제거] 버튼 → DELETE /api/shop/publish?productId=X&type=shop
- *  - 다중선택 → 일괄 제거
+ *  - 카테고리 탭 (SEA/AGR/MEA/MKT/PRC/HLT/ETC + 전체)
+ *  - 쇼핑몰별 필터
+ *  - 검색 (이름/설명)
+ *  - 페이지 사이즈 (20/50/100)
+ *  - 편집(/sourcing/product/detail/[id]) / 쇼핑몰 보기 / 쇼핑몰 제거 / 일괄 제거
  *
- * 편집은 기존 product detail 페이지 재사용 (이미 모든 필드 편집 가능):
- *  - 상품명, 설명, 도매가, 판매가, 옵션, 변형상품, 배송비, 카테고리 등
+ * 옛 메뉴 두 개("상품 관리" + "카테고리")를 통합. 카테고리 탭이 페이지 안에서
+ * 동작하므로 별도 카테고리 페이지 불필요.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -22,6 +21,7 @@ import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
+import { CATEGORY_LIST, type CategoryCode } from '@/modules/category/category.keywords'
 
 interface Variant {
   id: number
@@ -39,6 +39,8 @@ interface ShopRef {
 interface Product {
   id: number
   name: string
+  description?: string | null
+  categoryId?: string | null
   thumbnailUrl: string | null
   shippingFee: number | null
   bundleShippingType: 'NONE' | 'INCLUDED' | 'SEPARATE' | null
@@ -58,17 +60,27 @@ interface Shop {
   subdomain: string | null
 }
 
+type PageSize = 20 | 50 | 100
+type CategoryFilter = 'all' | CategoryCode
+
 export default function ShopProductsListPage() {
   const toast = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [shops, setShops] = useState<Shop[]>([])
   const [filterShopId, setFilterShopId] = useState<number | 'all'>('all')
+  const [filterCategory, setFilterCategory] = useState<CategoryFilter>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ ids: number[]; isBulk: boolean } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  // 페이지 사이즈 + 현재 페이지
+  const [pageSize, setPageSize] = useState<PageSize>(20)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  // 카테고리별 카운트 (탭 옆에 N개 표시용)
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({})
 
   // 쇼핑몰 목록 로드
   const loadShops = useCallback(async () => {
@@ -81,38 +93,57 @@ export default function ShopProductsListPage() {
     }
   }, [])
 
-  // 발행된 상품 로드
+  // 모든 상품 로드 (publishStatus 무필터) — 카테고리/쇼핑몰/검색은 클라이언트에서 필터
+  // 카테고리 페이지에 보이던 상품 + 쇼핑몰 발행 상품 모두 포함.
   const loadProducts = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ publishStatus: 'published', limit: '500', page: '1' })
+      const params = new URLSearchParams({ limit: '2000', page: '1' })
       const res = await fetch(`/api/product?${params}`)
       const data = await res.json()
       if (data.success) {
-        // 응답에서 shopProducts 가 직접 안 올 수 있어 별도 조회 필요할 수도. 일단 그대로.
         let raw = (data.data || []) as any[]
-        // 쇼핑몰에 발행된 항목만 필터 (shopProducts.length > 0)
-        raw = raw.filter((p) => Array.isArray(p.shopProducts) && p.shopProducts.length > 0)
-        if (filterShopId !== 'all') {
-          raw = raw.filter((p) => p.shopProducts.some((sp: any) => sp.shopId === filterShopId))
+
+        // 카테고리별 카운트 (전체 기준 — 검색/쇼핑몰 필터 적용 전)
+        const counts: Record<string, number> = { all: raw.length }
+        for (const c of CATEGORY_LIST) counts[c.code] = 0
+        for (const p of raw) {
+          const code = p.categoryId
+          if (code && counts[code] !== undefined) counts[code]++
         }
+        setCategoryCounts(counts)
+
+        // 카테고리 필터
+        if (filterCategory !== 'all') {
+          raw = raw.filter((p) => p.categoryId === filterCategory)
+        }
+        // 쇼핑몰 필터 — 'all' 이면 모든 상품, 특정 쇼핑몰 선택 시 그 쇼핑몰에 발행된 것만
+        if (filterShopId !== 'all') {
+          raw = raw.filter(
+            (p) => Array.isArray(p.shopProducts) && p.shopProducts.some((sp: any) => sp.shopId === filterShopId)
+          )
+        }
+        // 검색
         if (searchTerm.trim()) {
           const q = searchTerm.toLowerCase()
           raw = raw.filter(
             (p) => p.name?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q)
           )
         }
+        setTotalCount(raw.length)
         setProducts(raw as Product[])
       } else {
         setProducts([])
+        setTotalCount(0)
       }
     } catch (e) {
       console.error('상품 조회 실패:', e)
       setProducts([])
+      setTotalCount(0)
     } finally {
       setLoading(false)
     }
-  }, [filterShopId, searchTerm])
+  }, [filterShopId, filterCategory, searchTerm])
 
   useEffect(() => {
     loadShops()
@@ -121,6 +152,18 @@ export default function ShopProductsListPage() {
   useEffect(() => {
     loadProducts()
   }, [loadProducts])
+
+  // 필터/검색/페이지 사이즈 변경 시 1페이지로
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterShopId, filterCategory, searchTerm, pageSize])
+
+  // 클라이언트 측 페이지네이션 — products 는 필터된 전체, 화면엔 page 단위만 표시
+  const totalPages = Math.max(1, Math.ceil(products.length / pageSize))
+  const paginatedProducts = useMemo(
+    () => products.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [products, currentPage, pageSize]
+  )
 
   // 변형상품 첫 행 가격 표시용 (대표 가격)
   const firstVariantPrice = (p: Product) => {
@@ -188,14 +231,25 @@ export default function ShopProductsListPage() {
   }
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === products.length) {
-      setSelectedIds(new Set())
+    // 현재 페이지 항목만 토글 — 보이는 것만 선택/해제
+    const pageIds = paginatedProducts.map((p) => p.id)
+    const allSelected = pageIds.every((id) => selectedIds.has(id)) && pageIds.length > 0
+    if (allSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (const id of pageIds) next.delete(id)
+        return next
+      })
     } else {
-      setSelectedIds(new Set(products.map((p) => p.id)))
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (const id of pageIds) next.add(id)
+        return next
+      })
     }
   }
 
-  const totalCount = useMemo(() => products.length, [products])
+  // (totalCount 는 setTotalCount 로 직접 관리)
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto">
@@ -203,7 +257,7 @@ export default function ShopProductsListPage() {
         <div className="flex items-center gap-3">
           <Package size={24} className="text-blue-600" />
           <h1 className="text-2xl font-bold text-slate-900">상품 관리</h1>
-          <span className="text-sm text-slate-500">쇼핑몰 발행 상품 편집/삭제</span>
+          <span className="text-sm text-slate-500">카테고리별 / 쇼핑몰별 조회 · 편집 · 삭제</span>
         </div>
         <button
           onClick={loadProducts}
@@ -211,6 +265,37 @@ export default function ShopProductsListPage() {
         >
           <RefreshCw size={14} /> 새로고침
         </button>
+      </div>
+
+      {/* 카테고리 탭 */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3 mb-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setFilterCategory('all')}
+            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+              filterCategory === 'all'
+                ? 'bg-blue-600 border-blue-600 text-white'
+                : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            전체 <span className="ml-1 opacity-70 text-xs">{categoryCounts['all'] || 0}</span>
+          </button>
+          {CATEGORY_LIST.map((c) => (
+            <button
+              key={c.code}
+              onClick={() => setFilterCategory(c.code)}
+              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                filterCategory === c.code
+                  ? 'bg-blue-600 border-blue-600 text-white'
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              <span className="mr-1">{c.emoji}</span>
+              {c.name}
+              <span className="ml-1 opacity-70 text-xs">{categoryCounts[c.code] || 0}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 필터 영역 */}
@@ -252,6 +337,24 @@ export default function ShopProductsListPage() {
           <span className="text-sm text-slate-500">
             총 <strong className="text-slate-900">{totalCount}</strong>건
           </span>
+
+          {/* 페이지 사이즈 선택 */}
+          <div className="flex items-center gap-1 ml-auto">
+            <span className="text-xs text-slate-500 mr-1">페이지당</span>
+            {([20, 50, 100] as PageSize[]).map((size) => (
+              <button
+                key={size}
+                onClick={() => setPageSize(size)}
+                className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
+                  pageSize === size
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                {size}개
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -297,7 +400,10 @@ export default function ShopProductsListPage() {
                   <th className="w-10 py-2 px-3">
                     <input
                       type="checkbox"
-                      checked={selectedIds.size > 0 && selectedIds.size === products.length}
+                      checked={
+                        paginatedProducts.length > 0 &&
+                        paginatedProducts.every((p) => selectedIds.has(p.id))
+                      }
                       onChange={toggleSelectAll}
                     />
                   </th>
@@ -311,7 +417,7 @@ export default function ShopProductsListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {products.map((p) => {
+                {paginatedProducts.map((p) => {
                   const fv = firstVariantPrice(p)
                   const checked = selectedIds.has(p.id)
                   return (
@@ -400,6 +506,49 @@ export default function ShopProductsListPage() {
                 })}
               </tbody>
             </table>
+
+            {/* 페이지네이션 */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50">
+                <span className="text-xs text-slate-500">
+                  {(currentPage - 1) * pageSize + 1}–
+                  {Math.min(currentPage * pageSize, products.length)} / {products.length}건
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    «
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    ‹
+                  </button>
+                  <span className="px-3 text-xs text-slate-700">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    ›
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="px-2 py-1 text-xs rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    »
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

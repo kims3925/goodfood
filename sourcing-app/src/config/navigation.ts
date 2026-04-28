@@ -107,8 +107,8 @@ export const sourcingMenuItems: MenuItem[] = [
 export const shopMenuItems: MenuItem[] = [
   { label: '대시보드', href: '/shop/dashboard', icon: LayoutDashboard },
   { label: '쇼핑몰 관리', href: '/shop/store/list', icon: ShoppingBag },
+  // 상품 관리(/shop/products/list) 안에 카테고리 탭 통합 — 별도 카테고리 메뉴 제거
   { label: '상품 관리', href: '/shop/products/list', icon: Package },
-  { label: '카테고리', href: '/shop/category/list', icon: LayoutGrid },
   {
     label: '주문/정산',
     icon: ClipboardList,
@@ -228,7 +228,7 @@ export const shopPathToMenuMap: Record<string, string> = {
   '/shop/dashboard': '대시보드',
   '/shop/store': '쇼핑몰 관리',
   '/shop/products': '상품 관리',
-  '/shop/category': '카테고리',
+  '/shop/category': '상품 관리', // 옛 카테고리 경로도 상품 관리 메뉴 하이라이트로
   '/shop/order': '주문/정산',
   '/shop/wholesale-orders': '주문/정산',
   '/shop/settlement': '주문/정산',
