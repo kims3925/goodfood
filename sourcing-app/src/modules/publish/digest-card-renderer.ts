@@ -342,6 +342,59 @@ export interface RenderedCard {
   filePath: string
 }
 
+/**
+ * 단일 카드 렌더링 — 외부에서 try/catch 로 감싸 호출.
+ * 페이지/브라우저는 호출자가 관리 (재사용/재시작 결정 위임).
+ */
+async function renderSingleCard(
+  page: import('playwright').Page,
+  product: DigestCardProduct,
+  orderNumber: number,
+  tempDir: string
+): Promise<RenderedCard> {
+  // 1) 원본 이미지 URL들을 모두 base64로 변환 (네트워크 의존 제거)
+  const dataUris: string[] = []
+  for (const src of product.imageUrls.slice(0, 4)) {
+    const uri = await toDataUri(src)
+    if (uri) dataUris.push(uri)
+  }
+  const productForHtml = { ...product, imageUrls: dataUris }
+
+  // 2) 주문 URL → QR 코드 data URI (카드에 박아 스캔 가능하게)
+  const qrDataUri = await generateQrDataUri(product.orderUrl)
+
+  const html = buildCardHtml(productForHtml, orderNumber, qrDataUri)
+
+  await page.setContent(html, { waitUntil: 'load', timeout: 30_000 })
+  // 모든 <img> 요소의 load/error 완료 대기
+  await page.evaluate(async () => {
+    const imgs = Array.from(document.images)
+    await Promise.all(
+      imgs.map((img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.onload = () => resolve()
+              img.onerror = () => resolve()
+            })
+      )
+    )
+  })
+  await page.waitForTimeout(200) // 폰트/레이아웃 안정화
+
+  const element = await page.$('#card')
+  if (!element) {
+    throw new Error(`digest card #${orderNumber}: #card element not found`)
+  }
+
+  const filePath = path.join(
+    tempDir,
+    `digest-card-${Date.now()}-${orderNumber}-${product.id}.png`
+  )
+  await element.screenshot({ type: 'png', path: filePath, timeout: 15_000 })
+  return { productId: product.id, filePath }
+}
+
 export async function renderDigestCards(
   options: RenderDigestCardsOptions
 ): Promise<RenderedCard[]> {
@@ -350,61 +403,85 @@ export async function renderDigestCards(
   const results: RenderedCard[] = []
   const tempDir = os.tmpdir()
 
-  const browser = await chromium.launch({ headless: true })
-  try {
-    const page = await browser.newPage()
+  // 메모리 압박 방지 — 5장마다 브라우저 재시작 (Chrome OOM / "Target crashed" 회피)
+  const BATCH_SIZE = 5
+  let browser: import('playwright').Browser | null = null
+  let page: import('playwright').Page | null = null
+
+  const startBrowser = async () => {
+    if (browser) {
+      try { await browser.close() } catch { /* ignore */ }
+    }
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--disable-dev-shm-usage', // /dev/shm 작은 도커 환경 대응
+        '--no-sandbox',
+        '--disable-gpu',
+      ],
+    })
+    page = await browser.newPage()
     await page.setViewportSize({ width: 800, height: 1200 })
+  }
+
+  try {
+    await startBrowser()
 
     for (let i = 0; i < products.length; i++) {
       const product = products[i]
       const orderNumber = i + 1
 
-      // 1) 원본 이미지 URL들을 모두 base64로 변환 (네트워크 의존 제거)
-      const dataUris: string[] = []
-      for (const src of product.imageUrls.slice(0, 4)) {
-        const uri = await toDataUri(src)
-        if (uri) dataUris.push(uri)
-      }
-      const productForHtml = { ...product, imageUrls: dataUris }
+      // 카드 단위 try/catch — 한 장 실패해도 다른 카드 진행
+      let attempt = 0
+      let renderedCard: RenderedCard | null = null
+      let lastError: any = null
 
-      // 2) 주문 URL → QR 코드 data URI (카드에 박아 스캔 가능하게)
-      const qrDataUri = await generateQrDataUri(product.orderUrl)
+      while (attempt < 2 && !renderedCard) {
+        attempt++
+        try {
+          renderedCard = await renderSingleCard(page!, product, orderNumber, tempDir)
+        } catch (err: any) {
+          lastError = err
+          const msg = String(err?.message || err)
+          const looksFatal =
+            msg.includes('Target crashed') ||
+            msg.includes('Browser closed') ||
+            msg.includes('disconnected') ||
+            msg.includes('captureScreenshot')
 
-      const html = buildCardHtml(productForHtml, orderNumber, qrDataUri)
-
-      await page.setContent(html, { waitUntil: 'load', timeout: 30_000 })
-      // 모든 <img> 요소의 load/error 완료 대기
-      await page.evaluate(async () => {
-        const imgs = Array.from(document.images)
-        await Promise.all(
-          imgs.map((img) =>
-            img.complete
-              ? Promise.resolve()
-              : new Promise<void>((resolve) => {
-                  img.onload = () => resolve()
-                  img.onerror = () => resolve()
-                })
+          console.warn(
+            `[digest-card-renderer] card #${orderNumber} (productId=${product.id}) attempt ${attempt} 실패: ${msg}`
           )
-        )
-      })
-      await page.waitForTimeout(200) // 폰트/레이아웃 안정화
 
-      const element = await page.$('#card')
-      if (!element) {
-        throw new Error(`digest card #${orderNumber}: #card element not found`)
+          if (looksFatal && attempt < 2) {
+            // 브라우저 재시작 후 재시도
+            console.warn('[digest-card-renderer] 치명적 에러 — 브라우저 재시작 후 재시도')
+            await startBrowser()
+          }
+        }
       }
 
-      const filePath = path.join(
-        tempDir,
-        `digest-card-${Date.now()}-${orderNumber}-${product.id}.png`
-      )
-      await element.screenshot({ type: 'png', path: filePath })
-      results.push({ productId: product.id, filePath })
+      if (renderedCard) {
+        results.push(renderedCard)
+        if (onProgress) onProgress(i + 1, total)
+      } else {
+        console.error(
+          `[digest-card-renderer] card #${orderNumber} (productId=${product.id}) 최종 실패 — 스킵`,
+          lastError
+        )
+        // 한 카드만 빠지고 다음 카드 진행 (전체 배치 보존)
+      }
 
-      if (onProgress) onProgress(i + 1, total)
+      // BATCH_SIZE 마다 브라우저 재시작 (메모리 누적 방지)
+      if ((i + 1) % BATCH_SIZE === 0 && i + 1 < products.length) {
+        console.log(`[digest-card-renderer] ${BATCH_SIZE}장 완료 — 브라우저 재시작 (메모리 정리)`)
+        await startBrowser()
+      }
     }
   } finally {
-    await browser.close()
+    if (browser) {
+      try { await browser.close() } catch { /* ignore */ }
+    }
   }
   return results
 }
