@@ -268,10 +268,15 @@ export class ProductRepository {
     const isShippingIncluded = !hasSeparateKeyword
       && /배송비\s*포함|택배비\s*포함|무료\s*배송|배송\s*무료/.test(shippingInfoStr)
 
-    if (isShippingIncluded) {
-      bundleShippingType = BundleShippingType.INCLUDED
-    } else if (shippingFeeNum > 0) {
+    // ⚠️ 모순 감지 + 숫자 우선 (2026-04-28):
+    //   shippingFee > 0 인데 shippingInfo 에 "포함" 키워드도 있으면 모순 상황.
+    //   이 경우 0원이 아닌 실제 금액(숫자)을 신뢰해 SEPARATE 처리.
+    //   (예: AI 가 description 의 "배송비 포함" 잘못된 텍스트를 shippingInfo 에 복제했지만
+    //   실제 본문엔 "택배비 4,000원" 명시 → shippingFee 4000 으로 SEPARATE 가 맞음)
+    if (shippingFeeNum > 0) {
       bundleShippingType = BundleShippingType.SEPARATE
+    } else if (isShippingIncluded) {
+      bundleShippingType = BundleShippingType.INCLUDED
     }
 
     // 정책 우선 적용 — 본문 키워드 추론 결과를 덮어씀.
