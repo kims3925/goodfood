@@ -46,6 +46,9 @@ model User {
   googleSheetConfig  GoogleSheetConfig?
   kakaoAdCards       KakaoAdCard[]
   kakaoAdBatches     KakaoAdBatch[]
+  // SaaS 종합계획서 Phase 0 (2026-04-28): 요금제/사용량 추적 백릴레이션
+  subscription       UserSubscription?
+  usageLogs          UsageLog[]
 
   @@index([shopId])
   @@index([email])

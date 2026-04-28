@@ -1,0 +1,83 @@
+/**
+ * SaaS 요금제/구독 모델 (BandAuto SaaS 종합계획서 Phase 0)
+ *
+ * - SubscriptionPlan: Free/Starter/Pro/Enterprise 등 요금제 정의
+ * - UserSubscription: 사용자별 현재 구독 상태
+ * - UsageLog: 일별 사용량 추적 (AI 호출/수집/발행/API 호출)
+ *
+ * 요금제별 limits 예시 (limits JSON 구조):
+ *   { channels: 3, aiCallsPerMonth: 500, publishesPerDay: 100, ... }
+ *
+ * features 예시 (features JSON 구조):
+ *   { autoPublish: true, multiShop: false, customDomain: false, ... }
+ */
+
+model SubscriptionPlan {
+  id            Int      @id @default(autoincrement())
+  slug          String   @unique @db.VarChar(50)        // 'free' / 'starter' / 'pro' / 'enterprise'
+  name          String   @db.VarChar(100)               // "Free", "Starter", ...
+  priceMonthly  Int      @default(0) @map("price_monthly") // 원 단위
+  priceYearly   Int      @default(0) @map("price_yearly")  // 원 단위 (연 결제 할인)
+  features      String   @db.LongText                    // JSON
+  limits        String   @db.LongText                    // JSON
+  sortOrder     Int      @default(0) @map("sort_order")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  subscriptions UserSubscription[]
+
+  @@map("subscription_plan")
+}
+
+model UserSubscription {
+  id              Int                @id @default(autoincrement())
+  userId          Int                @unique @map("user_id")        // 사용자당 1개 active 구독
+  planId          Int                @map("plan_id")
+  status          SubscriptionStatus @default(ACTIVE)
+  periodStart     DateTime           @map("period_start") @db.Timestamp(0)
+  periodEnd       DateTime           @map("period_end") @db.Timestamp(0)
+  paymentMethod   String?            @map("payment_method") @db.VarChar(50) // 'TOSS_CARD' / 'TOSS_BILLING' / null(Free)
+  cancelAtPeriodEnd Boolean          @default(false) @map("cancel_at_period_end")
+  cancelledAt     DateTime?          @map("cancelled_at") @db.Timestamp(0)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([planId])
+  @@index([status])
+  @@map("user_subscription")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+  TRIALING
+}
+
+/**
+ * 일별 사용량 추적 — 요금제 한도 게이트 체크에 사용.
+ * (userId, date) 유니크 — 하루에 한 행. 카운터는 increment 로 갱신.
+ */
+model UsageLog {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  date          DateTime @db.Date // 일 단위 키 (UTC)
+  aiCalls       Int      @default(0) @map("ai_calls")
+  collections   Int      @default(0)
+  publishes     Int      @default(0)
+  apiCalls      Int      @default(0) @map("api_calls")
+  storageMb     Int      @default(0) @map("storage_mb") // 누적 스토리지(파일 업로드)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([date])
+  @@map("usage_log")
+}
