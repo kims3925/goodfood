@@ -436,22 +436,26 @@ export default function ShopProductsListPage() {
                         >
                           {p.name}
                         </Link>
-                        {p.variants.length > 1 && (
+                        {(p.variants?.length ?? 0) > 1 && (
                           <span className="ml-2 text-xs text-slate-400">
-                            +{p.variants.length - 1}옵션
+                            +{(p.variants?.length ?? 0) - 1}옵션
                           </span>
                         )}
                       </td>
                       <td className="py-2 px-3">
                         <div className="flex flex-wrap gap-1">
-                          {p.shopProducts.map((sp) => (
-                            <span
-                              key={sp.id}
-                              className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-xs"
-                            >
-                              {sp.shop.name}
-                            </span>
-                          ))}
+                          {(p.shopProducts || []).length > 0 ? (
+                            (p.shopProducts || []).map((sp) => (
+                              <span
+                                key={sp.id}
+                                className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-xs"
+                              >
+                                {sp?.shop?.name || '-'}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-slate-400">미발행</span>
+                          )}
                         </div>
                       </td>
                       <td className="py-2 px-3 text-right text-slate-500 tabular-nums">
@@ -481,7 +485,7 @@ export default function ShopProductsListPage() {
                           >
                             <Edit3 size={14} />
                           </Link>
-                          {p.shopProducts[0]?.shop.subdomain && (
+                          {p.shopProducts && p.shopProducts[0]?.shop?.subdomain && (
                             <a
                               href={`/${p.shopProducts[0].shop.subdomain}/product/${p.id}`}
                               target="_blank"
@@ -494,8 +498,13 @@ export default function ShopProductsListPage() {
                           )}
                           <button
                             onClick={() => requestSingleDelete(p.id)}
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-md"
-                            title="쇼핑몰에서 제거"
+                            disabled={!p.shopProducts || p.shopProducts.length === 0}
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-md disabled:opacity-30 disabled:cursor-not-allowed"
+                            title={
+                              !p.shopProducts || p.shopProducts.length === 0
+                                ? '쇼핑몰에 발행되지 않은 상품 (제거 대상 아님)'
+                                : '쇼핑몰에서 제거'
+                            }
                           >
                             <Trash2 size={14} />
                           </button>
