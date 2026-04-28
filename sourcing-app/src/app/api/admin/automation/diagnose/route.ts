@@ -16,10 +16,10 @@ export const dynamic = 'force-dynamic'
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { TriggerType } from '@bandauto/db'
+import prisma from '@bandauto/db'
+import * as cron from 'node-cron'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { getActiveSchedulers, updateScheduler } from '@/modules/automation/scheduler'
-import { executeFullPipelineWithLock } from '@/modules/automation/executor'
 
 export async function GET() {
   try {
@@ -46,6 +46,29 @@ export async function GET() {
 
     const activeUserIds = getActiveSchedulers()
     const isRegisteredInMemory = activeUserIds.includes(currentUser.userId)
+
+    // node-cron 라이브러리 자체의 task registry 조회 — 어떤 cron 이 살아있는지 확인
+    let nodeCronTasks: Array<{ id: string; name: string; status: string; nextRun: string | null }> = []
+    try {
+      const tasks = (cron as any).getTasks?.() as Map<string, any> | undefined
+      if (tasks && typeof tasks.forEach === 'function') {
+        tasks.forEach((task: any, key: string) => {
+          let nextRun: string | null = null
+          try {
+            const d = task?.getNextRun?.()
+            if (d) nextRun = d instanceof Date ? d.toISOString() : String(d)
+          } catch {}
+          nodeCronTasks.push({
+            id: task?.id || key,
+            name: task?.name || '',
+            status: typeof task?.getStatus === 'function' ? task.getStatus() : 'unknown',
+            nextRun,
+          })
+        })
+      }
+    } catch (e) {
+      // node-cron v4 API 가 변경되면 여기 catch
+    }
 
     // 최근 워크플로우 실행 이력 (최대 10건)
     const recentRuns = await prisma.workflowLog.findMany({
@@ -85,7 +108,8 @@ export async function GET() {
           : null,
         scheduler: {
           isRegisteredInMemory,
-          activeUserIds, // 이 프로세스에 등록된 모든 userId
+          activeUserIds, // 이 프로세스 activeSchedulers Map 에 등록된 모든 userId
+          nodeCronTasks, // node-cron 라이브러리 내부 registry 에 살아있는 task 전체
         },
         recentRuns,
         diagnosis: buildDiagnosis(config, isRegisteredInMemory),
@@ -111,35 +135,22 @@ export async function POST(request: NextRequest) {
     const action = body?.action
 
     if (action === 'reregister') {
+      // 자동 파이프라인 실행은 하지 않음 — cron 메모리 재등록만.
+      // 다음 cron 시각이 도래하면 정상 실행됨.
       await updateScheduler(currentUser.userId)
       const isRegistered = getActiveSchedulers().includes(currentUser.userId)
       return NextResponse.json({
         success: true,
         action,
         message: isRegistered
-          ? 'cron 재등록 완료 (메모리에 등록됨)'
+          ? 'cron 재등록 완료 (메모리에 등록됨, 다음 일정에 자동 실행)'
           : 'cron 등록되지 않음 — isEnabled=false 또는 cronExpression 누락',
         isRegisteredInMemory: isRegistered,
       })
     }
 
-    if (action === 'trigger') {
-      console.log(`[Diagnose] 수동 트리거 시작 (user: ${currentUser.userId})`)
-      const result = await executeFullPipelineWithLock(
-        currentUser.userId,
-        undefined,
-        TriggerType.MANUAL
-      )
-      return NextResponse.json({
-        success: true,
-        action,
-        message: result ? '실행 완료' : 'Lock 획득 실패 (이미 실행 중)',
-        result,
-      })
-    }
-
     return NextResponse.json(
-      { success: false, error: 'action 은 reregister 또는 trigger 여야 합니다.' },
+      { success: false, error: 'action 은 reregister 만 지원합니다 (트리거는 사용자 요청에 따라 비활성).' },
       { status: 400 }
     )
   } catch (error: any) {

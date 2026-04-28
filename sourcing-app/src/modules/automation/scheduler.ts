@@ -16,6 +16,7 @@ const activeSchedulers: Map<number, cron.ScheduledTask[]> = new Map()
  * 애플리케이션 시작 시 호출
  */
 export async function initializeScheduler(): Promise<void> {
+  console.log('[Scheduler] 초기화 시작 (서버 시각 ' + new Date().toISOString() + ', TZ=' + (process.env.TZ || 'system') + ')')
   try {
     // ⚠️ 명시적 select 사용 — Prisma 기본 findMany는 모든 컬럼을 SELECT한다.
     // 운영 DB에 신규 컬럼(digest_mode/digest_products_per_post/digest_images_per_product
@@ -37,15 +38,27 @@ export async function initializeScheduler(): Promise<void> {
       },
     })
 
+    console.log('[Scheduler] DB 활성 자동화 설정 ' + configs.length + '건 발견')
+
+    let registered = 0
+    let skipped = 0
     for (const config of configs) {
-      if (config.cronExpression) {
-        registerSchedulerSilent(config.user.id, config.cronExpression)
+      if (!config.cronExpression) {
+        console.warn(`[Scheduler] user=${config.user.id} (${config.user.email}) cronExpression 누락 — 스킵`)
+        skipped++
+        continue
+      }
+      const ok = registerSchedulerSilent(config.user.id, config.cronExpression)
+      if (ok) {
+        registered++
+        console.log(`[Scheduler] ✓ user=${config.user.id} (${config.user.email}) cron="${config.cronExpression}" 등록 완료`)
+      } else {
+        skipped++
+        console.error(`[Scheduler] ✗ user=${config.user.id} (${config.user.email}) cron="${config.cronExpression}" 등록 실패 (validate 실패 가능성)`)
       }
     }
 
-    if (configs.length > 0) {
-      console.log(`[Scheduler] ${configs.length}개의 자동화 스케줄러 시작됨`)
-    }
+    console.log(`[Scheduler] 초기화 완료: ${registered}개 등록 / ${skipped}개 스킵 / 활성 userId=[${getActiveSchedulers().join(',')}]`)
   } catch (error) {
     console.error('[Scheduler] 초기화 실패:', error)
   }
@@ -124,9 +137,10 @@ function createCronTask(userId: number, singleCron: string): cron.ScheduledTask 
 }
 
 /**
- * 스케줄러 등록 (내부용, 로그 없음)
+ * 스케줄러 등록 (내부용)
+ * @returns 1개 이상 등록되었으면 true
  */
-function registerSchedulerSilent(userId: number, cronExpression: string): void {
+function registerSchedulerSilent(userId: number, cronExpression: string): boolean {
   unregisterScheduler(userId)
 
   const cronExpressions = parseCronExpressions(cronExpression)
@@ -134,12 +148,18 @@ function registerSchedulerSilent(userId: number, cronExpression: string): void {
 
   for (const singleCron of cronExpressions) {
     const task = createCronTask(userId, singleCron)
-    if (task) tasks.push(task)
+    if (task) {
+      tasks.push(task)
+    } else {
+      console.warn(`[Scheduler] cron 표현식 "${singleCron}" 검증 실패 — user=${userId}`)
+    }
   }
 
   if (tasks.length > 0) {
     activeSchedulers.set(userId, tasks)
+    return true
   }
+  return false
 }
 
 /**
