@@ -94,16 +94,53 @@ async function scrapeBandPost(userId: number, channelId: number, bandUrl: string
         }
       }
 
-      // 이미지 URL 추출 — 게시물 영역 내부에서만
+      // 이미지 URL 추출 — 게시물 영역 내부에서만 + 밴드 자체 이미지(커버/프로필/배지 등) 차단
       const images: string[] = []
       const seenUrls = new Set<string>()
 
-      const addImage = (url: string) => {
+      // URL/경로 단위로 비-상품 이미지를 거른다.
+      const NON_PRODUCT_KEYWORDS = [
+        'profile', 'profileimage', 'avatar',
+        'emoji', 'emoticon', 'sticker',
+        'icon', 'spacer', 'blank',
+        'logo', 'banner', 'cover',
+        'badge', 'reaction', 'rcmd',
+        'thumb_band', 'band_cover', 'bandcover',
+        'phinf.png',  // Band 기본 placeholder
+      ]
+
+      // 본문 안에서도 등장 가능한 비-상품 컨테이너 (스티커/이모지/리액션/프로필 박스)
+      const NON_PRODUCT_ANCESTOR_SELECTORS = [
+        '.profile', '.profileImage', '[class*="profile"]',
+        '.uName', '[class*="userBox"]',
+        '[class*="reaction"]', '[class*="emoji"]', '[class*="sticker"]',
+        '[class*="bandCover"]', '[class*="bandLogo"]',
+        '.commentLayer', '.dCommentLayer', '[class*="comment"]',
+      ]
+      const isInsideNonProductContainer = (el: Element): boolean => {
+        for (const sel of NON_PRODUCT_ANCESTOR_SELECTORS) {
+          if (el.closest(sel)) return true
+        }
+        return false
+      }
+
+      const isLikelyProductUrl = (url: string): boolean => {
+        if (!url) return false
+        const lower = url.toLowerCase()
+        if (NON_PRODUCT_KEYWORDS.some((kw) => lower.includes(kw))) return false
+        // 작은 크기 썸네일 제외: /c80x80/, /C200x200/, type=f40_40, type=s80 등
+        if (/\/[cC]\d+x\d+\//.test(url)) return false
+        if (/type=f\d+_\d+/.test(url)) return false
+        if (/type=[sm]\d+$/i.test(url)) return false
+        // Band CDN 의 phinf / dthumb 만 허용 (그 외 호스트의 정적 자원은 제외)
+        if (!url.includes('phinf') && !url.includes('dthumb')) return false
+        return true
+      }
+
+      const addImage = (url: string, el?: Element) => {
         if (!url || seenUrls.has(url)) return
-        if (url.includes('profile') || url.includes('emoji') || url.includes('icon') || url.includes('sticker')) return
-        if (url.includes('spacer') || url.includes('blank') || url.includes('logo') || url.includes('banner')) return
-        // 작은 크기 썸네일 제외 (cover, 40x40 등)
-        if (/\/[cC]\d+x\d+\//.test(url) || /type=f40_40/.test(url)) return
+        if (!isLikelyProductUrl(url)) return
+        if (el && isInsideNonProductContainer(el)) return
         seenUrls.add(url)
         const originalUrl = url
           .replace(/\/dthumb-[^/]+\//, '/')
@@ -112,33 +149,39 @@ async function scrapeBandPost(userId: number, channelId: number, bandUrl: string
         images.push(originalUrl || url)
       }
 
-      // 게시물 본문 영역 찾기
-      const postArea = document.querySelector('.postBody, .dPostBody, [class*="postBody"], .postWrap, .postView, #post_detail')
+      // 게시물 본문 영역 찾기 — 가능한 가장 좁은 셀렉터 우선 사용
+      // (.postWrap / [class*="postBody"] 같은 너른 셀렉터는 사이드 영역까지 포함될 수 있음)
+      const postArea =
+        document.querySelector('.dPostBody') ||
+        document.querySelector('.postBody') ||
+        document.querySelector('.dPostText')?.parentElement ||
+        document.querySelector('.postText')?.parentElement ||
+        document.querySelector('#post_detail .postView') ||
+        document.querySelector('#post_detail') ||
+        document.querySelector('[class*="postBody"]')
 
       if (postArea) {
-        // 게시물 영역 내 img
+        // 게시물 영역 내 img — 단, 댓글/프로필/스티커 컨테이너 안의 이미지는 제외
         postArea.querySelectorAll('img').forEach((img) => {
           const src = img.src || img.getAttribute('data-src') || img.getAttribute('data-original') || ''
-          if (src && (src.includes('phinf') || src.includes('dthumb'))) {
-            addImage(src)
-          }
+          // 작은 이미지(width/height 둘 다 200 미만)는 비상품 가능성 높음
+          const w = (img as HTMLImageElement).naturalWidth || (img as HTMLImageElement).width || 0
+          const h = (img as HTMLImageElement).naturalHeight || (img as HTMLImageElement).height || 0
+          if (w > 0 && h > 0 && w < 200 && h < 200) return
+          addImage(src, img)
         })
 
         // 게시물 영역 내 background-image
         postArea.querySelectorAll('[style*="background-image"]').forEach((el) => {
           const style = (el as HTMLElement).style.backgroundImage
           const match = style.match(/url\(["']?([^"')]+)["']?\)/)
-          if (match?.[1] && (match[1].includes('phinf') || match[1].includes('dthumb'))) {
-            addImage(match[1])
-          }
+          if (match?.[1]) addImage(match[1], el)
         })
 
-        // 게시물 영역 내 data 속성
+        // 게시물 영역 내 data 속성 — 사진 뷰어 노드들
         postArea.querySelectorAll('[data-url], [data-image], [data-photo-url]').forEach((el) => {
           const url = el.getAttribute('data-url') || el.getAttribute('data-image') || el.getAttribute('data-photo-url') || ''
-          if (url && (url.includes('phinf') || url.includes('dthumb'))) {
-            addImage(url)
-          }
+          if (url) addImage(url, el)
         })
       }
 
