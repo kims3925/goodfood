@@ -262,6 +262,8 @@ export async function POST(request: NextRequest) {
       include: { collectedProducts: { where: { isConverted: true } } },
     })
 
+    console.log('[Collect URL] force:', force, 'existingPost:', existingPost?.id, 'collectedProducts:', existingPost?.collectedProducts.length)
+
     if (existingPost) {
       const hasActiveProducts = existingPost.collectedProducts.length > 0
       // force=true 면 가공 이력이 있어도 강제 재수집.
@@ -277,11 +279,28 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         )
       }
-      // 기존 게시물 + 부속 데이터(이미지/댓글/CollectedProduct) 정리 후 재생성
-      await prisma.collectedPostImage.deleteMany({ where: { postId: existingPost.id } })
-      await prisma.collectedPostComment.deleteMany({ where: { postId: existingPost.id } }).catch(() => null)
-      await prisma.collectedProduct.deleteMany({ where: { postId: existingPost.id } }).catch(() => null)
-      await prisma.collectedPost.delete({ where: { id: existingPost.id } })
+      // 기존 게시물 + 부속 데이터(이미지/댓글/CollectedProduct) 정리 후 재생성.
+      // 트랜잭션으로 묶어서 부분 실패 방지. CollectedProduct 는 onDelete:Restrict 라 먼저 지워야
+      // CollectedPost 삭제 가능. .catch 로 무시하지 않고 명시적 throw 로 사용자에게 원인 노출.
+      try {
+        await prisma.$transaction([
+          prisma.collectedPostImage.deleteMany({ where: { postId: existingPost.id } }),
+          prisma.collectedPostComment.deleteMany({ where: { postId: existingPost.id } }),
+          prisma.collectedProduct.deleteMany({ where: { postId: existingPost.id } }),
+          prisma.collectedPost.delete({ where: { id: existingPost.id } }),
+        ])
+        console.log('[Collect URL] 기존 게시물 정리 완료 (id=' + existingPost.id + ')')
+      } catch (delErr: any) {
+        console.error('[Collect URL] 기존 게시물 삭제 실패:', delErr)
+        return NextResponse.json(
+          {
+            success: false,
+            error: '기존 게시물 삭제에 실패했습니다: ' + (delErr?.message || '알 수 없음'),
+            debug: { existingPostId: existingPost.id, force },
+          },
+          { status: 500 }
+        )
+      }
     }
 
     await postService.create({

@@ -1665,6 +1665,7 @@ export default function PostsManagePage() {
 
                       // force=true 옵션으로 재시도 가능한 단일 호출 헬퍼
                       const callCollect = async (force: boolean) => {
+                        console.log('[URL 수집] force=' + force + ' 요청')
                         const res = await fetch('/api/post/collect-url', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
@@ -1674,14 +1675,22 @@ export default function PostsManagePage() {
                             force,
                           }),
                         })
-                        return { res, data: await res.json() }
+                        const data = await res.json()
+                        console.log('[URL 수집] force=' + force + ' 응답', { status: res.status, data })
+                        return { res, data }
                       }
 
                       try {
                         let { res, data } = await callCollect(false)
 
-                        // 이미 가공된 게시물이면 사용자에게 재수집 여부 확인
-                        if (!data.success && data.code === 'ALREADY_PROCESSED' && res.status === 409) {
+                        // 이미 가공된 게시물이면 사용자에게 재수집 여부 확인.
+                        // 일부 옛 배포에서 code 가 누락되어 있을 수 있으니 status+text 로 보강.
+                        const looksAlreadyProcessed =
+                          !data.success &&
+                          (res.status === 409 ||
+                            data.code === 'ALREADY_PROCESSED' ||
+                            (typeof data.error === 'string' && data.error.includes('이미 수집되어 가공된')))
+                        if (looksAlreadyProcessed) {
                           const ok = window.confirm(
                             '이미 가공된 적이 있는 게시물입니다.\n\n가공 결과가 잘못되어 다시 수집하려는 경우 [확인] 을 눌러주세요. 기존 가공상품(Product) 자체는 그대로 남고, 수집 게시물(CollectedPost)만 삭제 후 재수집합니다.\n\n※ 가공 결과가 멀쩡한 경우라면 [취소] 를 누르세요.'
                           )
