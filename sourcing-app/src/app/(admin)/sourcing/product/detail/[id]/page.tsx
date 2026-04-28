@@ -1358,24 +1358,45 @@ export default function ProductDetailPage() {
                         <thead>
                           <tr className="bg-slate-50">
                             <th className="text-left py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200">옵션</th>
-                            <th className="text-right py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200 w-28">도매가</th>
+                            <th className="text-right py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200 w-24">도매원가</th>
+                            <th className="text-right py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200 w-24">마진조정가</th>
+                            <th className="text-right py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200 w-24">배송비</th>
                             <th className="text-right py-2.5 px-3 font-medium text-slate-600 border-b border-slate-200 w-28">판매가</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {product.variants.map((variant) => (
-                            <tr key={variant.id} className="hover:bg-slate-50/50">
-                              <td className="py-2 px-3 text-slate-900">
-                                {variant.optionSummary || '-'}
-                              </td>
-                              <td className="py-2 px-3 text-right text-slate-500 tabular-nums">
-                                {formatPrice(variant.wholesalePrice)}
-                              </td>
-                              <td className="py-2 px-3 text-right text-slate-700 font-medium tabular-nums">
-                                {formatPrice(variant.price)}
-                              </td>
-                            </tr>
-                          ))}
+                          {product.variants.map((variant) => {
+                            // 배송비: SEPARATE 면 product.shippingFee 가산, INCLUDED 면 0, 그 외 0
+                            const shippingFee = product.shippingFee || 0
+                            const isIncluded = product.bundleShippingType === 'INCLUDED'
+                            const shippingForRow = isIncluded ? 0 : shippingFee
+                            const finalPrice = (variant.price || 0) + shippingForRow
+                            return (
+                              <tr key={variant.id} className="hover:bg-slate-50/50">
+                                <td className="py-2 px-3 text-slate-900">
+                                  {variant.optionSummary || '-'}
+                                </td>
+                                <td className="py-2 px-3 text-right text-slate-500 tabular-nums">
+                                  {formatPrice(variant.wholesalePrice)}
+                                </td>
+                                <td className="py-2 px-3 text-right text-slate-700 tabular-nums">
+                                  {formatPrice(variant.price)}
+                                </td>
+                                <td className="py-2 px-3 text-right text-slate-500 tabular-nums">
+                                  {isIncluded ? (
+                                    <span className="text-emerald-600 text-xs">포함</span>
+                                  ) : shippingForRow > 0 ? (
+                                    `+${formatPrice(shippingForRow)}`
+                                  ) : (
+                                    formatPrice(0)
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-right text-blue-700 font-semibold tabular-nums">
+                                  {formatPrice(finalPrice)}
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
