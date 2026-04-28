@@ -222,11 +222,19 @@ ChannelProduct / ShopProduct (product/list 발행완료 탭, publish 페이지)
 6. post/list에서 해당 게시물 자동 제거 (필터: `collectedProducts: { none: {} }`)
 7. product/list 미발행 탭 맨위에 표시 (`orderBy: createdAt desc`)
 
-### 상품 발행 플로우
+### 상품 발행 플로우 (2026-04-28 통일 완료)
 
-- **ProcessedProductTab**: "상품발행하기" 버튼 → 발행 방식 선택 모달
-  - 자동발행: 등록된 모든 소매밴드에 일괄 발행 (`/api/publish/template/publish`)
-  - 수동발행: `/sourcing/publish?productIds=...` 이동
+자동발행 / 재발행 / Stage2(post/list 가공 직후) / 가공상품(ProcessedProductTab) **네 경로 모두**
+`/api/automation/execute` (`type='publish'`) 단일 호출 사용 — 자동 cron 과 100% 동일한
+`runPublishPipeline → publishService.publishBatch` 경로. 옛 per-product per-channel 루프
+(`/api/publish/template/publish`) 는 카드 포맷 깨짐 / 댓글 쇼핑몰 링크 누락 사고로 제거.
+
+- **ProcessedProductTab** (`/sourcing/product/list`): "상품발행하기" → **재발행 모달과 동일** 통합
+  레이아웃 (소매밴드 / 쇼핑몰 다중 체크박스 + 개별/종합 모드 + ⏱️ N분 지연 입력)
+- **Stage2** (`/sourcing/post/list` AI 가공 직후): 동일 자동경로 + 활성 쇼핑몰 자동 발행 추가
+- **재발행** (`/sourcing/publish`): 채널/쇼핑몰 다중 체크박스 + "자동발행 경로 사용" 토글 + ⏱️ 지연 입력
+- **자동 cron**: `instrumentation.ts:initializeScheduler` 가 `AutomationConfig.cronExpression` 로
+  `runPublishPipeline` 등록 (timezone Asia/Seoul)
 
 ### 상품 복원
 
@@ -280,13 +288,152 @@ ChannelProduct / ShopProduct (product/list 발행완료 탭, publish 페이지)
 - AI 가공 시점(`productService.create`)에 `post.title`을 `sourceProductName`에 자동 저장하고 `collectedPostId`도 채움.
 - `/api/order/unified/[id]` 응답의 `items[].sourceProductName`은 `Product.sourceProductName ?? Product.collectedPost.title ?? null` 순으로 폴백. 기존 상품도 `collectedPostId`가 있으면 원본 제목으로 즉시 표시됨.
 
-## 발행 경로 통일 (자동발행 = 수동발행 = 재발행)
+## 발행 경로 통일 (자동 cron = 수동 = 재발행 = Stage2)
 
-밴드 발행은 `/sourcing/publish` 수동, `/sourcing/product/list` 자동, "재발행" 세 경로에서 일어나지만 모두 **동일한 `/api/publish/template/publish` 엔드포인트**를 호출합니다.
+**현재 (2026-04-28 이후)**: 모든 밴드 발행은 `/api/automation/execute` (`type='publish'`) 단일 경로
+사용. 내부에서 `executePublishPipeline → runPublishPipeline → publishService.publishBatch` 호출.
+쇼핑몰 발행은 별도로 `/api/shop/publish` 를 product × shop 루프로 호출 (활성 쇼핑몰만).
 
-- 과거 존재했던 `/api/shop/publish/stream` (SSE) 경로는 본문 폰트 굵기가 깨지고 이미지가 글 중간에 삽입되는 포맷 이슈가 있어 **모든 프론트엔드 호출을 제거**했습니다. API 파일은 `/src/app/api/shop/publish/stream/route.ts`에 남아 있지만 사용하지 않음.
-- 세션 만료 자동/수동 재시도(`handleAutoRetry`, `handleRetryWithSessionSave`)도 template/publish 단순 POST 루프로 통일. stage/imageProgress 세부 표시는 포기(template은 단일 응답), pending/publishing/success/failed 3-state만 유지.
-- 재발행 플로우(`handleRepublishSelected`)도 자동발행과 동일한 순서(밴드 → 쇼핑몰)와 파라미터로 재작성. 기존의 "Step 1 Playwright DELETE"는 세션을 훼손해 글 깨짐을 유발하므로 제거.
+| 진입점 | 호출 |
+|---|---|
+| 자동 cron | `AutomationConfig.cronExpression` → `executeFullPipelineWithLock` |
+| `/sourcing/publish` 재발행 | `runRepublishNow` → `automation/execute` + shop loop |
+| `/sourcing/product/list` 상품발행하기 | `runAutoPublishNow` → 동일 |
+| `/sourcing/post/list` Stage2 발행 | `handlePublishProducts` → 동일 |
+
+### 옛 경로 (제거됨)
+- `/api/publish/template/publish` per-product per-channel 루프 — 제목 카드가 본문 사이에
+  끼임 / 댓글에 쇼핑몰 링크 누락 사고. 코드 파일은 남아있지만 더 이상 호출하지 않음.
+- `/api/shop/publish/stream` (SSE) — 본문 폰트 굵기 깨짐 / 이미지 중간 삽입. 호출 제거.
+- 재발행 시 "Step 1 Playwright DELETE" — 세션 훼손으로 글 깨짐. 제거.
+
+## 가격정책 시스템 (v4 체크리스트)
+
+도매방별 가격정책을 PolicyModal 에서 작성하고, AI 가공 시 자동 적용. 정책의 "배송비:" 항목이
+**모든 소싱 경로의 최우선 권위**.
+
+### 정책 유형 4종 (`PolicyModal.tsx`)
+
+| 유형 | 적용 도매방 | 마진 |
+|---|---|---|
+| `ZERO_MARGIN` | 킹도매방 | 마진 없음 (도매가 = 판매가) |
+| `BRACKET_MARGIN` | 가족도매방 / 초록이네 | 3-step (~19,900→+0 / ~29,900→+1,000 / ~40,000→+2,000) |
+| `BRACKET_MARGIN_EXTENDED` | 나은 / VIP / SD푸드 | 9-step + 동적 (1~19,900→+4,000 / +1,000원 단계 / 99,901+ 동적 +1,000/만원) |
+| `SD_FOOD_SPECIAL` | SD푸드만 | 위 +"공급가_출처: 댓글" + "기준가: 공급가+배송비 합산" |
+
+### 마진 구간표 (1,000원 밀린 적용, 2026-04-27)
+
+나은/VIP/SD 의 NAUN_BRACKETS — 첫 두 구간 통합 후 모든 마진 -1,000원:
+- `1~19,900 → +4,000` / `19,901~29,900 → +5,000` / ... / `89,901~99,900 → +12,000` /
+  `99,901+ → +12,000~ (1만원 구간마다 +1,000)`
+
+### 정책 일괄 시드
+
+`POST /api/admin/policies/seed-from-checklist` — 6개 도매방(킹/가족/초록/나은/VIP/SD) 의 표준 정책을
+v4 xlsx 값으로 일괄 upsert. 채널명 keyword contains 매칭. 고정 이름
+"BandAuto 표준 (v4 체크리스트)" 로 저장 → 기존 정책 보존, 재호출 idempotent.
+- `body.dryRun=true` 로 미리보기
+- excludeAbove: 가족/초록 40,001 / 나은/VIP/SD/킹 100,001
+
+### 배송비 결정 (정책 최우선)
+
+`product.repository.create()` 내부 우선순위:
+0. **`policyShippingType`** (정책의 "배송비:" 항목) — 있으면 최우선 (NEW)
+   - `'separate'` → bundleShippingType=SEPARATE 강제
+   - `'included'` → bundleShippingType=INCLUDED 강제
+1. shippingInfo "배송비 별도" / "N원 추가" 키워드 → SEPARATE
+2. shippingInfo "배송비 포함" / "무료배송" → INCLUDED
+3. shippingFee > 0 → SEPARATE
+4. else → NONE
+
+`policyShippingType` 전달 경로:
+- `productService.create` 가 `data.policyShippingType` 미전달 시 **DB 의 활성 PricingPolicy 자동 조회**
+  (`parsePolicyShippingType(content)` 로 파싱) — 모든 호출 경로 자동 보강
+- `/api/product/ai-generate` 응답에 `policyShippingType` 포함 → 클라이언트가 forward
+- 자동 파이프라인은 `transform.ts` 가 rawMetadata 에 함께 저장
+
+### AI 가공 정책 우선 원칙 (prompt-templates.ts)
+
+"## 4. 배송비 및 합배송 추출" 섹션 추가 지시:
+- 정책 "배송비: 별도" → 본문에 명시 없어도 `shippingInfo: "배송비 별도"`, `shippingFee: null` 유지
+- 정책 "배송비: 포함" → `shippingInfo: "배송비 포함"`, `shippingFee: 0`
+- 옛 텍스트 "기준가: 도매가 + 배송비 합산" 은 SD푸드 외 정책에서 **제거됨** — calculateSellingPrice
+  와의 이중 합산 사고 방지 (`0d7228a`)
+
+### excludeAbove (글로벌 + 정책별)
+
+- 글로벌: `GLOBAL_MAX_PRICE = 100000` 이상 옵션 자동 제외 (`/api/product/ai-generate`)
+- 정책별: 정책 content 의 `"40001원 이상 제외"` 패턴 파싱 → 그 값 이상 옵션 제외
+- AI 응답 후처리 (Phase 3): variants 필터에서 `max(sellingPrice, price)` 로 비교 — AI 가
+  sellingPrice 만 채우는 케이스 방지
+
+## Channel 가격 범위 필터 (수집 단계, 지침서 Phase 1)
+
+```
+Channel.minSourcingPrice  Int?  // 최소 도매가 (NULL=무제한)
+Channel.maxSourcingPrice  Int?  // 최대 도매가 (NULL=무제한)
+```
+
+`automation/pipelines/collection.ts` 가 게시글 본문에서 `extractPriceFromContent()`
+(`lib/price-extractor.ts`) 로 가격 추출 후 범위 밖이면 **수집 자체에서 스킵** —
+AI 가공 단계 토큰 낭비 방지. 가격 추출 실패 시 통과 (false negative 우선).
+
+채널 상세 페이지(`/sourcing/channel/detail/[id]`)에 WHOLESALE 전용 입력 UI
++ 주문 마감시간(`Channel.orderDeadline`).
+
+## 예약 발행 (N분 후 자동/재발행)
+
+자동발행 / 재발행 모달 양쪽에 "⏱️ N분 후 자동발행" 입력. 0=즉시, N>0=클라이언트 setTimeout 으로
+지연 후 같은 발행 흐름 트리거.
+
+- 공통 헬퍼: `sourcing-app/src/lib/delayed-publish.ts`
+  - `scheduleDelayedPublish(delayMinutes, run, marker?)` → cancel 함수 반환
+  - localStorage 마커로 새로고침 시 stale 자동 정리 (1시간 초과)
+- UI: 페이지 상단에 "⏳ 오후 X시 Y분 예약됨" 배너 + "예약 취소" 버튼
+- **한계**: 탭 닫으면 setTimeout 손실 (서버 측 영속화 미구현). 안내 문구로 명시.
+
+## URL 단일 수집 + 재수집
+
+`POST /api/post/collect-url` — Band URL 1건 직접 스크래핑.
+
+### 비-상품 이미지 필터 강화 (2026-04-28)
+
+postArea 셀렉터 **좁은 것부터 폴백**: `.dPostBody → .postBody → 텍스트 부모 → #post_detail`.
+키워드 차단 확장 (cover/bandcover/avatar/badge/reaction/rcmd/profileimage 등).
+본문 안이라도 댓글/프로필/스티커/리액션 컨테이너 내부 이미지는 `closest()` 로 제외.
+200x200 미만 이미지 자동 제거. → 밴드 커버/프로필 사진 / 리액션 스티커 침입 차단.
+
+### 강제 재수집 (force=true)
+
+가공이 잘못되어 사용자가 Product 삭제 후 다시 수집·가공 필요한 케이스:
+- 1차 호출 시 가공 이력 있으면 `409 + code:'ALREADY_PROCESSED'` 반환
+- UI 가 자동 confirm 다이얼로그 → "확인" 시 `force:true` 로 재시도
+- API 가 `prisma.$transaction` 으로 `CollectedPostImage / Comment / CollectedProduct / CollectedPost`
+  순차 삭제 후 재생성. Product 자체는 onDelete:SetNull 로 보존 (collectedPostId 만 NULL)
+
+## 자동화 cron 진단/복구
+
+### 진단 엔드포인트
+
+`GET /api/admin/automation/diagnose` — 사용자별 cron 상태 한눈 진단:
+- `config` (DB 상태 — isEnabled, cronExpression, lastRunAt, nextRunAt, pipelineSteps)
+- `scheduler.isRegisteredInMemory` (이 Node 프로세스 메모리 등록 여부)
+- `scheduler.activeUserIds` / `scheduler.nodeCronTasks` (라이브러리 내부 registry)
+- `runningWorkflows` (status='RUNNING' 워크플로우 — 멈춤 식별)
+- `recentRuns[].steps[]` (단계별 status / processedItems / errorMessage)
+- `recentPublishes` (최근 1시간 ChannelProduct/ShopProduct 카운트)
+- `diagnosis` (자동 진단 메시지 + 권고)
+
+### 복구 액션
+
+`POST /api/admin/automation/diagnose body={"action":"reregister"}` — 메모리에 cron 만 재등록 (실행 X).
+다음 일정에 자동 실행. 트리거 액션은 사용자 요청에 따라 비활성.
+
+### 스케줄러 자체 (`modules/automation/scheduler.ts`)
+
+- node-cron v4 + timezone `Asia/Seoul` 하드코딩
+- `initializeScheduler` 명시적 select 로 스키마 드리프트 방어 (24c628c)
+- 시작 시 상세 로깅: `[Scheduler] ✓ user=X cron="0 10 * * *" 등록 완료` / 실패 시 원인 표시
 
 ## 카테고리 자동 분류 (Phase 1)
 
@@ -394,16 +541,31 @@ ChannelProduct / ShopProduct (product/list 발행완료 탭, publish 페이지)
   - 필수 표시(*) 제거 — 값이 있을 때만 형식 검증
   - 체크 해제 시 기존 `sameAsCustomer`(customer→recipient 자동 덮어쓰기)도 동시 해제 → 별도 입력한 보내는사람이 받는사람을 덮어쓰지 않도록
 
-## 배송비 추론 로직 강화
+## 배송비 추론 (참고 — 위 "가격정책 시스템" 섹션 참조)
 
-`product.repository.ts::create()` — 상품 저장 시 `bundleShippingType` / `shippingFee` 자동 추론:
+`product.repository.ts::create()` 의 우선순위는 위 "배송비 결정 (정책 최우선)" 섹션 참조.
+정책 우선화 도입 이전(`7cde665` 이전) 흐름은 키워드 추론만 — 본문에 "배송비 N원" 명시
+없으면 NONE 으로 잘못 분류되어 발행 시 배송비 미합산 사고가 있었음 (예: band/64442308/post/173980).
 
-1. `shippingInfo`에 **"배송비 별도" / "N원 추가/별도/부과"** 같은 명시적 별도 키워드가 있으면 INCLUDED 분류 제외 (우선순위 최상위)
-2. `shippingFee`가 0일 때 `"배송비 N,NNN원"` 패턴에서 금액 자동 추출해 보강
-3. 별도 키워드가 없을 때만 `"배송비 포함" / "무료배송"` 키워드로 INCLUDED 판정
-4. 결과: `INCLUDED` / `SEPARATE` / `NONE`
+옛 데이터 중 오분류 의심 건은 3건(id=3417, 3595 등)만 수동 수정. 신규 가공은 정책 자동 적용.
 
-이전엔 "합배송 시 4,000원 포함"처럼 다른 맥락의 "포함" 문구까지 INCLUDED로 오분류되는 이슈가 있었음. 기존 저장된 데이터 중 오분류 의심 건은 3건(id=3417, 3595 등)만 수동 수정.
+## 상품 상세 변형상품 표 (5열, 2026-04-28)
+
+`/sourcing/product/detail/[id]` 의 변형상품 테이블:
+
+| 옵션 | 도매원가 | 마진조정가 | 배송비 | 판매가 |
+|---|---|---|---|---|
+| `optionSummary` | `variant.wholesalePrice` | `variant.price` (정책 마진 적용) | `+N원` 또는 "포함" | 마진조정가+배송비 (파란색 강조) |
+
+배송비 표기:
+- `bundleShippingType=INCLUDED` → 녹색 "포함" 라벨
+- `SEPARATE/NONE` → `+N원` (`product.shippingFee`)
+
+## 수집 게시물 목록 날짜 필터
+
+`/sourcing/post/list` 의 검색창 옆에 📅 시작~종료 date input + 초기화 버튼.
+KST 기준, "YYYY-MM-DD" 형식. `/api/post?startDate=...&endDate=...` 쿼리 추가.
+`PostListParams.startDate/endDate` 추가. 시간 없는 입력은 종료일 자정까지 자동 포함.
 
 ## 핵심 원칙
 

@@ -130,12 +130,47 @@ ChannelProduct/ShopProduct → publish (발행 관리)
 6. product/list 미발행 탭 맨위에 표시 (`createdAt desc`)
 7. viewMode 전환으로 가공 결과 즉시 확인 (리다이렉트 없음)
 
-### 발행 방식
+### 발행 방식 (2026-04-28 통일 완료)
 
-- **ProcessedProductTab**: "상품발행하기" 버튼 → 자동/수동 선택 모달
-  - 자동발행: 모든 소매밴드에 일괄 발행
-  - 수동발행: `/sourcing/publish?productIds=...` 이동
-- **publish 페이지**: 체크박스 선택 → 재발행/삭제 툴바
+자동발행 / 재발행 / Stage2 / 가공상품 페이지 **네 경로 모두**
+`/api/automation/execute` (`type='publish'`) 단일 호출 — 자동 cron 의 `runPublishPipeline` 과
+100% 동일한 결과. 옛 per-channel `template/publish` 루프는 카드 포맷 깨짐 사고로 제거.
+
+- **ProcessedProductTab** (`/sourcing/product/list`): "상품발행하기" → 재발행 모달과
+  동일한 통합 레이아웃 (소매밴드 / 쇼핑몰 다중 체크박스 + 개별/종합 모드 + ⏱️ N분 지연)
+- **Stage2** (`/sourcing/post/list` AI 가공 직후): 동일 자동경로 + 활성 쇼핑몰 자동 발행
+- **publish 페이지**: 체크박스 선택 → 재발행/삭제 툴바, 채널/쇼핑몰 모달 + ⏱️ 지연 입력
+- **자동 cron**: `AutomationConfig.cronExpression` 기반 (Asia/Seoul)
+
+### 예약 발행 (N분 후)
+
+- 공통: `src/lib/delayed-publish.ts` (`scheduleDelayedPublish`, localStorage 마커)
+- 한계: 클라이언트 setTimeout, 탭 닫으면 손실 (서버 영속화 미구현)
+
+### 가격정책 시스템 (v4)
+
+- `PolicyModal.tsx` 4종 정책 (ZERO_MARGIN / BRACKET_MARGIN / BRACKET_MARGIN_EXTENDED / SD_FOOD_SPECIAL)
+- `POST /api/admin/policies/seed-from-checklist` — 6개 도매방 정책 v4 일괄 시드
+- 나은/VIP/SD 마진: 1~19,900 +4,000 → +1,000 단계 → 99,901+ 동적 +1,000/만원
+- 정책 "배송비:" 항목이 `bundleShippingType` 의 **최우선 권위** (코드 매니저 자동 폴백 — `lib/policy-shipping.ts`)
+- 옛 "기준가: 도매가 + 배송비 합산" 텍스트는 SD푸드 외 전부 제거 (이중합산 방지)
+
+### Channel 가격 범위 (Phase 1)
+
+- `Channel.minSourcingPrice / maxSourcingPrice` (Int, NULL=무제한)
+- `automation/pipelines/collection.ts` 가 본문 가격 추출 후 범위 밖 게시글 수집 단계에서 스킵
+- 채널 상세 페이지에 WHOLESALE 전용 입력 UI
+
+### URL 단일 수집
+
+- `POST /api/post/collect-url` Playwright 스크래핑 + force=true 강제 재수집 옵션
+- 비-상품 이미지 필터: postArea 좁은 셀렉터 + closest() 컨테이너 제외 + 200x200 미만 제거
+
+### 자동화 cron 진단
+
+- `GET /api/admin/automation/diagnose` — DB 상태 + 메모리 cron + node-cron registry +
+  RUNNING 워크플로우 + 단계별 진행
+- `POST {action:"reregister"}` — 메모리 cron 재등록만 (실행 X)
 
 ### 상품 복원 API
 
