@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
     const userId = currentUser.userId
 
     const body = await request.json()
-    const { url, channelId } = body
+    const { url, channelId, force } = body
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json(
@@ -264,13 +264,20 @@ export async function POST(request: NextRequest) {
 
     if (existingPost) {
       const hasActiveProducts = existingPost.collectedProducts.length > 0
-      if (hasActiveProducts) {
+      // force=true 면 가공 이력이 있어도 강제 재수집.
+      // 가공이 잘못되어 사용자가 다시 가공해야 하는 케이스 지원.
+      // 주의: Product 가 collectedPostId 로 링크되어 있어도 onDelete: SetNull 이라 안전 (Product 자체는 유지).
+      if (hasActiveProducts && !force) {
         return NextResponse.json(
-          { success: false, error: '이미 수집되어 가공된 게시물입니다.' },
+          {
+            success: false,
+            error: '이미 수집되어 가공된 게시물입니다.',
+            code: 'ALREADY_PROCESSED', // 클라이언트가 force=true 로 재시도할 수 있도록 신호
+          },
           { status: 409 }
         )
       }
-      // 가공상품이 없으면 기존 게시물 삭제 후 재생성
+      // 기존 게시물 + 부속 데이터(이미지/댓글/CollectedProduct) 정리 후 재생성
       await prisma.collectedPostImage.deleteMany({ where: { postId: existingPost.id } })
       await prisma.collectedPostComment.deleteMany({ where: { postId: existingPost.id } }).catch(() => null)
       await prisma.collectedProduct.deleteMany({ where: { postId: existingPost.id } }).catch(() => null)

@@ -1662,15 +1662,39 @@ export default function PostsManagePage() {
                       if (!urlInput.trim() || !urlChannelId) return
                       setUrlSubmitting(true)
                       setUrlResult(null)
-                      try {
+
+                      // force=true 옵션으로 재시도 가능한 단일 호출 헬퍼
+                      const callCollect = async (force: boolean) => {
                         const res = await fetch('/api/post/collect-url', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ url: urlInput.trim(), channelId: Number(urlChannelId) }),
+                          body: JSON.stringify({
+                            url: urlInput.trim(),
+                            channelId: Number(urlChannelId),
+                            force,
+                          }),
                         })
-                        const data = await res.json()
+                        return { res, data: await res.json() }
+                      }
+
+                      try {
+                        let { res, data } = await callCollect(false)
+
+                        // 이미 가공된 게시물이면 사용자에게 재수집 여부 확인
+                        if (!data.success && data.code === 'ALREADY_PROCESSED' && res.status === 409) {
+                          const ok = window.confirm(
+                            '이미 가공된 적이 있는 게시물입니다.\n\n가공 결과가 잘못되어 다시 수집하려는 경우 [확인] 을 눌러주세요. 기존 가공상품(Product) 자체는 그대로 남고, 수집 게시물(CollectedPost)만 삭제 후 재수집합니다.\n\n※ 가공 결과가 멀쩡한 경우라면 [취소] 를 누르세요.'
+                          )
+                          if (ok) {
+                            ;({ res, data } = await callCollect(true))
+                          }
+                        }
+
                         if (data.success) {
-                          setUrlResult({ success: true, message: data.message || '게시물이 수집되었습니다.' })
+                          setUrlResult({
+                            success: true,
+                            message: data.message || '게시물이 수집되었습니다.',
+                          })
                           setUrlInput('')
                           loadPosts()
                         } else {
