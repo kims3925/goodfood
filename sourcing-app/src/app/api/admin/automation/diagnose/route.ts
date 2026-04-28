@@ -70,7 +70,7 @@ export async function GET() {
       // node-cron v4 API 가 변경되면 여기 catch
     }
 
-    // 최근 워크플로우 실행 이력 (최대 10건)
+    // 최근 워크플로우 실행 이력 (최대 10건) — 단계별 상세 포함
     const recentRuns = await prisma.workflowLog.findMany({
       where: { userId: currentUser.userId },
       orderBy: { startedAt: 'desc' },
@@ -80,13 +80,48 @@ export async function GET() {
         workflowType: true,
         triggerType: true,
         status: true,
+        currentStep: true,
         startedAt: true,
         completedAt: true,
         totalItems: true,
         successCount: true,
         failedCount: true,
+        errorMessage: true,
+        steps: {
+          select: {
+            stepType: true,
+            stepOrder: true,
+            status: true,
+            startedAt: true,
+            completedAt: true,
+            totalItems: true,
+            processedItems: true,
+            successCount: true,
+            failedCount: true,
+            errorMessage: true,
+          },
+          orderBy: { stepOrder: 'asc' },
+        },
       },
     }).catch(() => [])
+
+    // 현재 RUNNING 상태 워크플로우만 별도 추출 (멈춰있는 것 진단용)
+    const runningWorkflows = recentRuns.filter((r) => r.status === 'RUNNING')
+
+    // 최근 1시간 내 발행된 ChannelProduct / ShopProduct 카운트 (실제 발행됐는지 검증)
+    const recentCutoff = new Date(Date.now() - 60 * 60 * 1000)
+    const recentChannelPublishes = await prisma.channelProduct.count({
+      where: {
+        userId: currentUser.userId,
+        publishedAt: { gte: recentCutoff },
+      },
+    }).catch(() => 0)
+    const recentShopPublishes = await prisma.shopProduct.count({
+      where: {
+        userId: currentUser.userId,
+        publishedAt: { gte: recentCutoff },
+      },
+    }).catch(() => 0)
 
     return NextResponse.json({
       success: true,
@@ -111,8 +146,14 @@ export async function GET() {
           activeUserIds, // 이 프로세스 activeSchedulers Map 에 등록된 모든 userId
           nodeCronTasks, // node-cron 라이브러리 내부 registry 에 살아있는 task 전체
         },
+        runningWorkflows,
         recentRuns,
-        diagnosis: buildDiagnosis(config, isRegisteredInMemory),
+        recentPublishes: {
+          since: recentCutoff.toISOString(),
+          channelProducts: recentChannelPublishes,
+          shopProducts: recentShopPublishes,
+        },
+        diagnosis: buildDiagnosis(config, isRegisteredInMemory, runningWorkflows.length),
       },
     })
   } catch (error: any) {
@@ -164,7 +205,8 @@ export async function POST(request: NextRequest) {
 
 function buildDiagnosis(
   config: { isEnabled: boolean; cronExpression: string | null } | null,
-  isRegisteredInMemory: boolean
+  isRegisteredInMemory: boolean,
+  runningCount: number
 ): { ok: boolean; reasons: string[]; recommendation: string | null } {
   const reasons: string[] = []
   let recommendation: string | null = null
@@ -192,6 +234,14 @@ function buildDiagnosis(
   if (config.isEnabled && config.cronExpression && isRegisteredInMemory) {
     reasons.push('정상 — DB 설정 활성 & 메모리 cron 등록 완료. 이미 등록된 cron 이 다음 일정에 실행됩니다.')
   }
+  if (runningCount > 0) {
+    reasons.push(
+      `⚠️ 현재 RUNNING 상태 워크플로우 ${runningCount}건. 정상 진행 중이거나 멈춰있을 수 있음 — runningWorkflows.steps 에서 어느 단계가 stuck 인지 확인하세요.`
+    )
+    recommendation =
+      'DELETE /api/automation/execute?workflowId={id} 로 멈춘 워크플로우를 취소하거나, ' +
+      '?cleanup=true 로 30분 이상 stuck 인 워크플로우 일괄 정리.'
+  }
 
-  return { ok: reasons.length === 1 && isRegisteredInMemory, reasons, recommendation }
+  return { ok: reasons.length === 1 && isRegisteredInMemory && runningCount === 0, reasons, recommendation }
 }
