@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle, Archive, Eye, ChevronDown, ChevronUp, Info, Send, ExternalLink } from 'lucide-react'
+import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle, Archive, Eye, ChevronDown, ChevronUp, Info, Send } from 'lucide-react'
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -195,9 +195,6 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
   const [autoPublishAvailableShops, setAutoPublishAvailableShops] = useState<{ id: number; name: string }[]>([])
   const [autoPublishSelectedChannelIds, setAutoPublishSelectedChannelIds] = useState<Set<number>>(new Set())
   const [autoPublishSelectedShopIds, setAutoPublishSelectedShopIds] = useState<Set<number>>(new Set())
-
-  // 발행 방식 선택 모달
-  const [showPublishMethodModal, setShowPublishMethodModal] = useState(false)
 
   // 발행된 상품 삭제 차단 모달 states
   const [showPublishedWarning, setShowPublishedWarning] = useState(false)
@@ -1252,62 +1249,76 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
       }
 
 
-      // 2) 개별발행 (선택 시) — 각 상품을 모든 소매밴드 + 모든 쇼핑몰에 발행
+      // 2) 개별발행 (선택 시) — 재발행과 100% 동일한 경로 사용.
+      //    이전엔 per-product per-channel 로 /api/publish/template/publish 를 호출했으나
+      //    제목 카드가 본문 텍스트 사이에 끼이고 댓글에 쇼핑몰 링크가 안 달리는 사고 발생.
+      //    /api/automation/execute (type=publish) 는 자동 cron 과 동일한
+      //    runPublishPipeline → publishService.publishBatch 경로라 포맷이 일치한다.
       if (autoPublishMode.individual) {
-      for (const productId of selectedProductIds) {
-        // 2-1) 소매밴드 발행 (Playwright 템플릿)
-        for (const channel of retailChannels) {
+        // 2-1) 소매밴드 발행 — 단일 호출 (재발행 로직과 동일)
+        if (retailChannels.length > 0) {
           try {
-            const res = await fetch('/api/publish/template/publish', {
+            const res = await fetch('/api/automation/execute', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ productId, channelId: channel.id }),
+              credentials: 'include',
+              body: JSON.stringify({
+                type: 'publish',
+                config: {
+                  channelIds: retailChannels.map((c) => c.id),
+                  productIds: selectedProductIds,
+                  publishReadyOnly: false,
+                },
+              }),
             })
             const data = await res.json()
-            if (data.success || data.publishId) {
-              bandSuccessCount++
+            if (data.success) {
+              const stage = data.data?.stages?.publish
+              bandSuccessCount += stage?.successCount || 0
+              bandFailCount += stage?.failedCount || 0
             } else {
-              bandFailCount++
-              if (data.error) errorMessages.push(`[밴드:${channel.name}] ${data.error}`)
-            }
-          } catch (err) {
-            bandFailCount++
-            errorMessages.push(`[밴드:${channel.name}] 네트워크 오류`)
-          }
-        }
-
-        // 2-2) 쇼핑몰 발행 (Shop별 ShopProduct 생성)
-        for (const shop of activeShops) {
-          try {
-            const res = await fetch('/api/shop/publish', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
-            })
-            const data = await res.json()
-            console.log(`[자동발행] shopId=${shop.id} (${shop.name}) 응답:`, data)
-
-            if (data.success && data.summary) {
-              shopSuccessCount += data.summary.success || 0
-              shopSkippedCount += data.summary.skipped || 0
-              shopFailCount += data.summary.failed || 0
-              if (data.summary.failed > 0 && data.results) {
-                data.results
-                  .filter((r: any) => r.status === 'FAILED')
-                  .forEach((r: any) => errorMessages.push(`[쇼핑몰:${shop.name}] ${r.message || '발행 실패'}`))
-              }
-            } else {
-              // success: false 또는 summary 없음
-              shopFailCount++
-              const errMsg = data.error || data.message || '알 수 없는 오류'
-              errorMessages.push(`[쇼핑몰:${shop.name}] ${errMsg}`)
+              bandFailCount += selectedProductIds.length
+              errorMessages.push(`[밴드 자동경로] ${data.error || '알 수 없음'}`)
             }
           } catch (err: any) {
-            shopFailCount++
-            errorMessages.push(`[쇼핑몰:${shop.name}] ${err?.message || '네트워크 오류'}`)
+            bandFailCount += selectedProductIds.length
+            errorMessages.push(`[밴드 자동경로] ${err?.message || '네트워크 오류'}`)
           }
         }
-      }
+
+        // 2-2) 쇼핑몰 발행 (Shop별 ShopProduct 생성) — 재발행과 동일하게 product × shop 루프
+        for (const productId of selectedProductIds) {
+          for (const shop of activeShops) {
+            try {
+              const res = await fetch('/api/shop/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
+              })
+              const data = await res.json()
+              console.log(`[자동발행] shopId=${shop.id} (${shop.name}) 응답:`, data)
+
+              if (data.success && data.summary) {
+                shopSuccessCount += data.summary.success || 0
+                shopSkippedCount += data.summary.skipped || 0
+                shopFailCount += data.summary.failed || 0
+                if (data.summary.failed > 0 && data.results) {
+                  data.results
+                    .filter((r: any) => r.status === 'FAILED')
+                    .forEach((r: any) => errorMessages.push(`[쇼핑몰:${shop.name}] ${r.message || '발행 실패'}`))
+                }
+              } else {
+                shopFailCount++
+                const errMsg = data.error || data.message || '알 수 없는 오류'
+                errorMessages.push(`[쇼핑몰:${shop.name}] ${errMsg}`)
+              }
+            } catch (err: any) {
+              shopFailCount++
+              errorMessages.push(`[쇼핑몰:${shop.name}] ${err?.message || '네트워크 오류'}`)
+            }
+          }
+        }
       } // end if (autoPublishMode.individual)
 
       // 3) 종합발행 (선택 시) — 개별발행 완료 후 실행
@@ -1383,13 +1394,6 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
         console.error('[자동발행] 전체 실패 목록:', errorMessages)
       }
     }
-  }
-
-  // 선택 상품 수동발행 → 가공상품발행 페이지로 이동
-  const handleManualPublish = () => {
-    if (selectedProductIds.length === 0) return
-    const ids = selectedProductIds.join(',')
-    router.push(`/sourcing/publish?productIds=${ids}`)
   }
 
   // 수정 모달 열기
@@ -1790,7 +1794,7 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
           <button
             onClick={() => {
               if (selectedProductIds.length === 0) { toast.error('먼저 상품을 선택해주세요.'); return }
-              setShowPublishMethodModal(true)
+              handleAutoPublish()
             }}
             disabled={isAutoPublishing}
             className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
@@ -2166,61 +2170,6 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
         </div>
       )}
 
-
-      {/* 발행 방식 선택 모달 */}
-      {showPublishMethodModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">상품발행하기</h3>
-            <p className="text-sm text-gray-500 mb-6">
-              선택한 {selectedProductIds.length}개 상품의 발행 방식을 선택하세요.
-            </p>
-
-            <button
-              onClick={() => {
-                setShowPublishMethodModal(false)
-                handleAutoPublish()
-              }}
-              className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors mb-3 text-left"
-            >
-              <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                <Send size={18} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">자동발행</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  등록된 모든 소매밴드 + 쇼핑몰에 동시 일괄 발행합니다.
-                </p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                setShowPublishMethodModal(false)
-                handleManualPublish()
-              }}
-              className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-colors mb-5 text-left"
-            >
-              <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
-                <ExternalLink size={18} className="text-purple-600" />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">수동발행</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  채널을 직접 선택하여 발행 상세 설정이 가능합니다.
-                </p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setShowPublishMethodModal(false)}
-              className="w-full py-2.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              취소
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* 자동발행 대상 선택 모달 — 재발행 대상 선택과 동일 레이아웃 */}
       {showAutoPublishConfirm && (
