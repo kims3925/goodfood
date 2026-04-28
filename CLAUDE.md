@@ -335,22 +335,32 @@ v4 xlsx 값으로 일괄 upsert. 채널명 keyword contains 매칭. 고정 이�
 - `body.dryRun=true` 로 미리보기
 - excludeAbove: 가족/초록 40,001 / 나은/VIP/SD/킹 100,001
 
-### 배송비 결정 (정책 최우선)
+### 배송비 결정 (5단계, 모순 차단 포함)
 
-`product.repository.create()` 내부 우선순위:
-0. **`policyShippingType`** (정책의 "배송비:" 항목) — 있으면 최우선 (NEW)
-   - `'separate'` → bundleShippingType=SEPARATE 강제
-   - `'included'` → bundleShippingType=INCLUDED 강제
-1. shippingInfo "배송비 별도" / "N원 추가" 키워드 → SEPARATE
-2. shippingInfo "배송비 포함" / "무료배송" → INCLUDED
-3. shippingFee > 0 → SEPARATE
-4. else → NONE
+`product.repository.create()` 우선순위 (2026-04-28 최종):
+
+```
+1) shippingFee>0 → SEPARATE                                        (최우선 — 실제 금액이 있으면 무조건 별도)
+2) shippingInfo "포함/무료" 키워드 → INCLUDED                      (단 shippingFee=0 일 때만 1)에서 결정 안 됨)
+3) 정책 'separate' (policyShippingType='separate') → SEPARATE      (덮어씀)
+4) 정책 'included' AND shippingFee=0 → INCLUDED                    (덮어씀, 일관 케이스만)
+5) 정책 'included' AND shippingFee>0 → 1)의 SEPARATE 유지          (모순 차단 — 정책 잘못 박힌 경우)
+```
+
+**모순 차단 사례** (`fab052f` + `8be2e4a`):
+- AI 가 본문에서 "배송비 3,500원" 추출 → shippingFee=3500
+- 도매방 정책에 "배송비: 포함" 잘못 설정
+- 옛 로직: 정책이 이김 → INCLUDED → 발행 시 배송비 미산입 사고
+- 새 로직: 실제 금액이 있으면 정책 텍스트보다 그 금액 신뢰 → SEPARATE 유지
 
 `policyShippingType` 전달 경로:
 - `productService.create` 가 `data.policyShippingType` 미전달 시 **DB 의 활성 PricingPolicy 자동 조회**
   (`parsePolicyShippingType(content)` 로 파싱) — 모든 호출 경로 자동 보강
 - `/api/product/ai-generate` 응답에 `policyShippingType` 포함 → 클라이언트가 forward
 - 자동 파이프라인은 `transform.ts` 가 rawMetadata 에 함께 저장
+
+**옛 모순 Product 일괄 정정**: `POST /api/admin/products/fix-shipping-type`
+(`{dryRun:true}` 미리보기 → `{dryRun:false}` 실제 적용. shippingFee>0 + INCLUDED 인 행을 SEPARATE 로.)
 
 ### AI 가공 정책 우선 원칙 (prompt-templates.ts)
 
@@ -411,7 +421,7 @@ postArea 셀렉터 **좁은 것부터 폴백**: `.dPostBody → .postBody → �
 - API 가 `prisma.$transaction` 으로 `CollectedPostImage / Comment / CollectedProduct / CollectedPost`
   순차 삭제 후 재생성. Product 자체는 onDelete:SetNull 로 보존 (collectedPostId 만 NULL)
 
-## 자동화 cron 진단/복구
+## 자동화 cron 진단/복구 + 운영 도구 모음
 
 ### 진단 엔드포인트
 
@@ -419,21 +429,59 @@ postArea 셀렉터 **좁은 것부터 폴백**: `.dPostBody → .postBody → �
 - `config` (DB 상태 — isEnabled, cronExpression, lastRunAt, nextRunAt, pipelineSteps)
 - `scheduler.isRegisteredInMemory` (이 Node 프로세스 메모리 등록 여부)
 - `scheduler.activeUserIds` / `scheduler.nodeCronTasks` (라이브러리 내부 registry)
-- `runningWorkflows` (status='RUNNING' 워크플로우 — 멈춤 식별)
+- `runningWorkflows[].steps[]` (status='RUNNING' 워크플로우, 단계별 진행 상태)
 - `recentRuns[].steps[]` (단계별 status / processedItems / errorMessage)
 - `recentPublishes` (최근 1시간 ChannelProduct/ShopProduct 카운트)
 - `diagnosis` (자동 진단 메시지 + 권고)
 
-### 복구 액션
+### 일괄 복구 엔드포인트
 
-`POST /api/admin/automation/diagnose body={"action":"reregister"}` — 메모리에 cron 만 재등록 (실행 X).
-다음 일정에 자동 실행. 트리거 액션은 사용자 요청에 따라 비활성.
+`POST /api/admin/automation/repair` — 1회 호출로 자동화 정상화 + 나은 배송비 점검:
+1. `cleanupStuck` — 30분+ stuck RUNNING 워크플로우 + step FAILED 처리
+2. `fixPipelineSteps` — `pipelineSteps.transform=false` 자동 보정 (수집→변환 진행 가능)
+3. `reregisterCron` — `updateScheduler(userId)` 메모리 cron 재등록
+4. `seedPolicies` (옵션) — 6 도매방 v4 정책 일괄 갱신
+5. `fixShippingType` (옵션) — 모순 Product (INCLUDED+fee>0) → SEPARATE 정정
+6. **나은 도매방 자가 진단**: 정책 "배송비:" 별도 여부, 채널별 Product 통계,
+   모순 카운트, diagnosis 한 줄 요약
+
+### 즉시 중단 + 재등록
+
+`POST /api/admin/automation/stop-all body={"disable":false}` — 진행 중 모든 자동화/발행 즉시 중단:
+- RUNNING workflow_log + step_log 모두 FAILED 처리 (executor 가 다음 단계 진입 시 종료)
+- 메모리 cron unregister → 다음 일정 발화 차단
+- `disable:true` 시 `AutomationConfig.isEnabled=false` 까지 영구 비활성화
+- 한계: 클라이언트 setTimeout(N분 후 예약발행)은 브라우저 타이머라 서버에서 못 멈춤
+
+`POST /api/admin/automation/diagnose body={"action":"reregister"}` — 메모리에 cron 만 재등록.
+다음 일정에 자동 실행. 트리거(즉시 실행) 액션은 사용자 요청에 따라 비활성.
 
 ### 스케줄러 자체 (`modules/automation/scheduler.ts`)
 
 - node-cron v4 + timezone `Asia/Seoul` 하드코딩
 - `initializeScheduler` 명시적 select 로 스키마 드리프트 방어 (24c628c)
 - 시작 시 상세 로깅: `[Scheduler] ✓ user=X cron="0 10 * * *" 등록 완료` / 실패 시 원인 표시
+- 멈췄을 때 흔한 원인: `pipelineSteps.transform=false`, 컨테이너 재시작 중 cron 시각 누락,
+  stuck workflow 가 lock 잡고 있음, AI config 누락. 위 repair API 가 모두 자동 처리.
+
+### 밴드 게시글 삭제 진행 상태
+
+`GET /api/admin/band-deletion/status` — `ProductManagerAgent.runContentExpiry` (매일 03:00 KST) 의
+실행 상태 조회. 최근 7일 KPI(content_expiry_band_deleted/channel_deleted/shop_deleted),
+recentTasks (status/error/duration), recentLogs(이전글/expiry/삭제 키워드 50건),
+softDeletedChannelProducts 7d/1h 카운트.
+
+## Admin 운영 도구 모음 (요약)
+
+| 엔드포인트 | 용도 |
+|---|---|
+| `GET /api/admin/automation/diagnose` | cron + 워크플로우 + 발행 카운트 진단 |
+| `POST /api/admin/automation/diagnose {action:"reregister"}` | 메모리 cron 재등록 |
+| `POST /api/admin/automation/repair` | 1회 호출 일괄 복구 (stuck/pipelineSteps/cron + 나은 점검) |
+| `POST /api/admin/automation/stop-all` | 모든 진행 작업 즉시 중단 |
+| `GET /api/admin/band-deletion/status` | 밴드 게시글 자동 삭제 진행 상태 |
+| `POST /api/admin/products/fix-shipping-type` | 모순 Product (INCLUDED+fee>0) → SEPARATE 일괄 정정 |
+| `POST /api/admin/policies/seed-from-checklist` | v4 체크리스트 기반 6 도매방 정책 일괄 시드 |
 
 ## 카테고리 자동 분류 (Phase 1)
 
@@ -566,6 +614,76 @@ postArea 셀렉터 **좁은 것부터 폴백**: `.dPostBody → .postBody → �
 `/sourcing/post/list` 의 검색창 옆에 📅 시작~종료 date input + 초기화 버튼.
 KST 기준, "YYYY-MM-DD" 형식. `/api/post?startDate=...&endDate=...` 쿼리 추가.
 `PostListParams.startDate/endDate` 추가. 시간 없는 입력은 종료일 자정까지 자동 포함.
+
+## 쇼핑몰 상품 관리 (카테고리 통합)
+
+`/shop/products/list` — 카테고리 + 쇼핑몰 발행 통합 관리 페이지. 옛 `/shop/category/list`
+는 동일 페이지에서 카테고리 탭으로 통합 (메뉴는 "상품 관리" 하나).
+
+| 영역 | 기능 |
+|---|---|
+| 카테고리 탭 | 전체 + SEA/AGR/MEA/MKT/PRC/HLT/ETC 7종, 각 탭에 카운트 |
+| 쇼핑몰 필터 | 전체 / 특정 쇼핑몰 |
+| 검색 | 이름/설명 |
+| 페이지 사이즈 | 20 / 50 / 100 |
+| 페이지네이션 | 클라이언트 측 (서버는 limit 2000 한 번에 fetch 후 분할) |
+| 행 액션 | ✏️ 편집 (`/sourcing/product/detail/[id]`) / 🔗 쇼핑몰에서 보기 / 🗑️ 쇼핑몰 제거 |
+| 일괄 액션 | 다중선택 → 일괄 쇼핑몰 제거 |
+| 가격 표시 | 도매원가 / 마진조정가 / 배송비 / 판매가 (4열 — calculateSellingPrice 일관 계산) |
+
+**삭제는 ShopProduct 만 soft-delete** — Product 자체와 다른 쇼핑몰/소매밴드 발행은 영향 없음.
+미발행 상품은 "제거" 버튼이 자동 disabled.
+
+## AI 가공 — 다중 선택 패턴 (N종선택)
+
+`prompt-templates.ts` "## 3. 옵션 및 가격 추출" 섹션에 도매처 게시글의
+"2종선택" / "N종 세트" / "N종 묶음" / "N종 혼합" 패턴 처리 규칙 명시 (`ac99ce9`):
+
+- variants 는 종류가 아닌 **묶음 수량 단위**로 등록 (650g 1봉 / 650g 2종 세트 / 3종 세트 등)
+- description 마지막에 "📝 비고/요청사항" 섹션 + "종류 선택: 주문 후 댓글로
+  원하시는 종류를 알려주세요." 한 줄 필수 포함
+- 가능하면 종류 후보 목록도 한 줄 요약 (예: "650g: 흰쌀/찐쌀/보리/오란다/강냉이 中 N가지")
+
+이유: variants 는 고정 옵션 조합만 지원 → 자유 다중 선택 불가. 6C2=15개, 6C3=20개
+조합 펼치면 비현실적 → 묶음 수량 + 댓글로 종류 받기 패턴이 가장 실용적.
+
+## SaaS Phase 0 기반 (BandAuto SaaS 종합계획서)
+
+20주 로드맵 중 **Phase 0 비파괴적 기반만 구현** (UI 재설계 등 Phase 1~3 은
+디자이너 검토 후 Claude Code 별도 세션에서 진행). 종합 트래킹: `docs/SAAS_ROADMAP.md`.
+
+### DB 스키마 (`db/prisma/models/subscription.prisma`)
+
+- `SubscriptionPlan` — slug/name/priceMonthly/features(JSON)/limits(JSON)
+- `UserSubscription` — userId 유니크, status enum (ACTIVE/PAST_DUE/CANCELLED/EXPIRED/TRIALING)
+- `UsageLog` — (userId, date) 유니크, 일별 카운터 (aiCalls/collections/publishes/apiCalls)
+- User 모델에 subscription / usageLogs 백릴레이션 추가
+- **db push 필요** — 새 테이블 생성 후 사용 가능
+
+### 라이브러리
+
+- `sourcing-app/src/lib/feature-gate.ts`:
+  - `getFeatureGate(userId)` → `PlanInfo` (구독 없으면 `FREE_DEFAULTS` 폴백)
+  - `gate.hasFeature() / isWithinLimit() / getLimit()`
+  - `incrementUsage(userId, field, amount)` — UsageLog 일별 카운터 자동 증가 (upsert)
+  - 모델 미적용 환경 자동 폴백 — 기존 코드 영향 없음
+- `sourcing-app/src/lib/tenant.ts`:
+  - `assertProductOwnedByUser` / `assertChannelOwnedByUser` / `assertShopOwnedByUser`
+  - `assertAllProductsOwnedByUser` (배치)
+  - `withUserScope(where, userId)` — Prisma where 자동 병합 + 덮어쓰기 시도 시 throw
+  - `TenantViolationError` — 명시적 권한 위반 에러
+
+### 요금제 정의 (계획서 1.4)
+
+| 플랜 | 월 요금 | 채널 | AI 가공/월 | 자동발행 | 다중쇼핑몰 |
+|---|---|---|---|---|---|
+| Free | ₩0 | 1 | 50 | ❌ | ❌ |
+| Starter | ₩29,000 | 3 | 500 | 스케줄 | ❌ |
+| Pro | ₩79,000 | 10 | 무제한 | 풀 자동 | ✅ |
+| Enterprise | 협의 | 무제한 | 무제한 | 풀 + API | ✅ + 화이트라벨 |
+
+요금제 시드 endpoint (`POST /api/admin/subscription/seed-plans`) 와 UI 는 **미구현** —
+Phase 0 후속 또는 Claude Code 별도 세션에서 진행.
 
 ## 핵심 원칙
 
