@@ -836,6 +836,8 @@ export default function PostsManagePage() {
             variants,
             shippingFee: draft.shipping?.shippingFee ?? draft.shippingFee ?? null,
             shippingInfo: draft.shipping?.shippingInfo ?? draft.shippingInfo ?? null,
+            // 정책의 "배송비: 별도/포함" 을 명시 전달 → 본문 키워드 누락 시에도 정확히 적용
+            policyShippingType: aiData.policyShippingType ?? null,
             categoryId: draft.categoryId ?? null,
           }),
         })

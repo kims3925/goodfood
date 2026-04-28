@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
       price,
       shippingFee,
       shippingInfo,
+      policyShippingType, // 'separate' | 'included' | undefined
       options,
       variants,
       imageUrls,
@@ -103,6 +104,9 @@ export async function POST(request: NextRequest) {
       price,
       shippingFee,
       shippingInfo,
+      policyShippingType: policyShippingType === 'separate' || policyShippingType === 'included'
+        ? policyShippingType
+        : undefined,
       options,
       variants,
       imageUrls,

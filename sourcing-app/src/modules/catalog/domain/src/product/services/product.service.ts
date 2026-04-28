@@ -28,6 +28,8 @@ export class ProductService {
     let categoryId: string | undefined = data.categoryId ?? undefined
     let wholesalePrice: number | undefined = data.wholesalePrice ?? undefined
     let price: number | undefined = data.price ?? undefined
+    // 정책 기반 배송비 타입 (호출자가 명시하면 그 값을, 아니면 DB 정책에서 폴백 조회)
+    let policyShippingType: 'separate' | 'included' | undefined = data.policyShippingType ?? undefined
 
     // postId 기반 생성 시 channelId와 이미지 가져오기
     let sourceProductName: string | undefined = undefined
@@ -112,9 +114,35 @@ export class ProductService {
           if (price === undefined && metadata.price !== undefined) {
             price = metadata.price
           }
+
+          // policyShippingType: 자동 파이프라인이 rawMetadata 에 저장한 값 활용
+          if (policyShippingType === undefined && metadata.policyShippingType) {
+            const v = String(metadata.policyShippingType).toLowerCase()
+            if (v === 'separate' || v === 'included') {
+              policyShippingType = v
+            }
+          }
         } catch {
           // rawMetadata 파싱 실패 시 무시 (요청 데이터 그대로 사용)
         }
+      }
+    }
+
+    // policyShippingType 폴백: 채널에 활성 PricingPolicy 가 있으면 그 content 의
+    // "배송비:" 항목을 파싱해 사용. 호출자가 명시하지 않은 경우만 작동.
+    if (policyShippingType === undefined && channelId) {
+      try {
+        const { parsePolicyShippingType } = await import('@/lib/policy-shipping')
+        const prisma = (await import('@bandauto/db')).default
+        const policy = await prisma.pricingPolicy.findFirst({
+          where: { userId: data.userId, channelId, isActive: true },
+          orderBy: { updatedAt: 'desc' },
+          select: { content: true },
+        })
+        const parsed = parsePolicyShippingType(policy?.content)
+        if (parsed) policyShippingType = parsed
+      } catch (e) {
+        // 정책 조회 실패는 무시 — 기존 키워드 추론으로 폴백
       }
     }
 
@@ -131,6 +159,7 @@ export class ProductService {
       categoryId,
       wholesalePrice,
       price,
+      policyShippingType,
       sourceProductName,
       collectedPostId: data.postId,
     })

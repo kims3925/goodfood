@@ -373,6 +373,11 @@ export async function runTransformPipeline(
       const today = new Date()
       today.setHours(0, 0, 0, 0)
 
+      // 정책의 "배송비:" 항목을 rawMetadata 에도 함께 저장 → 추후 productService.create
+      // 시점에 본문 키워드 추론보다 우선 적용됨.
+      const { parsePolicyShippingType } = await import('@/lib/policy-shipping')
+      const batchPolicyShippingType = parsePolicyShippingType(batchPolicyContent || null)
+
       const collectedProduct = await prisma.$transaction(async (tx) => {
         // CollectedProduct 생성 (CollectedProductService 사용 - 수동과 동일한 로직)
         const created = await collectedProductService.create({
@@ -397,6 +402,8 @@ export async function runTransformPipeline(
               shippingInfo: draft.shippingInfo ?? null,
               bundleMaxQty: draft.bundleMaxQty ?? 1,
             },
+            // 정책 우선 배송 타입 (productService.create 가 활용)
+            policyShippingType: batchPolicyShippingType,
           },
         }, { tx })
 

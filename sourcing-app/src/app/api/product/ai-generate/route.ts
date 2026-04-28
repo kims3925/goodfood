@@ -502,9 +502,15 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // 정책의 "배송비:" 항목을 클라이언트로 함께 전달 → /api/product POST 시 forward.
+    // 이 값은 product.repository.create 에서 본문 키워드 추론보다 우선 적용된다.
+    const { parsePolicyShippingType } = await import('@/lib/policy-shipping')
+    const policyShippingType = parsePolicyShippingType(policyContent || null)
+
     return NextResponse.json({
       success: true,
       draft,
+      policyShippingType, // 'separate' | 'included' | null
     })
   } catch (error: any) {
     console.error('[AI Product Generation] Error:', error)

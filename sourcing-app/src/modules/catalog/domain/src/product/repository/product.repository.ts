@@ -274,6 +274,15 @@ export class ProductRepository {
       bundleShippingType = BundleShippingType.SEPARATE
     }
 
+    // 정책 우선 적용 — 본문 키워드 추론 결과를 덮어씀.
+    // 정책의 "배송비:" 항목은 도매방 운영자가 직접 설정한 값이므로 본문 텍스트보다 신뢰도 높음.
+    // (이전엔 본문에 "배송비 N원" 텍스트 없으면 NONE 으로 잘못 분류 → 발행 시 배송비 미합산)
+    if (data.policyShippingType === 'separate') {
+      bundleShippingType = BundleShippingType.SEPARATE
+    } else if (data.policyShippingType === 'included') {
+      bundleShippingType = BundleShippingType.INCLUDED
+    }
+
     // 상품 생성 (options와 variants 포함)
     const product = await prisma.product.create({
       data: {
