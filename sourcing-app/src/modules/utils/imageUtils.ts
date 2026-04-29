@@ -103,10 +103,16 @@ export async function downloadAndSaveProductImage(imageUrl: string): Promise<{
       buffer = localBuffer
       console.log(`[Product Image] 로컬 게시물 이미지에서 복사: ${postImageFileName}`)
     } else {
-      // 외부 URL에서 이미지 다운로드
-      const response = await fetch(imageUrl)
+      // 외부 URL에서 이미지 다운로드 (Band CDN 등은 referer/UA 없는 hotlink 차단이 잦음)
+      const response = await fetch(imageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+          'Referer': 'https://band.us/',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        },
+      })
       if (!response.ok) {
-        throw new Error(`Failed to download image: ${response.statusText}`)
+        throw new Error(`Failed to download image: HTTP ${response.status} ${response.statusText} (${imageUrl})`)
       }
 
       const arrayBuffer = await response.arrayBuffer()
@@ -289,10 +295,16 @@ export async function downloadAndSavePostImage(imageUrl: string): Promise<{
   isExisting: boolean
 }> {
   try {
-    // 이미지 다운로드
-    const response = await fetch(imageUrl)
+    // 이미지 다운로드 (Band CDN 등은 referer/UA 없는 hotlink 차단이 잦음)
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        'Referer': 'https://band.us/',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      },
+    })
     if (!response.ok) {
-      throw new Error(`Failed to download image: ${response.statusText}`)
+      throw new Error(`Failed to download image: HTTP ${response.status} ${response.statusText} (${imageUrl})`)
     }
 
     const arrayBuffer = await response.arrayBuffer()

@@ -367,23 +367,18 @@ export class PublishService {
           error: '밴드 세션이 없거나 만료되었습니다. 채널 설정에서 밴드 로그인을 해주세요.',
         }
       } else if (imageUrls.length === 0) {
-        // 이미지가 없는 경우 - Band API로 텍스트만 발행
-        if (!apiConfig?.accessToken) {
-          return {
-            success: false,
-            productId,
-            channelId,
-            error: 'Band API 토큰이 설정되지 않았습니다. 설정 > API 연동에서 Band API를 설정해주세요.',
-          }
+        // 이미지가 없으면 발행 차단 — 옛날엔 Band API 텍스트로 폴백 발행했으나,
+        // 그러면 사용자에게는 "이미지 안 붙은 게시글" 사고로 보였음 (자동발행이 4채널 ×
+        // 반복 호출까지 결합되면 더 두드러짐). 이미지 누락은 보통 수집 단계에서
+        // Band CDN fetch가 거부된 결과이므로, 발행을 막아 상위 워크플로우에 가시화한다.
+        const errorMessage = '발행할 이미지가 없습니다 (Product 의 ProductImage 가 0건). 게시물을 다시 수집하거나 수동으로 이미지를 첨부 후 재발행해주세요.'
+        console.error(`[PublishService] product ${productId}: ${errorMessage}`)
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: errorMessage,
         }
-
-        const bandClient = new NaverBandClient(apiConfig.accessToken)
-        const result = await bandClient.createPost(channel.channelKey, postContent, {
-          doPush: false, // 푸시 알림 비활성화
-        })
-        postKey = result.postKey
-        publishMethod = 'api'
-        console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
       }
 
       // 7. ChannelProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원, postKey 저장)
@@ -1079,43 +1074,24 @@ export class PublishService {
           error: errorMessage,
         }
       } else if (imageUrls.length === 0) {
-        // 이미지가 없는 경우 - Band API로 텍스트만 발행
-        if (!apiConfig?.accessToken) {
-          if (onStageProgress) {
-            await onStageProgress({
-              productId,
-              productName: product.name,
-              stage: 'failed',
-              stageLabel: '실패',
-              error: 'Band API 토큰이 설정되지 않았습니다.',
-            })
-          }
-          return {
-            success: false,
-            productId,
-            channelId,
-            error: 'Band API 토큰이 설정되지 않았습니다. 설정 > API 연동에서 Band API를 설정해주세요.',
-          }
-        }
-
-        // API 발행 진행 상태 알림
+        // 이미지 0개면 발행 차단 (publishToChannel 과 동일 정책 — 텍스트만 발행되는 사고 방지)
+        const errorMessage = '발행할 이미지가 없습니다 (Product 의 ProductImage 가 0건). 게시물을 다시 수집하거나 수동으로 이미지를 첨부 후 재발행해주세요.'
+        console.error(`[PublishService] product ${productId}: ${errorMessage}`)
         if (onStageProgress) {
           await onStageProgress({
             productId,
             productName: product.name,
-            stage: 'submitting',
-            stageLabel: '게시물 등록 중 (API)',
-            publishMethod: 'api',
+            stage: 'failed',
+            stageLabel: '실패',
+            error: errorMessage,
           })
         }
-
-        const bandClient = new NaverBandClient(apiConfig.accessToken)
-        const result = await bandClient.createPost(channel.channelKey, postContent, {
-          doPush: false,
-        })
-        postKey = result.postKey
-        publishMethod = 'api'
-        console.log(`[PublishService] Band API 발행 성공: ${postKey} (텍스트만, 이미지 없음)`)
+        return {
+          success: false,
+          productId,
+          channelId,
+          error: errorMessage,
+        }
       }
 
       // 7. ChannelProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원, postKey 저장)
