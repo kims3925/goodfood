@@ -98,18 +98,21 @@ export async function register() {
 
     // ── 이전글 자동 정리: 매일 03:00 KST (cron timezone은 Asia/Seoul) ──
     // 일반 카테고리 7일 초과, COM(상시상품) 30일 초과 발행분의 ChannelProduct/
-    // ShopProduct를 소프트 삭제. 사용자 명시 요청 "에이전트를 동원해서 모두 시행".
-    // 실제 Band 게시글 삭제는 emit된 band.post.delete.requested 이벤트의 listener가
-    // 추후 처리 (Phase 2). DB 정리만 우선.
+    // ShopProduct를 소프트 삭제 + Band 페이지에서 Playwright 로 실 삭제.
+    //
+    // limit=500: 한 번 cron 발화 당 최대 500건 처리. 옛 default(100)는
+    // 운영 백로그 5,847건(2026-04-29 기준) 정리에 58일 걸리는 페이스라 너무 느림.
+    // Playwright 1건당 ~10-15초 = 500건 약 1.5~2시간 (cron 다음 발화 06:00 까지
+    // 충분히 종료). 12~14일 안에 백로그 해소.
     scheduler.register(
       `${productManagerAgent.name}:content-expiry`,
       '0 3 * * *',
       async () => {
         try {
-          console.log('[Instrumentation] 이전글 정리 시작 (dryRun=false)')
-          const summary = await productManagerAgent.runContentExpiry({ dryRun: false })
+          console.log('[Instrumentation] 이전글 정리 시작 (dryRun=false, limit=500)')
+          const summary = await productManagerAgent.runContentExpiry({ dryRun: false, limit: 500 })
           console.log(
-            `[Instrumentation] 이전글 정리 완료: 채널 ${summary.channelProducts.softDeleted}/${summary.channelProducts.found}, 쇼핑몰 ${summary.shopProducts.softDeleted}/${summary.shopProducts.found}, 오류 ${summary.errors.length}`
+            `[Instrumentation] 이전글 정리 완료: 채널 ${summary.channelProducts.softDeleted}/${summary.channelProducts.found}, 쇼핑몰 ${summary.shopProducts.softDeleted}/${summary.shopProducts.found}, Band 실삭제 ${summary.bandPosts.deleted}/${summary.bandPosts.attempted}, 오류 ${summary.errors.length}`
           )
         } catch (err) {
           console.error('[Instrumentation] 이전글 정리 실패:', err)
