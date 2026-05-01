@@ -63,14 +63,21 @@ export const sourcingMenuItems: MenuItem[] = [
   { label: '대시보드', href: '/sourcing/dashboard', icon: LayoutDashboard },
   { label: '채널 관리', href: '/sourcing/channel/list', icon: Store },
   {
-    label: '상품및광고',
+    label: '상품',
     icon: Package,
     children: [
-      { label: '소싱작업', href: '/sourcing/post/list', icon: FileText },
-      { label: '가공 상품', href: '/sourcing/product/list', icon: Package },
-      { label: '가공상품 발행', href: '/sourcing/publish', icon: Upload },
-      { label: '종합 발행', href: '/sourcing/publish/digest', icon: LayoutList },
-      { label: '광고', href: '/sourcing/publish/ad', icon: Megaphone },
+      { label: '상품소싱', href: '/sourcing/post/list', icon: FileText },
+      { label: '가공상품', href: '/sourcing/product/list', icon: Package },
+      { label: '발행', href: '/sourcing/publish', icon: Upload },
+    ],
+  },
+  {
+    label: '광고',
+    icon: Megaphone,
+    children: [
+      { label: '종합발행', href: '/sourcing/publish/digest', icon: LayoutList },
+      { label: '콜라주', href: '/sourcing/publish/ad/collage', icon: LayoutGrid },
+      { label: '카톡광고', href: '/sourcing/publish/ad/kakao', icon: MessageSquare },
     ],
   },
   {
@@ -209,15 +216,20 @@ export function getDefaultPathBySection(section: AppSection): string {
 }
 
 // 경로 → 메뉴 라벨 매핑 (메뉴 자동 확장용)
+// ⚠️ 순서 중요: startsWith 첫 매치 사용 — 더 긴 경로를 위에 배치
 export const sourcingPathToMenuMap: Record<string, string> = {
   '/sourcing/dashboard': '대시보드',
   '/pipeline': '대시보드',
   '/sourcing/channel': '채널 관리',
   '/sourcing/guide': '채널 관리',
-  '/sourcing/post': '소싱',
-  '/sourcing/collected-product': '소싱',
-  '/sourcing/product': '소싱',
-  '/sourcing/publish': '소싱',
+  // 광고 (구체 경로 — /sourcing/publish 보다 먼저)
+  '/sourcing/publish/digest': '광고',
+  '/sourcing/publish/ad': '광고',
+  // 상품
+  '/sourcing/post': '상품',
+  '/sourcing/collected-product': '상품',
+  '/sourcing/product': '상품',
+  '/sourcing/publish': '상품',
   '/sourcing/automation': '자동화',
   '/sourcing/notification': '설정',
   '/sourcing/settings': '설정',
