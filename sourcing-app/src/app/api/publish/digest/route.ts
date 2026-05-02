@@ -275,52 +275,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '발행할 소매밴드(channelId)를 지정하세요.' }, { status: 400 })
     }
 
-    // 상품 조회 (선택 순서 유지)
-    const fetched = await prisma.product.findMany({
-      where: { id: { in: productIds }, userId: user.userId, deletedAt: null },
-      include: {
-        images: { orderBy: { sortOrder: 'asc' } },
-        variants: { where: { deletedAt: null } },
-        channel: { select: { orderDeadline: true } },
-        shopProducts: {
-          where: { deletedAt: null },
-          include: { shop: { select: { id: true, subdomain: true } } },
-        },
-      },
-    })
-    const productMap = new Map(fetched.map((p) => [p.id, p]))
-    const orderedProducts = productIds.map((id) => productMap.get(id)).filter(Boolean) as typeof fetched
-
-    const shopDomain = process.env.NEXT_PUBLIC_SHOP_DOMAIN || 'shop.abcpharm.net'
-    const digestProducts: DigestProduct[] = orderedProducts.map((p) => {
-      const firstShopProduct = p.shopProducts[0]
-      const subdomain = firstShopProduct?.shop?.subdomain
-      const shopProductUrl = subdomain
-        ? `https://${shopDomain}/${subdomain}/product/${p.id}`
-        : undefined
-      return {
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        variants: p.variants.map((v) => ({ optionSummary: v.optionSummary || '', price: v.price })),
-        images: p.images.map((img) => ({ url: img.url, sortOrder: img.sortOrder })),
-        shopProductUrl,
-        deadline: p.channel?.orderDeadline || undefined,
-      }
-    })
-
-    const digest = buildDigest({
-      category: categoryId,
-      products: digestProducts,
-      date: date ? new Date(date) : undefined,
-      headerText,
-      footerText,
-      maxImagesPerProduct: typeof maxImagesPerProduct === 'number' ? maxImagesPerProduct : 1,
-    })
-
-    // 채널 조회 (단일) — 콜라주 본문에 들어가는 쇼핑몰 링크는 채널에 매핑된
-    // 쇼핑몰 subdomain을 우선 사용해서 "밴드별로 다른 URL"을 보내게 한다.
+    // 채널 조회 (단일) — 발행할 소매밴드에 매핑된 쇼핑몰을 먼저 확인.
+    // 같은 발행 요청이라도 밴드별로 자신의 쇼핑몰 URL이 본문/카드에 들어가야 한다.
+    // (옛 버그: shopProducts[0] 사용 → 모든 밴드가 동일한 첫 ShopProduct 의 shop 으로
+    //  연결되어, 자산어보 등 한 곳으로 몰리는 사고 발생. 2026-05-02 fix)
     const channel = await prisma.channel.findFirst({
       where: {
         id: channelId,
@@ -332,6 +290,7 @@ export async function POST(request: NextRequest) {
         id: true,
         name: true,
         channelKey: true,
+        shopId: true,
         shop: { select: { id: true, subdomain: true, name: true } },
       },
     })
@@ -349,6 +308,59 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // 상품 조회 (선택 순서 유지)
+    const fetched = await prisma.product.findMany({
+      where: { id: { in: productIds }, userId: user.userId, deletedAt: null },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        variants: { where: { deletedAt: null } },
+        channel: { select: { orderDeadline: true } },
+        shopProducts: {
+          where: { deletedAt: null },
+          include: { shop: { select: { id: true, subdomain: true } } },
+        },
+      },
+    })
+    const productMap = new Map(fetched.map((p) => [p.id, p]))
+    const orderedProducts = productIds.map((id) => productMap.get(id)).filter(Boolean) as typeof fetched
+
+    const shopDomain = process.env.NEXT_PUBLIC_SHOP_DOMAIN || 'shop.abcpharm.net'
+
+    // 상품의 쇼핑몰 URL 결정 헬퍼 — 발행 채널(밴드)의 매핑 쇼핑몰을 1순위로 사용.
+    // 1) 채널이 어떤 shop 에 연결되어 있고 그 shop 에 이 상품이 발행돼 있으면 → 그 shop 사용
+    // 2) 채널 매핑 shop 에 상품이 없으면 → 채널 매핑 shop subdomain 으로라도 URL 생성
+    //    (상품 페이지가 없을 수 있으나, 적어도 다른 쇼핑몰로 잘못 보내지는 않음)
+    // 3) 채널에 shop 매핑이 아예 없으면 → 상품의 첫 ShopProduct fallback (옛 동작)
+    const resolveProductShopUrl = (p: typeof orderedProducts[number]): string | undefined => {
+      // 1+2: 채널의 shop subdomain 이 있으면 무조건 그것을 사용
+      if (channel.shop?.subdomain) {
+        return `https://${shopDomain}/${channel.shop.subdomain}/product/${p.id}`
+      }
+      // 3: fallback (채널 매핑 없음)
+      const firstSub = p.shopProducts[0]?.shop?.subdomain
+      return firstSub ? `https://${shopDomain}/${firstSub}/product/${p.id}` : undefined
+    }
+
+    const digestProducts: DigestProduct[] = orderedProducts.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      price: p.price,
+      variants: p.variants.map((v) => ({ optionSummary: v.optionSummary || '', price: v.price })),
+      images: p.images.map((img) => ({ url: img.url, sortOrder: img.sortOrder })),
+      shopProductUrl: resolveProductShopUrl(p),
+      deadline: p.channel?.orderDeadline || undefined,
+    }))
+
+    const digest = buildDigest({
+      category: categoryId,
+      products: digestProducts,
+      date: date ? new Date(date) : undefined,
+      headerText,
+      footerText,
+      maxImagesPerProduct: typeof maxImagesPerProduct === 'number' ? maxImagesPerProduct : 1,
+    })
 
     // ────────────────────────────────────────────────────────────
     // 🖼️ 콜라주 모드 — N×M 포스터 1장 + 카테고리 링크 본문
@@ -411,10 +423,11 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // 쇼핑몰 링크 — 채널(밴드)에 매핑된 shop을 우선, 미매핑 시 첫 상품 shop으로 폴백
-      const channelSubdomain = channel.shop?.subdomain
-      const fallbackSubdomain = orderedProducts[0]?.shopProducts[0]?.shop?.subdomain
-      const subdomain = channelSubdomain || fallbackSubdomain
+      // 쇼핑몰 링크 — 채널(밴드)에 매핑된 shop 만 사용. 매핑 없으면 URL 미렌더.
+      // (옛 폴백 orderedProducts[0]?.shopProducts[0]?.shop?.subdomain 은 상품의
+      //  첫 ShopProduct 가 비결정적이라 모든 밴드가 같은 쇼핑몰로 몰리는 사고 원인.
+      //  채널 매핑이 없는 경우는 사용자 설정 누락으로 보고 URL 자체를 생략한다.)
+      const subdomain = channel.shop?.subdomain
 
       const linkMode = collageOptions?.shopLinkMode || 'auto'
       const userCategoryCodes =
@@ -528,11 +541,10 @@ export async function POST(request: NextRequest) {
 
     // ── 상품별 "사진(최대 4장 2×2 그리드) + 번호/제목/가격/마감/주문링크" 카드를
     //    PNG 1장으로 렌더링하고, Band에 20장까지 첨부. 본문 텍스트는 카드 밑에 첨부.
+    // orderUrl 은 위에서 정의한 resolveProductShopUrl(채널 매핑 shop 우선) 사용 —
+    // shopProducts[0] 비결정 ordering 으로 자산어보 등 한 쇼핑몰로 몰리던 사고 fix.
     const cardProducts: DigestCardProduct[] = orderedProducts.slice(0, 20).map((p) => {
-      const firstShop = p.shopProducts[0]
-      const orderUrl = firstShop?.shop?.subdomain
-        ? `https://${shopDomain}/${firstShop.shop.subdomain}/product/${p.id}`
-        : undefined
+      const orderUrl = resolveProductShopUrl(p)
       const variantPrices = p.variants.map((v) => v.price).filter((x) => x > 0)
       let priceText: string | undefined
       if (variantPrices.length > 1) {
