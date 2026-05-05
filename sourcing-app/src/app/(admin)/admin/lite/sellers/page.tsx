@@ -41,6 +41,7 @@ interface SellerRow {
 }
 
 const EMPTY_FORM = {
+  mode: 'lite' as 'lite' | 'lite_band',
   email: '',
   password: '',
   name: '',
@@ -63,6 +64,9 @@ const EMPTY_FORM = {
   publishMinute: 0,
   dailyCount: 20,
   isActive: true,
+  // Lite Band 전용
+  bandChannelKey: '',
+  bandChannelName: '',
 }
 
 export default function AdminLiteSellersPage() {
@@ -101,8 +105,8 @@ export default function AdminLiteSellersPage() {
     const cfg = s.liteAutoPublishConfig
     setEditingId(s.id)
     setForm({
+      ...EMPTY_FORM,
       email: s.email,
-      password: '',
       name: s.name || '',
       phone: s.phone || '',
       shopName: shop?.name || '',
@@ -111,14 +115,7 @@ export default function AdminLiteSellersPage() {
       managerName: shop?.managerName || '',
       managerPhone: shop?.managerPhone || '',
       managerEmail: shop?.managerEmail || '',
-      contactPhone: '',
-      contactEmail: '',
-      businessNumber: '',
-      bankName: '',
-      bankAccount: '',
-      accountHolder: '',
       adminLoginId: shop?.adminLoginId || '',
-      adminLoginPassword: '',
       publishHour: cfg?.publishHour ?? 10,
       publishMinute: cfg?.publishMinute ?? 0,
       dailyCount: cfg?.dailyCount ?? 20,
@@ -351,6 +348,25 @@ function SellerFormModal({
             </div>
           )}
 
+          {!editing && (
+            <Section title="🎯 트랙 선택">
+              <div className="md:col-span-2 grid grid-cols-2 gap-3">
+                <ModeRadio
+                  active={form.mode === 'lite'}
+                  onClick={() => set('mode', 'lite')}
+                  title="✨ Lite (쇼핑몰만)"
+                  desc="어드민이 매일 가공 상품을 자동 등록합니다. 셀러는 받기만."
+                />
+                <ModeRadio
+                  active={form.mode === 'lite_band'}
+                  onClick={() => set('mode', 'lite_band')}
+                  title="📡 Lite Band"
+                  desc="이미 운영중인 Band가 있는 셀러용. 쇼핑몰 + 본인 Band 자동 발행."
+                />
+              </div>
+            </Section>
+          )}
+
           <Section title="🔐 로그인 계정 (라이트 셀러)">
             <Field label="이메일 *" disabled={editing}>
               <input
@@ -502,6 +518,32 @@ function SellerFormModal({
             </Field>
           </Section>
 
+          {!editing && form.mode === 'lite_band' && (
+            <Section title="📡 본인 Band 채널 (Lite Band 전용)">
+              <Field label="Band 키 (band_key) *">
+                <input
+                  type="text"
+                  value={form.bandChannelKey}
+                  onChange={(e) => set('bandChannelKey', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                  placeholder="예: 87654321"
+                />
+              </Field>
+              <Field label="Band 이름 *">
+                <input
+                  type="text"
+                  value={form.bandChannelName}
+                  onChange={(e) => set('bandChannelName', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                  placeholder="예: 우리 동네 마트"
+                />
+              </Field>
+              <div className="md:col-span-2 text-xs text-gray-600 bg-yellow-50 p-3 rounded border border-yellow-200">
+                ⚠️ Band 세션 쿠키는 셀러가 직접 등록해야 합니다. 발급 후 셀러가 /lite/channel 에서 본인 계정으로 로그인하여 쿠키를 저장합니다.
+              </div>
+            </Section>
+          )}
+
           <Section title="⚡ 자동 발행 설정 (가공상품 풀에서 매일 자동 등록)">
             <Field label="발행 시각 (KST 시:분)">
               <div className="flex items-center gap-2">
@@ -591,5 +633,32 @@ function Field({
       <span className="block mb-1">{label}</span>
       {children}
     </label>
+  )
+}
+
+function ModeRadio({
+  active,
+  onClick,
+  title,
+  desc,
+}: {
+  active: boolean
+  onClick: () => void
+  title: string
+  desc: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-left p-3 rounded-lg border-2 transition-colors ${
+        active
+          ? 'border-blue-500 bg-blue-50'
+          : 'border-gray-200 bg-white hover:border-blue-200'
+      }`}
+    >
+      <div className="font-semibold text-sm">{title}</div>
+      <div className="text-xs text-gray-600 mt-1">{desc}</div>
+    </button>
   )
 }
