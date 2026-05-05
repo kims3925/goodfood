@@ -99,6 +99,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // SNSAUTO Lite Manager (체험용 7일) — /lite/* 는 모든 인증 사용자 접근 허용
+  // mode='lite' 인 셀러도 사용 가능 (USER role 포함). 정식 매니저 패널과 별개 트리.
+  if (pathname.startsWith('/lite')) {
+    return NextResponse.next()
+  }
+
   // sourcing-app은 ADMIN 또는 MANAGER만 접근 가능
   if (!ALLOWED_ROLES.includes(payload.role)) {
     return NextResponse.redirect(new URL('/forbidden', request.url))

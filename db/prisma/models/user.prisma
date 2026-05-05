@@ -50,10 +50,19 @@ model User {
   subscription       UserSubscription?
   usageLogs          UsageLog[]
 
+  // SNSAUTO Lite Manager (2026-05-05): 체험용 7일 프로그램
+  // mode='lite' 면 마이샵 + 코칭 + 미션 표시, 'pro' 면 풀 매니저 패널
+  mode               String              @default("lite") @db.VarChar(20)
+  liteStartAt        DateTime?           @map("lite_start_at") @db.Timestamp(0)
+  proStartAt         DateTime?           @map("pro_start_at") @db.Timestamp(0)
+  coachingTips       CoachingTip[]       @relation("UserCoachingTips")
+  userMissions       UserMission[]       @relation("UserMissions")
+
   @@index([shopId])
   @@index([email])
   @@index([phone])
   @@index([role])
+  @@index([mode])
   @@map("user")
 }
 
