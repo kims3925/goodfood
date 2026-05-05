@@ -113,6 +113,47 @@ export async function register() {
     // )
     console.log('[Instrumentation] ⚠️ content-expiry cron 비활성화 (2026-05-04 사용자 요청)')
 
+    // ═══════════════════════════════════════════════════════════════
+    // SNSAUTO Lite Manager — 코칭/미션 자동 평가 cron (E4)
+    // ───────────────────────────────────────────────────────────────
+    // 매시간 정각 (KST) 모든 mode='lite' 사용자에 대해:
+    //   1) 코칭 룰 평가 → CoachingTip 생성 (시간대 룰 등 발화)
+    //   2) 미션 진행도 재평가 → 신규 완료 시 SSE 알림
+    // 단일 노드 가정. 수가 늘어나면 worker queue 로 분리.
+    // ═══════════════════════════════════════════════════════════════
+    try {
+      const { evaluateAndCreateTips } = await import('@/modules/lite-manager/coaching-engine')
+      const { evaluateUserMissions } = await import('@/modules/lite-manager/mission.service')
+
+      scheduler.register('lite:coaching+mission', '0 * * * *', async () => {
+        try {
+          const liteUsers = await prisma.user.findMany({
+            where: { mode: 'lite', deletedAt: null },
+            select: { id: true },
+          })
+          let coachCreated = 0
+          let missionsCompleted = 0
+          for (const u of liteUsers) {
+            try {
+              coachCreated += await evaluateAndCreateTips(u.id)
+              const r = await evaluateUserMissions(u.id)
+              missionsCompleted += r.newlyCompleted.length
+            } catch (err) {
+              console.error(`[lite:cron] user ${u.id} 평가 실패`, (err as Error).message)
+            }
+          }
+          console.log(
+            `[lite:cron] ${liteUsers.length}명 평가 — 신규 코칭 팁 ${coachCreated} / 신규 미션 완료 ${missionsCompleted}`
+          )
+        } catch (err) {
+          console.error('[lite:cron] 실패', err)
+        }
+      })
+      console.log('[Instrumentation] ✓ lite:coaching+mission cron 등록 (매 정시)')
+    } catch (err) {
+      console.error('[Instrumentation] lite cron 등록 실패', err)
+    }
+
     scheduler.startAll()
     console.log(`[Instrumentation] AgentScheduler 시작 완료: ${scheduler.size}개 cron 등록`)
 

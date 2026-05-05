@@ -12,6 +12,8 @@ const NAV = [
   { href: '/lite/orders', label: '🔔 주문', desc: '실시간 알림 + 발주' },
   { href: '/lite/missions', label: '🎯 미션', desc: '판매 미션 + 배지' },
   { href: '/lite/report', label: '📊 리포트', desc: '수익 카드 공유' },
+  { href: '/lite/rankings', label: '🏆 랭킹', desc: '셀러들과 비교' },
+  { href: '/lite/upgrade', label: '⚡ Pro 전환', desc: '7일 무료 체험' },
 ]
 
 export default function LiteLayout({ children }: { children: ReactNode }) {
