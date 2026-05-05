@@ -60,6 +60,10 @@ model User {
   coachingTips       CoachingTip[]       @relation("UserCoachingTips")
   userMissions       UserMission[]       @relation("UserMissions")
 
+  // SNSAUTO Lite Manager v2 (2026-05-05): 어드민 자동 발행 설정/이력
+  liteAutoPublishConfig LiteAutoPublishConfig? @relation("UserLiteAutoPublishConfig")
+  liteAutoPublishLogs   LiteAutoPublishLog[]   @relation("UserLiteAutoPublishLogs")
+
   @@index([shopId])
   @@index([email])
   @@index([phone])

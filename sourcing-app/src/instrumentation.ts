@@ -154,6 +154,34 @@ export async function register() {
       console.error('[Instrumentation] lite cron 등록 실패', err)
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Lite Manager v2 — 어드민 자동 발행 cron (매분 tick)
+    // ───────────────────────────────────────────────────────────────
+    // 매분 LiteAutoPublishConfig 활성 셀러 점검:
+    //   - publishHour:publishMinute 도달 + 오늘 미실행 → 자동 발행 실행
+    //   - 기본값 매일 10:00, dailyCount=20개
+    // ═══════════════════════════════════════════════════════════════
+    try {
+      const { runAllDueAutoPublish } = await import('@/modules/lite-manager/auto-publish.service')
+      scheduler.register('lite:auto-publish', '* * * * *', async () => {
+        try {
+          const results = await runAllDueAutoPublish()
+          const fired = results.filter((r) => r.status === 'SUCCESS' || r.status === 'PARTIAL')
+          if (fired.length > 0) {
+            console.log(
+              `[lite:auto-publish] ${fired.length}명 발행 완료 ` +
+                fired.map((r) => `user=${r.userId} count=${r.count}`).join(' / ')
+            )
+          }
+        } catch (err) {
+          console.error('[lite:auto-publish] 실행 실패', err)
+        }
+      })
+      console.log('[Instrumentation] ✓ lite:auto-publish cron 등록 (매분 tick)')
+    } catch (err) {
+      console.error('[Instrumentation] lite:auto-publish cron 등록 실패', err)
+    }
+
     scheduler.startAll()
     console.log(`[Instrumentation] AgentScheduler 시작 완료: ${scheduler.size}개 cron 등록`)
 
