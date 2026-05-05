@@ -11,6 +11,12 @@ model Shop {
   contactEmail   String?        @map("contact_email") @db.VarChar(255)
   ownerName      String?        @map("owner_name") @db.VarChar(100)
   businessNumber String?        @map("business_number") @db.VarChar(20)
+  // SNSAUTO Lite Manager v2 (2026-05-05): 어드민이 라이트 셀러용으로 생성 시 채움
+  managerName        String?    @map("manager_name") @db.VarChar(100)
+  managerPhone       String?    @map("manager_phone") @db.VarChar(20)
+  managerEmail       String?    @map("manager_email") @db.VarChar(255)
+  adminLoginId       String?    @map("admin_login_id") @db.VarChar(50)         // 라이트 셀러 구분용 보안 ID
+  adminLoginPassword String?    @map("admin_login_password") @db.VarChar(255)  // bcrypt 해시
   isActive       Boolean        @default(true) @map("is_active")
   deletedAt      DateTime?      @map("deleted_at") @db.Timestamp(0)
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamp(0)

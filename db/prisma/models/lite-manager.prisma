@@ -84,3 +84,43 @@ model UserMission {
   @@index([missionId])
   @@map("user_mission")
 }
+
+// ─────────────────────────────────────────────────────────────
+// LiteAutoPublishConfig — 라이트 셀러별 일일 자동 발행 설정 (어드민 관리)
+// 매일 publishHour:publishMinute (KST) 에 dailyCount 개 가공 상품 자동 등록
+// ─────────────────────────────────────────────────────────────
+model LiteAutoPublishConfig {
+  userId        Int       @id @map("user_id")
+  publishHour   Int       @default(10) @map("publish_hour")    // KST 0-23
+  publishMinute Int       @default(0)  @map("publish_minute")  // 0-59
+  dailyCount    Int       @default(20) @map("daily_count")
+  isActive      Boolean   @default(true) @map("is_active")
+  lastRunAt     DateTime? @map("last_run_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  user          User      @relation("UserLiteAutoPublishConfig", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([isActive, publishHour, publishMinute])
+  @@map("lite_auto_publish_config")
+}
+
+// ─────────────────────────────────────────────────────────────
+// LiteAutoPublishLog — 자동 발행 실행 이력
+// ─────────────────────────────────────────────────────────────
+model LiteAutoPublishLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  shopId      Int      @map("shop_id")
+  publishedAt DateTime @default(now()) @map("published_at")
+  productIds  Json     @map("product_ids")   // [1, 2, 3, ...]
+  count       Int
+  status      String   @db.VarChar(20)        // "SUCCESS" | "PARTIAL" | "FAILED"
+  errorMessage String?  @map("error_message") @db.Text
+
+  user        User     @relation("UserLiteAutoPublishLogs", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, publishedAt])
+  @@index([status])
+  @@map("lite_auto_publish_log")
+}

@@ -121,6 +121,7 @@ export const shopMenuItems: MenuItem[] = [
     icon: ClipboardList,
     children: [
       { label: '주문 목록', href: '/shop/order/list', icon: ClipboardList },
+      { label: '라이트주문', href: '/shop/lite-orders/list', icon: Zap },
       { label: '발주 관리', href: '/shop/wholesale-orders', icon: Truck },
       { label: '정산 목록', href: '/shop/settlement/list', icon: Calculator },
       { label: '정산 이력', href: '/shop/settlement/history', icon: History },
@@ -188,6 +189,15 @@ export const adminMenuItems: MenuItem[] = [
       { label: '서비스 상태', href: '/admin/system/status', icon: Activity },
       { label: '통계/분석', href: '/admin/system/analytics', icon: BarChart3 },
       { label: '시스템 설정', href: '/admin/system/settings', icon: Settings },
+    ],
+  },
+  {
+    label: '라이트 운영',
+    icon: Zap,
+    children: [
+      { label: '라이트 셀러', href: '/admin/lite/sellers', icon: Users },
+      { label: '자동 발행 설정', href: '/admin/lite/auto-publish', icon: Cog },
+      { label: '광고카드 발행', href: '/admin/lite/ad-cards', icon: Megaphone },
     ],
   },
 ]
@@ -258,6 +268,7 @@ export const adminPathToMenuMap: Record<string, string> = {
   '/admin/agents': '에이전트 관리',
   '/admin/users': '사용자 관리',
   '/admin/system': '시스템',
+  '/admin/lite': '라이트 운영',
 }
 
 export function getPathToMenuMap(section: AppSection): Record<string, string> {
