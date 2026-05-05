@@ -25,6 +25,8 @@ interface Order {
   paidAt: string | null
   shippedAt: string | null
   deliveredAt: string | null
+  wholesaleOrderStatus: 'PENDING' | 'ORDERED' | 'CONFIRMED' | null
+  wholesaleOrderedAt: string | null
   shop: { id: number | undefined; name: string | undefined; subdomain: string | undefined }
   items: OrderItem[]
   buyer: { name: string; phone: string; address: string }
@@ -72,6 +74,12 @@ export default function LiteOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [total, setTotal] = useState(0)
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null)
+  const [wholesaleRequestingId, setWholesaleRequestingId] = useState<number | null>(null)
+  const [wholesaleResultModal, setWholesaleResultModal] = useState<{
+    orderId: number
+    dispatchPreview: string
+    note: string
+  } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -235,15 +243,67 @@ export default function LiteOrdersPage() {
                   <span>📞 {order.buyer.phone}</span>
                   {order.buyer.address && <span>📍 {order.buyer.address}</span>}
                   <div className="ml-auto flex items-center gap-2">
-                    {(order.status === 'PAID' || order.status === 'PREPARING') && (
-                      <button
-                        disabled
-                        title="Phase 2 — F6 발주 트리거 활성화 예정"
-                        className="px-3 py-1 bg-gray-100 text-gray-400 rounded text-xs cursor-not-allowed"
-                      >
-                        🛒 발주 요청 (Phase 2)
-                      </button>
-                    )}
+                    {(() => {
+                      const canRequest =
+                        ['PAID', 'PREPARING', 'SHIPPED'].includes(order.status) &&
+                        order.wholesaleOrderStatus !== 'ORDERED' &&
+                        order.wholesaleOrderStatus !== 'CONFIRMED'
+                      const alreadyOrdered =
+                        order.wholesaleOrderStatus === 'ORDERED' ||
+                        order.wholesaleOrderStatus === 'CONFIRMED'
+
+                      if (alreadyOrdered) {
+                        return (
+                          <span className="px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-xs">
+                            ✓ 발주 완료
+                          </span>
+                        )
+                      }
+                      if (!canRequest) return null
+                      const isWorking = wholesaleRequestingId === order.id
+                      return (
+                        <button
+                          disabled={isWorking}
+                          onClick={async () => {
+                            setWholesaleRequestingId(order.id)
+                            try {
+                              const res = await fetch(
+                                `/api/lite/orders/${order.id}/wholesale-request`,
+                                {
+                                  method: 'POST',
+                                  credentials: 'include',
+                                }
+                              )
+                              const data = await res.json()
+                              if (data.success) {
+                                // 카드의 상태를 즉시 업데이트
+                                setOrders((prev) =>
+                                  prev.map((o) =>
+                                    o.id === order.id
+                                      ? { ...o, wholesaleOrderStatus: 'ORDERED', status: data.order.status }
+                                      : o
+                                  )
+                                )
+                                setWholesaleResultModal({
+                                  orderId: order.id,
+                                  dispatchPreview: data.dispatchPreview || '',
+                                  note: data.note || '',
+                                })
+                              } else {
+                                alert(data.error || '발주 요청 실패')
+                              }
+                            } catch (err: any) {
+                              alert(err?.message || '네트워크 오류')
+                            } finally {
+                              setWholesaleRequestingId(null)
+                            }
+                          }}
+                          className="px-3 py-1 bg-orange-50 text-orange-700 border border-orange-200 rounded text-xs hover:bg-orange-100 disabled:opacity-50"
+                        >
+                          {isWorking ? '요청 중...' : '🛒 발주 요청'}
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
               </article>
@@ -253,13 +313,48 @@ export default function LiteOrdersPage() {
       )}
 
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Tip title="🔔 실시간 알림 (Phase 1 곧 활성화)">
-          주문 발생 시 토스트 + 사운드. SSE 인프라(B1) 추가 후 즉시 동작.
+        <Tip title="🔔 실시간 알림">
+          주문 발생 시 토스트 + 사운드. 좌하단 인디케이터가 green 이면 연결됨.
         </Tip>
         <Tip title="🛡️ 개인정보 자동 마스킹">
           이름은 첫글자+**, 연락처는 끝 4자리만, 주소는 시/구까지만 — 셀러도 안전.
         </Tip>
       </div>
+
+      {/* 발주 요청 결과 모달 */}
+      {wholesaleResultModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-2">✅ 발주 요청 완료</h2>
+            <p className="text-sm text-gray-600 mb-3">{wholesaleResultModal.note}</p>
+            <div className="text-xs font-semibold text-gray-700 mb-2">📤 도매처 알림 미리보기</div>
+            <pre className="bg-gray-50 border border-gray-200 rounded p-3 text-xs whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">
+              {wholesaleResultModal.dispatchPreview}
+            </pre>
+            <div className="mt-3 p-3 bg-blue-50 rounded text-xs text-blue-700">
+              💡 Lite 에서는 도매처에 자동으로 알림이 가지 않아요. 위 텍스트를 복사해서 도매방에 직접 전달하세요. (Pro 매니저에서는 자동 fan-out)
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(wholesaleResultModal.dispatchPreview)
+                  } catch {}
+                }}
+                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                📋 복사
+              </button>
+              <button
+                onClick={() => setWholesaleResultModal(null)}
+                className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

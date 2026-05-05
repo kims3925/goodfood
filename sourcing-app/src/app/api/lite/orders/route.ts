@@ -112,6 +112,9 @@ export async function GET(request: NextRequest) {
       paidAt: o.paidAt,
       shippedAt: o.shippedAt,
       deliveredAt: o.deliveredAt,
+      // 발주 상태 (F6) — UI 의 발주 요청 버튼 활성화 결정에 사용
+      wholesaleOrderStatus: o.wholesaleOrderStatus,
+      wholesaleOrderedAt: o.wholesaleOrderedAt,
       shop: {
         id: o.shop?.id,
         name: o.shop?.name,
