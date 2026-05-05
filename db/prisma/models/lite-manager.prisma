@@ -1,0 +1,86 @@
+// SNSAUTO Lite Manager (체험용 7일 프로그램)
+// 기준: snsauto-lite-manager-dev-plan.md v1.0 (2026-05-02)
+// 철학: "편하게 만들지 말고 이해하게 만들어라" — Semi-Auto + 코칭
+
+// ─────────────────────────────────────────────────────────────
+// OrderEvent — 실시간 알림용 주문 이벤트 (F1)
+// ─────────────────────────────────────────────────────────────
+model OrderEvent {
+  id        String   @id @default(cuid())
+  orderId   Int      @map("order_id")
+  type      String   @db.VarChar(50) // "created" | "confirmed" | "shipped" | "done"
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("order_event")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CoachingTip — 행동 유도 가이드 (F4) — 룰 엔진 결과 저장
+// ─────────────────────────────────────────────────────────────
+model CoachingTip {
+  id        String   @id @default(cuid())
+  userId    Int      @map("user_id")
+  ruleKey   String   @map("rule_key") @db.VarChar(100) // "morning_upload" | "hot_product" | "no_review" ...
+  message   String   @db.Text
+  ctaUrl    String?  @map("cta_url") @db.VarChar(500)
+  shown     Boolean  @default(false)
+  shownAt   DateTime? @map("shown_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation("UserCoachingTips", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, shown])
+  @@index([ruleKey])
+  @@index([createdAt])
+  @@map("coaching_tip")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Mission — 미션 정의 (G3 게이미피케이션)
+// ─────────────────────────────────────────────────────────────
+model Mission {
+  id           String   @id @default(cuid())
+  code         String   @unique @db.VarChar(100) // "first_sale" | "3_sales" | "10man_revenue" | ...
+  title        String   @db.VarChar(200)
+  description  String   @db.Text
+  targetValue  Int      @map("target_value") @default(1) // 목표값 (예: 3 sales = 3)
+  rewardType   String   @map("reward_type") @db.VarChar(50) // "badge" | "pro_trial" | "discount"
+  rewardValue  String   @map("reward_value") @db.VarChar(200)
+  sortOrder    Int      @map("sort_order") @default(0)
+  isActive     Boolean  @map("is_active") @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  userMissions UserMission[]
+
+  @@index([code])
+  @@index([isActive, sortOrder])
+  @@map("mission")
+}
+
+// ─────────────────────────────────────────────────────────────
+// UserMission — 사용자별 미션 진행도
+// ─────────────────────────────────────────────────────────────
+model UserMission {
+  userId      Int       @map("user_id")
+  missionId   String    @map("mission_id")
+  progress    Int       @default(0)
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  user        User      @relation("UserMissions", fields: [userId], references: [id], onDelete: Cascade)
+  mission     Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, missionId])
+  @@index([userId, completed])
+  @@index([missionId])
+  @@map("user_mission")
+}

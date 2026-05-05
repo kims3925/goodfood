@@ -27,6 +27,8 @@ model Order {
   payment               Payment?
   shippingAddress       ShippingAddress?
   refundAccount         RefundAccount?
+  // SNSAUTO Lite Manager — 실시간 주문 알림 이벤트
+  events                OrderEvent[]
 
   @@index([userId])
   @@index([shopId])
