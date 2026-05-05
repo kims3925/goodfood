@@ -53,6 +53,14 @@ export default function LiteMyShop() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [selected, setSelected] = useState<Map<number, string>>(new Map()) // productId → reason tag
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadResult, setUploadResult] = useState<{
+    summary: { total: number; success: number; skipped: number; failed: number }
+    shareText: string
+    shopMainUrl: string | null
+    error?: string
+  } | null>(null)
+  const [shareCopied, setShareCopied] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -283,34 +291,180 @@ export default function LiteMyShop() {
         </div>
       )}
 
-      {/* 업로드 모달 (C3 stub) */}
+      {/* 업로드 모달 — C3 실구현 */}
       {uploadOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-2">업로드 (Phase 1 C3 진행 중)</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              {selectedCount}개 상품을 마이샵에 게재 + 카톡/밴드 공유 준비됩니다.
-              실제 발행 흐름은 다음 PR (C3)에서 활성화됩니다.
-            </p>
-            <div className="bg-gray-50 rounded p-3 text-xs space-y-1 mb-4 max-h-40 overflow-y-auto">
-              {Array.from(selected.entries()).map(([pid, reason]) => {
-                const p = products.find((x) => x.id === pid)
-                return (
-                  <div key={pid} className="flex justify-between gap-2">
-                    <span className="truncate">{p?.name}</span>
-                    <span className="text-gray-400 shrink-0">{reason || '(이유 미선택)'}</span>
+            {!uploadResult && (
+              <>
+                <h2 className="text-lg font-bold text-gray-900 mb-2">업로드 확인</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  {selectedCount}개 상품을 마이샵에 게재합니다. 게재 후 카톡/밴드 공유 텍스트가 자동 생성됩니다.
+                </p>
+                <div className="bg-gray-50 rounded p-3 text-xs space-y-1 mb-4 max-h-40 overflow-y-auto">
+                  {Array.from(selected.entries()).map(([pid, reason]) => {
+                    const p = products.find((x) => x.id === pid)
+                    return (
+                      <div key={pid} className="flex justify-between gap-2">
+                        <span className="truncate">{p?.name}</span>
+                        <span className="text-gray-400 shrink-0">{reason || '(이유 미선택)'}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    disabled={uploading}
+                    onClick={() => setUploadOpen(false)}
+                    className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded disabled:opacity-50"
+                  >
+                    취소
+                  </button>
+                  <button
+                    disabled={uploading}
+                    onClick={async () => {
+                      setUploading(true)
+                      try {
+                        const reasons: Record<number, string> = {}
+                        Array.from(selected.entries()).forEach(([pid, r]) => {
+                          if (r) reasons[pid] = r
+                        })
+                        const res = await fetch('/api/lite/products/upload', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            productIds: Array.from(selected.keys()),
+                            reasons,
+                          }),
+                        })
+                        const data = await res.json()
+                        if (data.success) {
+                          setUploadResult({
+                            summary: data.summary,
+                            shareText: data.shareText || '',
+                            shopMainUrl: data.shop?.mainUrl || null,
+                          })
+                          // 게재 완료된 상품은 다시 안 뜨게 fetch 다시
+                          setSelected(new Map())
+                        } else {
+                          setUploadResult({
+                            summary: { total: 0, success: 0, skipped: 0, failed: 0 },
+                            shareText: '',
+                            shopMainUrl: null,
+                            error: data.error || '업로드 실패',
+                          })
+                        }
+                      } catch (err: any) {
+                        setUploadResult({
+                          summary: { total: 0, success: 0, skipped: 0, failed: 0 },
+                          shareText: '',
+                          shopMainUrl: null,
+                          error: err?.message || '네트워크 오류',
+                        })
+                      } finally {
+                        setUploading(false)
+                      }
+                    }}
+                    className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {uploading ? '업로드 중...' : '업로드 + 공유 텍스트 생성'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {uploadResult && uploadResult.error && (
+              <>
+                <h2 className="text-lg font-bold text-red-700 mb-2">업로드 실패</h2>
+                <p className="text-sm text-red-700 mb-4">{uploadResult.error}</p>
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      setUploadResult(null)
+                      setUploadOpen(false)
+                    }}
+                    className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </>
+            )}
+
+            {uploadResult && !uploadResult.error && (
+              <>
+                <h2 className="text-lg font-bold text-gray-900 mb-2">✅ 업로드 완료</h2>
+                <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+                  <div className="bg-green-50 rounded p-2">
+                    <div className="text-xl font-bold text-green-700">{uploadResult.summary.success}</div>
+                    <div className="text-xs text-green-600">신규 게재</div>
                   </div>
-                )
-              })}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setUploadOpen(false)}
-                className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded"
-              >
-                닫기
-              </button>
-            </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="text-xl font-bold text-gray-700">{uploadResult.summary.skipped}</div>
+                    <div className="text-xs text-gray-500">이미 게재</div>
+                  </div>
+                  <div className="bg-red-50 rounded p-2">
+                    <div className="text-xl font-bold text-red-700">{uploadResult.summary.failed}</div>
+                    <div className="text-xs text-red-600">실패</div>
+                  </div>
+                </div>
+
+                {uploadResult.shareText && (
+                  <>
+                    <div className="text-sm font-semibold text-gray-900 mb-2">📤 카톡/밴드 공유 텍스트</div>
+                    <textarea
+                      readOnly
+                      value={uploadResult.shareText}
+                      className="w-full h-48 text-xs p-2 bg-gray-50 border border-gray-200 rounded font-mono"
+                      onFocus={(e) => e.target.select()}
+                    />
+                    <div className="mt-2 flex flex-col gap-2">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(uploadResult.shareText)
+                            setShareCopied(true)
+                            setTimeout(() => setShareCopied(false), 2000)
+                          } catch {}
+                        }}
+                        className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                      >
+                        {shareCopied ? '✓ 복사됨!' : '📋 클립보드 복사'}
+                      </button>
+                      {uploadResult.shopMainUrl && (
+                        <a
+                          href={uploadResult.shopMainUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full px-4 py-2 bg-gray-100 text-gray-800 text-sm rounded text-center hover:bg-gray-200"
+                        >
+                          🛒 마이샵 보기
+                        </a>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                <div className="mt-4 p-3 bg-blue-50 rounded text-xs text-blue-700">
+                  💡 카톡/밴드에 붙여넣어 자연스럽게 공유하세요. 자동 게시는 Lite 에서 지원하지 않아요 — 셀러님의 손이 닿아야 신뢰가 쌓입니다.
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={() => {
+                      setUploadResult(null)
+                      setUploadOpen(false)
+                      // 게재된 상품은 다시 fetch 해서 alreadyListed 반영
+                      setCategoryFilter((c) => c)
+                    }}
+                    className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
