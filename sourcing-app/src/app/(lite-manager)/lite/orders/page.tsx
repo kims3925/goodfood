@@ -108,11 +108,31 @@ export default function LiteOrdersPage() {
 
   return (
     <div>
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">주문</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          실시간 알림으로 새 주문이 들어오는 순간 확인하세요. 발주는 직접 버튼을 눌러 시작합니다.
-        </p>
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">주문</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            실시간 알림으로 새 주문이 들어오는 순간 확인하세요. 발주는 직접 버튼을 눌러 시작합니다.
+          </p>
+        </div>
+        <button
+          onClick={async () => {
+            try {
+              await fetch('/api/lite/events/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ mock: true }),
+              })
+            } catch (err) {
+              console.error('test emit failed', err)
+            }
+          }}
+          className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100"
+          title="가짜 주문 이벤트 emit — 토스트/사운드 검증용"
+        >
+          🔔 알림 테스트
+        </button>
       </header>
 
       <div className="mb-4 flex items-center gap-2 flex-wrap">

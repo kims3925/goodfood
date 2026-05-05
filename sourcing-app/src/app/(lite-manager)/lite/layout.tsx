@@ -4,6 +4,7 @@
  */
 import Link from 'next/link'
 import { ReactNode } from 'react'
+import OrderNotifier from './_components/OrderNotifier'
 
 const NAV = [
   { href: '/lite/dashboard', label: '🏠 대시보드', desc: '오늘 매출 한눈에' },
@@ -55,6 +56,9 @@ export default function LiteLayout({ children }: { children: ReactNode }) {
 
         <main className="flex-1 p-6 max-w-[1400px]">{children}</main>
       </div>
+
+      {/* 실시간 주문 알림 (F1) — 모든 lite 페이지에서 동작 */}
+      <OrderNotifier />
     </div>
   )
 }
