@@ -86,6 +86,8 @@ export async function POST(request: NextRequest) {
     password,
     name,
     phone,
+    // 모드 — 'lite' (기본) 또는 'lite_band'
+    mode: modeRaw,
     // 쇼핑몰
     shopName,
     subdomain,
@@ -107,7 +109,12 @@ export async function POST(request: NextRequest) {
     publishHour,
     publishMinute,
     dailyCount,
+    // Lite Band 전용 — 본인 Band 채널
+    bandChannelKey,
+    bandChannelName,
   } = body || {}
+
+  const mode = modeRaw === 'lite_band' ? 'lite_band' : 'lite'
 
   // 필수 필드 검증
   if (!email || !password || !shopName || !subdomain || !adminLoginId || !adminLoginPassword) {
@@ -159,10 +166,10 @@ export async function POST(request: NextRequest) {
           name: name || null,
           phone: phone || null,
           role: 'USER',
-          mode: 'lite',
+          mode,
           liteStartAt: new Date(),
         },
-        select: { id: true, email: true, name: true, phone: true },
+        select: { id: true, email: true, name: true, phone: true, mode: true },
       })
 
       const shop = await tx.shop.create({
@@ -195,7 +202,22 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      return { user, shop, config }
+      // Lite Band 전용 — 본인 Band 채널 자동 등록 (선택)
+      let channel = null
+      if (mode === 'lite_band' && bandChannelKey && bandChannelName) {
+        channel = await tx.channel.create({
+          data: {
+            userId: user.id,
+            kind: 'RETAIL',
+            platform: 'BAND',
+            channelKey: String(bandChannelKey),
+            name: String(bandChannelName),
+            isActive: true,
+          },
+        })
+      }
+
+      return { user, shop, config, channel }
     })
 
     return NextResponse.json({ success: true, data: created }, { status: 201 })

@@ -178,6 +178,7 @@ export const adminMenuItems: MenuItem[] = [
     label: '사용자 관리',
     icon: UserCog,
     children: [
+      { label: '통합 셀러 관리', href: '/admin/users/sellers', icon: ShoppingBag },
       { label: '전체 사용자', href: '/admin/users/list', icon: Users },
       { label: '역할/권한', href: '/admin/users/roles', icon: Shield },
     ],
