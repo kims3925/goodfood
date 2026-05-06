@@ -90,6 +90,14 @@ export const sourcingMenuItems: MenuItem[] = [
     ],
   },
   {
+    label: 'AI 채팅',
+    icon: MessageSquare,
+    children: [
+      { label: '통합 인박스', href: '/sourcing/inbox', icon: MessageSquare },
+      { label: '자동응답 설정', href: '/sourcing/inbox/settings', icon: Bot },
+    ],
+  },
+  {
     label: '설정',
     icon: Settings,
     children: [
@@ -242,6 +250,7 @@ export const sourcingPathToMenuMap: Record<string, string> = {
   '/sourcing/product': '상품',
   '/sourcing/publish': '상품',
   '/sourcing/automation': '자동화',
+  '/sourcing/inbox': 'AI 채팅',
   '/sourcing/notification': '설정',
   '/sourcing/settings': '설정',
   '/sourcing/user': '설정',

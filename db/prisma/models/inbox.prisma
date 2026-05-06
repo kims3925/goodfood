@@ -1,0 +1,80 @@
+// AI 채팅 자동응답 — 4채널 통합 인박스 (2026-05-06)
+// 작업지시서: AI_채팅_자동응답_시스템_개발계획서.docx
+//
+// 채널: 밴드 댓글 / 밴드 1:1 채팅 / 카카오톡 / SMS
+// 의도 분류 12종 (ORDER, PRICE, STOCK, DELIVERY, PAYMENT, DEPOSIT, RETURN,
+// COMPLAINT, RESTOCK, RECOMMEND, INFO, GENERAL)
+// AI: Claude API (anthropic SDK 또는 fetch)
+
+enum MessageChannel {
+  BAND_COMMENT  // 밴드 포스트 댓글
+  BAND_CHAT     // 밴드 1:1 채팅
+  KAKAO         // 카카오톡 (알림톡 / 채널)
+  SMS           // 문자 메시지
+
+  @@map("message_channel")
+}
+
+enum MessageDirection {
+  INBOUND   // 고객 → 셀러
+  OUTBOUND  // 셀러/AI → 고객
+
+  @@map("message_direction")
+}
+
+model InboxMessage {
+  id            Int               @id @default(autoincrement())
+  userId        Int               @map("user_id")           // 어느 셀러의 메시지인지
+  channel       MessageChannel
+  direction     MessageDirection
+  threadId      String            @map("thread_id") @db.VarChar(255) // 대화 스레드 식별 (채널별 고유)
+  senderId      String            @map("sender_id") @db.VarChar(255) // 밴드닉네임/카카오ID/전화번호
+  senderName    String?           @map("sender_name") @db.VarChar(255)
+  content       String            @db.Text
+  // AI 분석 결과
+  intent        String?           @db.VarChar(50)            // ORDER | PRICE | STOCK | ... | GENERAL
+  confidence    Float?                                       // 0~1
+  aiReply       String?           @map("ai_reply") @db.Text  // AI 생성 응답 (발송 전 검토 가능)
+  isAutoReplied Boolean           @default(false) @map("is_auto_replied")
+  isEscalated   Boolean           @default(false) @map("is_escalated")
+  escalateReason String?          @map("escalate_reason") @db.VarChar(255)
+  isRead        Boolean           @default(false) @map("is_read")
+  // 컨텍스트 연결
+  orderId       Int?              @map("order_id")
+  productId     Int?              @map("product_id")
+  customerId    Int?              @map("customer_id")
+  metadata      Json?
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  repliedAt     DateTime?         @map("replied_at") @db.Timestamp(0)
+
+  user          User              @relation("UserInboxMessages", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, channel, isRead])
+  @@index([userId, isEscalated])
+  @@index([threadId])
+  @@index([senderId])
+  @@index([intent])
+  @@index([createdAt])
+  @@map("inbox_message")
+}
+
+// 의도별 자동응답 활성화/템플릿/지연 등 설정
+model AutoReplyConfig {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  intent         String   @db.VarChar(50)               // ORDER | PRICE | ... | GENERAL
+  isEnabled      Boolean  @default(true) @map("is_enabled")
+  template       String?  @db.Text                       // 고정 템플릿 (있으면 AI 대체)
+  aiPromptHint   String?  @map("ai_prompt_hint") @db.Text // AI 프롬프트 보강 메모
+  escalateAlways Boolean  @default(false) @map("escalate_always")
+  replyDelaySec  Int      @default(30) @map("reply_delay_sec")
+  maxAutoRetries Int      @default(2) @map("max_auto_retries")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user           User     @relation("UserAutoReplyConfigs", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, intent])
+  @@index([userId, isEnabled])
+  @@map("auto_reply_config")
+}
