@@ -9,6 +9,11 @@ import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { classifyMessage, shouldEscalate } from '@/modules/inbox/inbox.service'
 import { hasClaudeApiKey } from '@/modules/ai/claude.client'
+import {
+  createInboxEscalationNotification,
+  createInboxAutoOrderNotification,
+} from '@/modules/inbox/inbox-notifier'
+import { tryCreateAutoOrder } from '@/modules/inbox/auto-order.service'
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const me = await getCurrentUser()
@@ -44,11 +49,27 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
           escalateReason: escalation.reason || 'AI 판단',
         },
       })
+      // 사장님 알림 생성 (Notification — section='sourcing', type='INQUIRY')
+      await createInboxEscalationNotification(id, escalation.reason || 'AI 판단')
+    }
+
+    // 의도='ORDER' + 신뢰도 충분하면 자동 주문 생성 시도
+    let autoOrder: any = null
+    if (classification.intent === 'ORDER' && classification.confidence >= 0.7) {
+      autoOrder = await tryCreateAutoOrder(id)
+      if (autoOrder?.ok) {
+        await createInboxAutoOrderNotification(id, {
+          orderNumber: autoOrder.orderNumber!,
+          totalAmount: autoOrder.totalAmount!,
+          productName: classification.productName || '상품',
+          quantity: classification.quantity || 1,
+        })
+      }
     }
 
     return NextResponse.json({
       success: true,
-      data: { classification, escalation },
+      data: { classification, escalation, autoOrder },
     })
   } catch (err: any) {
     console.error('[Inbox Classify]', err)

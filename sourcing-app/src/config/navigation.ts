@@ -95,6 +95,7 @@ export const sourcingMenuItems: MenuItem[] = [
     children: [
       { label: '통합 인박스', href: '/sourcing/inbox', icon: MessageSquare },
       { label: '자동응답 설정', href: '/sourcing/inbox/settings', icon: Bot },
+      { label: '운영 매뉴얼', href: '/sourcing/inbox/help', icon: FileText },
     ],
   },
   {

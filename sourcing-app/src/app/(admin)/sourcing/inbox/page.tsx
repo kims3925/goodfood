@@ -7,6 +7,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   MessageSquare,
   Bot,
@@ -67,12 +68,20 @@ interface Stats {
 }
 
 export default function InboxPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const initialMessageId = (() => {
+    const v = searchParams.get('messageId')
+    const n = v ? Number(v) : NaN
+    return Number.isFinite(n) ? n : null
+  })()
+
   const [messages, setMessages] = useState<InboxMessage[]>([])
   const [stats, setStats] = useState<Stats>({ unreadCount: 0, escalatedCount: 0 })
   const [loading, setLoading] = useState(true)
   const [filterChannel, setFilterChannel] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(initialMessageId)
   const [thread, setThread] = useState<InboxMessage[]>([])
   const [busy, setBusy] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -121,6 +130,16 @@ export default function InboxPage() {
   useEffect(() => {
     load()
   }, [filterChannel, filterStatus])
+
+  // ?messageId= 딥링크 — 알림에서 진입 시 자동으로 해당 메시지 스레드 표시
+  useEffect(() => {
+    if (initialMessageId) {
+      loadThread(initialMessageId)
+      // URL 정리 (한 번 진입 후 파라미터 제거)
+      router.replace('/sourcing/inbox')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const selected = useMemo(() => messages.find((m) => m.id === selectedId), [messages, selectedId])
 
