@@ -29,7 +29,13 @@ const TAIL_NAV: NavItem[] = [
   { href: '/lite/upgrade', label: '⚡ Pro 전환', desc: '풀 자동화 체험' },
 ]
 
-export default function LiteSidebar({ mode }: { mode: 'lite' | 'lite_band' }) {
+export default function LiteSidebar({
+  mode,
+  isAdmin = false,
+}: {
+  mode: 'lite' | 'lite_band'
+  isAdmin?: boolean
+}) {
   const items = mode === 'lite_band' ? [...BASE_NAV, ...BAND_NAV, ...TAIL_NAV] : [...BASE_NAV, ...TAIL_NAV]
 
   return (
@@ -44,6 +50,27 @@ export default function LiteSidebar({ mode }: { mode: 'lite' | 'lite_band' }) {
             : '체험용 7일 프로그램'}
         </div>
       </div>
+
+      {/* 어드민 전용: Pro/어드민 패널로 빠른 이동 */}
+      {isAdmin && (
+        <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg space-y-1">
+          <div className="text-[10px] font-semibold text-indigo-900">
+            🛡️ ADMIN 미리보기 모드
+          </div>
+          <Link
+            href="/admin/dashboard"
+            className="block text-xs text-indigo-700 hover:underline"
+          >
+            ← 어드민 패널로 돌아가기
+          </Link>
+          <Link
+            href="/sourcing/dashboard"
+            className="block text-xs text-indigo-700 hover:underline"
+          >
+            🚀 Pro 매니저 보기
+          </Link>
+        </div>
+      )}
 
       <nav className="space-y-1">
         {items.map((item) => (

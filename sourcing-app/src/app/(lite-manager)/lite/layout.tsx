@@ -13,19 +13,21 @@ import prisma from '@bandauto/db'
 export default async function LiteLayout({ children }: { children: ReactNode }) {
   const me = await getCurrentUser()
   let mode: 'lite' | 'lite_band' = 'lite'
+  let isAdmin = false
 
   if (me) {
     const u = await prisma.user.findUnique({
       where: { id: me.userId },
-      select: { mode: true },
+      select: { mode: true, role: true },
     })
     if (u?.mode === 'lite_band') mode = 'lite_band'
+    if (u?.role === 'ADMIN') isAdmin = true
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="flex">
-        <LiteSidebar mode={mode} />
+        <LiteSidebar mode={mode} isAdmin={isAdmin} />
         <main className="flex-1 p-6 max-w-[1400px]">{children}</main>
       </div>
 
