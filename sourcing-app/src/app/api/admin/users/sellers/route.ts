@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
       name: true,
       phone: true,
       mode: true,
+      maxShops: true,
       role: true,
       liteStartAt: true,
       proStartAt: true,

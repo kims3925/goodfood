@@ -27,6 +27,7 @@ interface Seller {
   name: string | null
   phone: string | null
   mode: string
+  maxShops: number
   role: string
   liteStartAt: string | null
   proStartAt: string | null
@@ -109,6 +110,27 @@ export default function AdminUnifiedSellersPage() {
     else alert(res.error || '실패')
   }
 
+  async function changeMaxShops(id: number, currentMax: number) {
+    const input = prompt(
+      `최대 쇼핑몰 수를 입력하세요 (현재 ${currentMax}개):`,
+      String(currentMax)
+    )
+    if (input === null) return
+    const n = Number(input)
+    if (!Number.isFinite(n) || n < 1) {
+      alert('1 이상의 정수를 입력하세요.')
+      return
+    }
+    const res = await fetch(`/api/admin/users/sellers/${id}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ maxShops: Math.floor(n) }),
+    }).then((r) => r.json())
+    if (res.success) await load()
+    else alert(res.error || '실패')
+  }
+
   async function toggleActive(id: number, currentlyActive: boolean) {
     const action = currentlyActive ? '정지' : '활성화'
     if (!confirm(`사용자 ${id}를 ${action}할까요?`)) return
@@ -134,12 +156,20 @@ export default function AdminUnifiedSellersPage() {
             Pro / Lite / Lite Band 사용자를 한 곳에서 관리하고 mode를 전환합니다.
           </p>
         </div>
-        <Link
-          href="/admin/lite/sellers"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" /> 신규 Lite 셀러 발급
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/admin/shops/publish"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+          >
+            <ShoppingBag className="w-4 h-4" /> 쇼핑몰 발행
+          </Link>
+          <Link
+            href="/admin/lite/sellers"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> 신규 Lite 셀러 발급
+          </Link>
+        </div>
       </header>
 
       {/* 모드 필터 탭 */}
@@ -211,6 +241,7 @@ export default function AdminUnifiedSellersPage() {
                 <th className="px-3 py-2">사용자</th>
                 <th className="px-3 py-2">Mode</th>
                 <th className="px-3 py-2">쇼핑몰</th>
+                <th className="px-3 py-2">한도</th>
                 <th className="px-3 py-2">Band 채널</th>
                 <th className="px-3 py-2">자동 발행</th>
                 <th className="px-3 py-2">상태</th>
@@ -239,14 +270,37 @@ export default function AdminUnifiedSellersPage() {
                       </select>
                     </td>
                     <td className="px-3 py-2">
-                      {s.shops[0] ? (
-                        <div className="flex items-center gap-1 text-xs">
-                          <ShoppingBag className="w-3 h-3 text-gray-400" />
-                          <span>{s.shops[0].name}</span>
-                          <span className="text-gray-400">/{s.shops[0].subdomain}</span>
+                      {s.shops.length > 0 ? (
+                        <div className="text-xs">
+                          <div className="flex items-center gap-1">
+                            <ShoppingBag className="w-3 h-3 text-gray-400" />
+                            <span>{s.shops[0].name}</span>
+                            <span className="text-gray-400">/{s.shops[0].subdomain}</span>
+                          </div>
+                          {s.shops.length > 1 && (
+                            <div className="text-[10px] text-gray-500 ml-4">
+                              +{s.shops.length - 1}개 더
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-xs text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {s.mode === 'pro' ? (
+                        <button
+                          onClick={() => changeMaxShops(s.id, s.maxShops)}
+                          className="px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100 font-medium"
+                          title="클릭하여 변경"
+                        >
+                          {s.shops.length} / {s.maxShops}
+                        </button>
+                      ) : (
+                        <span className="text-gray-500">
+                          {s.shops.length} / 1
+                          <span className="block text-[10px] text-gray-400">라이트 1:1</span>
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-2">

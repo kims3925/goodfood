@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
 
     // 도메인 중복 체크 (삭제된 샵 제외)
     const existingShop = await prisma.shop.findFirst({
-      where: { 
+      where: {
         subdomain,
         deletedAt: null
       },
@@ -146,6 +146,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: '이미 사용 중인 도메인입니다.' },
         { status: 400 }
+      )
+    }
+
+    // 사용자 mode + maxShops 검증 (라이트 1:1, 프로 N개)
+    const userInfo = await prisma.user.findUnique({
+      where: { id: currentUser.userId },
+      select: { mode: true, maxShops: true },
+    })
+    if (!userInfo) {
+      return NextResponse.json(
+        { success: false, error: '사용자를 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    const currentShopCount = await prisma.shop.count({
+      where: { userId: currentUser.userId, deletedAt: null },
+    })
+
+    const isLite = userInfo.mode === 'lite' || userInfo.mode === 'lite_band'
+    const allowedMax = isLite ? 1 : Math.max(1, userInfo.maxShops || 1)
+
+    if (currentShopCount >= allowedMax) {
+      const errorMsg = isLite
+        ? `라이트 사용자는 쇼핑몰을 1개만 가질 수 있습니다. (현재 ${currentShopCount}개)`
+        : `최대 ${allowedMax}개까지 가능합니다. (현재 ${currentShopCount}개) — 한도를 늘리려면 어드민에 문의하세요.`
+      return NextResponse.json(
+        { success: false, error: errorMsg, currentShopCount, maxShops: allowedMax },
+        { status: 409 }
       )
     }
 

@@ -19,6 +19,8 @@ import {
   Server,
   Activity,
   BarChart3,
+  ShoppingBag,
+  Store,
   ChevronDown,
   ChevronRight,
   PanelLeftClose,
@@ -55,7 +57,16 @@ const adminNav: NavItem[] = [
     icon: UserCog,
     children: [
       { label: '전체 사용자', href: '/admin/users/list', icon: Users },
+      { label: '셀러 관리', href: '/admin/users/sellers', icon: Store },
       { label: '역할/권한', href: '/admin/users/roles', icon: Shield },
+    ],
+  },
+  {
+    label: '쇼핑몰 발행',
+    icon: ShoppingBag,
+    children: [
+      { label: '신규 발행', href: '/admin/shops/publish', icon: ShoppingBag },
+      { label: 'Lite 셀러 발급', href: '/admin/lite/sellers', icon: Store },
     ],
   },
   {
