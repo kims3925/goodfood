@@ -26,8 +26,12 @@ export async function GET(request: NextRequest) {
   const search = (searchParams.get('search') || '').trim()
   const includeInactive = searchParams.get('includeInactive') === '1'
 
+  // 셀러 한정: 쇼핑몰 회원 (User.shopId != null) 은 제외
+  // - shopId IS NULL: 직접 가입 또는 어드민 발급 (= 셀러 후보)
+  // - shopId NOT NULL: 특정 쇼핑몰의 고객으로 가입 (= 쇼핑몰 회원, 셀러 X)
   const where: any = {
     role: { not: 'ADMIN' },
+    shopId: null,
     ...(includeInactive ? {} : { deletedAt: null }),
   }
 
@@ -87,10 +91,10 @@ export async function GET(request: NextRequest) {
     take: 500,
   })
 
-  // 모드별 카운트
+  // 모드별 카운트 — shopId NULL (셀러) 만 집계, 쇼핑몰 고객 제외
   const counts = await prisma.user.groupBy({
     by: ['mode'],
-    where: { role: { not: 'ADMIN' }, deletedAt: null },
+    where: { role: { not: 'ADMIN' }, shopId: null, deletedAt: null },
     _count: { _all: true },
   })
 

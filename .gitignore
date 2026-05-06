@@ -254,3 +254,5 @@ shop-app/.data-recovery-*.done
 /workspace
 .grepai/
 .claude/settings.local.json
+
+.claude/worktrees/

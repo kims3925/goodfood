@@ -136,6 +136,12 @@ export default function LoginPage() {
               판매관리자 등록
             </a>
           </p>
+          <p className="text-sm text-gray-600">
+            셀러로 가입 + 쇼핑몰 발행을 함께 받고 싶으신가요?{' '}
+            <a href="/seller/register" className="text-purple-600 hover:underline font-medium">
+              셀러 통합 가입
+            </a>
+          </p>
           <a
             href="/"
             className="text-sm text-gray-500 hover:text-gray-700 inline-block"

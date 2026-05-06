@@ -12,12 +12,14 @@ export async function middleware(request: NextRequest) {
   const publicPaths = [
     '/login',
     '/register',
+    '/seller/register',     // 셀러 통합 가입 (회원가입 + 쇼핑몰 발행)
     '/forbidden',
     '/create-admin',       // 관리자 계정 생성
     '/api/create-admin',   // 관리자 계정 생성 API
     '/api/auth/login',
     '/api/auth/register',
     '/api/auth/logout',
+    '/api/seller/register', // 셀러 통합 가입 API
     '/api/order/webhook',  // Google Forms 웹훅
     '/api/assets/',        // 이미지 등 정적 자산
     '/api/images/',        // 이미지 API

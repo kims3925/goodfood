@@ -38,11 +38,16 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const target = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, mode: true, role: true, maxShops: true },
+    select: { id: true, mode: true, role: true, maxShops: true, shopId: true },
   })
   if (!target) return NextResponse.json({ success: false, error: '없음' }, { status: 404 })
   if (target.role === 'ADMIN')
     return NextResponse.json({ success: false, error: '관리자는 변경 불가' }, { status: 403 })
+  if (target.shopId != null)
+    return NextResponse.json(
+      { success: false, error: '쇼핑몰 회원은 셀러 관리 대상이 아닙니다.' },
+      { status: 403 }
+    )
 
   const updates: any = {}
   let needsLiteConfig = false
