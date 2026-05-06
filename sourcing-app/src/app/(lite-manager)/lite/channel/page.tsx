@@ -185,8 +185,8 @@ export default function LiteChannelPage() {
         <ol className="text-xs text-yellow-800 space-y-1 list-decimal list-inside">
           <li>PC 크롬으로 band.us 로그인</li>
           <li>F12 → Application → Cookies → https://band.us 선택</li>
-          <li>auth, AB_SESS 등 모든 쿠키를 "name=value; name2=value2" 형태로 묶어서 입력</li>
-          <li>"쿠키 등록"으로 저장 → 자동 발행이 활성화됩니다</li>
+          <li>auth, AB_SESS 등 모든 쿠키를 &quot;name=value; name2=value2&quot; 형태로 묶어서 입력</li>
+          <li>&quot;쿠키 등록&quot;으로 저장 → 자동 발행이 활성화됩니다</li>
         </ol>
       </div>
 
