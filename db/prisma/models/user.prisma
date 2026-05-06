@@ -57,6 +57,10 @@ model User {
   mode               String              @default("pro") @db.VarChar(20)
   liteStartAt        DateTime?           @map("lite_start_at") @db.Timestamp(0)
   proStartAt         DateTime?           @map("pro_start_at") @db.Timestamp(0)
+  // SNSAUTO Shop Publish (2026-05-06): 사용자가 보유 가능한 최대 쇼핑몰 수
+  // - lite/lite_band: 1 고정 (강제)
+  // - pro: 어드민이 차등 적용 (기본 1, 유료 등급에 따라 증가)
+  maxShops           Int                 @default(1) @map("max_shops")
   coachingTips       CoachingTip[]       @relation("UserCoachingTips")
   userMissions       UserMission[]       @relation("UserMissions")
 

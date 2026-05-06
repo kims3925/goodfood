@@ -1,13 +1,14 @@
 /**
- * PATCH /api/admin/users/sellers/[id] — 셀러 mode 변경 + 정지/활성화
+ * PATCH /api/admin/users/sellers/[id] — 셀러 mode/maxShops 변경 + 정지/활성화
  *
  * body:
  * - mode?: 'pro' | 'lite' | 'lite_band'
+ * - maxShops?: number (>=1, lite/lite_band 면 자동 1 로 강제)
  * - isActive?: boolean (false → deletedAt 설정 / true → deletedAt=null)
  *
  * mode 변경 부수 효과:
- * - pro → lite/lite_band: liteStartAt=now, proStartAt=null
- * - lite/lite_band → pro: proStartAt=now
+ * - pro → lite/lite_band: liteStartAt=now, maxShops=1 강제
+ * - lite/lite_band → pro: proStartAt=now (maxShops 는 명시 입력 안 하면 1 유지)
  * - 어떤 모드든 LiteAutoPublishConfig 가 없으면 자동 생성 (lite/lite_band 인 경우)
  */
 export const dynamic = 'force-dynamic'
@@ -37,7 +38,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const target = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, mode: true, role: true },
+    select: { id: true, mode: true, role: true, maxShops: true },
   })
   if (!target) return NextResponse.json({ success: false, error: '없음' }, { status: 404 })
   if (target.role === 'ADMIN')
@@ -45,6 +46,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const updates: any = {}
   let needsLiteConfig = false
+  let resolvedMode = target.mode
 
   if (body.mode !== undefined) {
     if (!isValidUserMode(body.mode))
@@ -53,6 +55,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         { status: 400 }
       )
     updates.mode = body.mode
+    resolvedMode = body.mode
     const now = new Date()
     if (body.mode === 'pro' && target.mode !== 'pro') {
       updates.proStartAt = now
@@ -61,6 +64,37 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
     if (body.mode === 'lite' || body.mode === 'lite_band') {
       needsLiteConfig = true
+      // 라이트 전환 시 maxShops 1 강제
+      updates.maxShops = 1
+    }
+  }
+
+  if (body.maxShops !== undefined) {
+    const n = Number(body.maxShops)
+    if (!Number.isFinite(n) || n < 1) {
+      return NextResponse.json(
+        { success: false, error: 'maxShops 는 1 이상의 정수' },
+        { status: 400 }
+      )
+    }
+    // lite/lite_band 는 1 강제
+    const isLiteResolved = resolvedMode === 'lite' || resolvedMode === 'lite_band'
+    updates.maxShops = isLiteResolved ? 1 : Math.floor(n)
+
+    // 새 한도가 현재 보유 쇼핑몰 갯수보다 작으면 차단
+    if (!isLiteResolved) {
+      const currentShopCount = await prisma.shop.count({
+        where: { userId, deletedAt: null },
+      })
+      if (Math.floor(n) < currentShopCount) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `현재 ${currentShopCount}개의 쇼핑몰을 보유 중이라 ${Math.floor(n)} 미만으로 줄일 수 없습니다.`,
+          },
+          { status: 409 }
+        )
+      }
     }
   }
 
