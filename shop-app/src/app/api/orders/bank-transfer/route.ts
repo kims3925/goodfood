@@ -14,7 +14,7 @@ import { authOptions } from '@/modules/auth/auth.config'
 import { calculateItemPrice } from '@/lib/price-calculator'
 
 // Phase 7: 공통 유틸로 이전
-import { generateOrderNumber, getCurrentUserId } from '@/lib/order-utils'
+import { generateOrderNumber, getCurrentUserId, getSessionId } from '@/lib/order-utils'
 
 // 결제키 생성 (무통장입금용 — bank-transfer 전용 로직)
 function generatePaymentKey(): string {
@@ -22,8 +22,6 @@ function generatePaymentKey(): string {
   const random = Math.random().toString(36).substring(2, 10)
   return `BT-${timestamp}-${random}`.toUpperCase()
 }
-
-import { getSessionId } from '@/lib/order-utils'
 
 // 입금 기한 계산 (3시간 후)
 function getDepositDeadline(): Date {

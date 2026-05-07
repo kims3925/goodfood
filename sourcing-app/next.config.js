@@ -118,6 +118,15 @@ const nextConfig = {
       '@imgly/background-removal-node',
       'onnxruntime-node',
       'sharp',
+      // AI 페이지 빌더 (Phase: 작업지침서 2026-05-07)
+      // cheerio 1.0.0 은 ESM + undici@6 private class field 사용 → Next.js 14 webpack 빌드 실패.
+      // server-side 에서만 사용하므로 external 처리 (런타임 native require).
+      'cheerio',
+      'undici',
+      // handlebars 도 dynamic require + AMD 호환 코드 → external 안전
+      'handlebars',
+      // anthropic SDK 도 외부 패키지로 두는 게 깔끔 (스트리밍 모듈 등)
+      '@anthropic-ai/sdk',
     ],
   },
 }
