@@ -80,6 +80,7 @@ export default function AdminShopsPublishPage() {
 
   useEffect(() => {
     loadUsers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function selectUser(u: UserRow) {

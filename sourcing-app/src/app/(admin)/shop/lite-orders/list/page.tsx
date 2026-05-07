@@ -86,6 +86,7 @@ export default function LiteOrdersListPage() {
 
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeShopId, status, days])
 
   const filteredOrders = activeShopId ? orders.filter((o) => o.shopId === activeShopId) : orders

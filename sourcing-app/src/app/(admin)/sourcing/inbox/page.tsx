@@ -130,6 +130,7 @@ export default function InboxPage() {
 
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterChannel, filterStatus])
 
   // Claude API 키 상태 1회 조회 — 미등록 시 헤더 배너 표시

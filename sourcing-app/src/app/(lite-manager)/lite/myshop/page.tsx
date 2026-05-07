@@ -95,6 +95,7 @@ export default function LiteMyShopPage() {
 
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showInactive, categoryFilter])
 
   async function toggle(spId: number, nextActive: boolean) {

@@ -91,6 +91,7 @@ export default function AdminUnifiedSellersPage() {
 
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, includeInactive])
 
   function onSearchSubmit(e: React.FormEvent) {
