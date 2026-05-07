@@ -111,21 +111,31 @@ export default function AdminUnifiedSellersPage() {
   }
 
   async function changeMaxShops(id: number, currentMax: number) {
+    const display = currentMax >= 9999 ? '무제한' : `${currentMax}개`
     const input = prompt(
-      `최대 쇼핑몰 수를 입력하세요 (현재 ${currentMax}개):`,
-      String(currentMax)
+      `최대 쇼핑몰 수를 입력하세요 (현재 ${display})\n` +
+        '- 숫자 입력: 해당 개수까지 허용\n' +
+        '- "무제한" 또는 0 입력: 한도 없음 (9999 로 설정)',
+      currentMax >= 9999 ? '무제한' : String(currentMax)
     )
     if (input === null) return
-    const n = Number(input)
-    if (!Number.isFinite(n) || n < 1) {
-      alert('1 이상의 정수를 입력하세요.')
-      return
+    const trimmed = input.trim()
+    let value: number
+    if (trimmed === '무제한' || trimmed === '0' || trimmed === '') {
+      value = 9999
+    } else {
+      const n = Number(trimmed)
+      if (!Number.isFinite(n) || n < 1) {
+        alert('1 이상의 정수, 또는 "무제한" 을 입력하세요.')
+        return
+      }
+      value = Math.floor(n)
     }
     const res = await fetch(`/api/admin/users/sellers/${id}`, {
       method: 'PATCH',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ maxShops: Math.floor(n) }),
+      body: JSON.stringify({ maxShops: value }),
     }).then((r) => r.json())
     if (res.success) await load()
     else alert(res.error || '실패')
@@ -294,7 +304,7 @@ export default function AdminUnifiedSellersPage() {
                           className="px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100 font-medium"
                           title="클릭하여 변경"
                         >
-                          {s.shops.length} / {s.maxShops}
+                          {s.shops.length} / {s.maxShops >= 9999 ? '∞ 무제한' : s.maxShops}
                         </button>
                       ) : (
                         <span className="text-gray-500">

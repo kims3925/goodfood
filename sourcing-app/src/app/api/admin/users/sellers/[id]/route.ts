@@ -78,24 +78,25 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const n = Number(body.maxShops)
     if (!Number.isFinite(n) || n < 1) {
       return NextResponse.json(
-        { success: false, error: 'maxShops 는 1 이상의 정수' },
+        { success: false, error: 'maxShops 는 1 이상의 정수 (무제한은 9999)' },
         { status: 400 }
       )
     }
     // lite/lite_band 는 1 강제
     const isLiteResolved = resolvedMode === 'lite' || resolvedMode === 'lite_band'
-    updates.maxShops = isLiteResolved ? 1 : Math.floor(n)
+    const targetMax = Math.floor(n)
+    updates.maxShops = isLiteResolved ? 1 : targetMax
 
-    // 새 한도가 현재 보유 쇼핑몰 갯수보다 작으면 차단
-    if (!isLiteResolved) {
+    // 새 한도가 현재 보유 쇼핑몰 갯수보다 작으면 차단 (무제한=9999 는 항상 통과)
+    if (!isLiteResolved && targetMax < 9999) {
       const currentShopCount = await prisma.shop.count({
         where: { userId, deletedAt: null },
       })
-      if (Math.floor(n) < currentShopCount) {
+      if (targetMax < currentShopCount) {
         return NextResponse.json(
           {
             success: false,
-            error: `현재 ${currentShopCount}개의 쇼핑몰을 보유 중이라 ${Math.floor(n)} 미만으로 줄일 수 없습니다.`,
+            error: `현재 ${currentShopCount}개의 쇼핑몰을 보유 중이라 ${targetMax} 미만으로 줄일 수 없습니다.`,
           },
           { status: 409 }
         )
