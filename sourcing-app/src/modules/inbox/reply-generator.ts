@@ -34,6 +34,7 @@ export interface ReplyContext {
     items?: Array<{ productName: string; quantity: number }>
   } | null
   customMessage?: string  // 의도별 커스텀 템플릿/지시
+  orderMatchConfidence?: 'high' | 'low' // Phase 3: 주문 매칭 신뢰도
 }
 
 const SYSTEM_PROMPT = `당신은 한국 수산물/농산물 셀러의 친절한 고객 응대 챗봇입니다.
@@ -145,6 +146,11 @@ export async function generateReply(
   const customCtx = context.customMessage
     ? `\n\n[관리자 추가 지시]\n${context.customMessage}`
     : ''
+  // Phase 3: 주문 매칭이 불확실하면 응답에 확인 유도 문구 포함
+  const lowConfidenceHint =
+    context.orderMatchConfidence === 'low' && context.order
+      ? '\n\n[주문 매칭 주의]\n주문 정보가 발신자와 정확히 매칭되지 않습니다. 응답 시 "혹시 주문번호를 알려주시면 더 정확히 안내드리겠습니다" 라는 확인 유도 문구를 자연스럽게 포함하세요.'
+      : ''
 
   const prompt = `[고객 메시지]
 ${customerMessage}
@@ -156,7 +162,7 @@ ${intent}
 ${INTENT_GUIDES[intent]}
 
 [셀러/상품/주문 컨텍스트]
-${[shopCtx, productCtx, orderCtx].filter(Boolean).join('\n\n') || '(컨텍스트 없음 — 일반적 응답)'}${customCtx}
+${[shopCtx, productCtx, orderCtx].filter(Boolean).join('\n\n') || '(컨텍스트 없음 — 일반적 응답)'}${customCtx}${lowConfidenceHint}
 
 위 컨텍스트만 사용하여 한국어로 친근한 응답을 작성하세요. 없는 정보는 추측 금지.`
 

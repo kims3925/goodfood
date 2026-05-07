@@ -72,6 +72,7 @@ export async function generateAndSaveReply(messageId: number) {
       content: true,
       intent: true,
       userId: true,
+      senderId: true,
       senderName: true,
       metadata: true,
     },
@@ -81,7 +82,11 @@ export async function generateAndSaveReply(messageId: number) {
     throw new Error('먼저 의도 분류를 실행하세요.')
   }
 
-  const ctx = await resolveContext(msg.userId, msg.intent, msg.metadata as any)
+  // Phase 3: senderInfo 전달 → resolveContext 가 발신자 매칭 강화
+  const ctx = await resolveContext(msg.userId, msg.intent, msg.metadata as any, {
+    senderId: msg.senderId,
+    senderName: msg.senderName,
+  })
   const reply = await generateReply(msg.userId, msg.intent, msg.content, ctx)
 
   await prisma.inboxMessage.update({
@@ -95,9 +100,10 @@ export async function generateAndSaveReply(messageId: number) {
 export async function resolveContext(
   userId: number,
   intent: Intent,
-  metadata?: { productName?: string | null; orderNumber?: string | null }
-): Promise<ReplyContext> {
-  const ctx: ReplyContext = {}
+  metadata?: { productName?: string | null; orderNumber?: string | null },
+  senderInfo?: { senderId?: string | null; senderName?: string | null }
+): Promise<ReplyContext & { orderMatchConfidence?: 'high' | 'low' }> {
+  const ctx: ReplyContext & { orderMatchConfidence?: 'high' | 'low' } = {}
 
   // 셀러 정보 (모든 의도에서 필요)
   const shop = await prisma.shop.findFirst({
@@ -144,33 +150,79 @@ export async function resolveContext(
     }
   }
 
-  // 주문 컨텍스트 (DELIVERY, DEPOSIT)
-  if (['DELIVERY', 'DEPOSIT'].includes(intent)) {
-    // 매칭 단순화 — 가장 최근 주문 사용. 운영에서는 senderName/phone 매칭 강화 가능.
-    const recentOrder = await prisma.order.findFirst({
-      where: {
-        shop: { userId },
+  // 주문 컨텍스트 (DELIVERY, DEPOSIT, RETURN, PAYMENT)
+  // Phase 3: 발신자 매칭 강화. Order 엔 customerName 없으니 ShippingAddress.recipientName/Phone 으로 조회.
+  if (['DELIVERY', 'DEPOSIT', 'RETURN', 'PAYMENT'].includes(intent)) {
+    type OrderShape = {
+      orderNumber: string
+      status: string
+      totalAmount: any
+      items: Array<{ productName: string; quantity: number }>
+    }
+    const orderSelect = {
+      orderNumber: true,
+      status: true,
+      totalAmount: true,
+      items: {
+        select: { productName: true, quantity: true },
       },
-      select: {
-        orderNumber: true,
-        status: true,
-        totalAmount: true,
-        items: {
-          select: {
-            productName: true,
-            quantity: true,
-          },
-        },
-      },
-      orderBy: { orderedAt: 'desc' },
-    })
-    if (recentOrder) {
-      ctx.order = {
-        orderNumber: recentOrder.orderNumber,
-        status: recentOrder.status,
-        totalAmount: Number(recentOrder.totalAmount),
-        items: recentOrder.items,
+    } as const
+    let matchedOrder: OrderShape | null = null
+    let confidence: 'high' | 'low' = 'low'
+
+    // 1순위: 메시지에서 추출된 주문번호로 직접 매칭
+    if (metadata?.orderNumber) {
+      matchedOrder = await prisma.order.findFirst({
+        where: { shop: { userId }, orderNumber: metadata.orderNumber },
+        select: orderSelect,
+      })
+      if (matchedOrder) confidence = 'high'
+    }
+
+    // 2순위: 발신자 이름/전화 → ShippingAddress.recipientName/recipientPhone 매칭
+    if (!matchedOrder && (senderInfo?.senderName || senderInfo?.senderId)) {
+      const phoneRe = /^[\d\s\-]{9,15}$/
+      const senderIsPhone = senderInfo?.senderId && phoneRe.test(senderInfo.senderId)
+
+      const orConds: any[] = []
+      if (senderInfo?.senderName) {
+        orConds.push({
+          shippingAddress: { recipientName: { contains: senderInfo.senderName } },
+        })
       }
+      if (senderIsPhone) {
+        orConds.push({
+          shippingAddress: { recipientPhone: { contains: senderInfo.senderId } },
+        })
+      }
+      if (orConds.length > 0) {
+        matchedOrder = await prisma.order.findFirst({
+          where: { shop: { userId }, OR: orConds },
+          select: orderSelect,
+          orderBy: { orderedAt: 'desc' },
+        })
+        if (matchedOrder) confidence = 'high'
+      }
+    }
+
+    // 3순위 (폴백): 최근 주문 — 신뢰도 낮음 표시
+    if (!matchedOrder) {
+      matchedOrder = await prisma.order.findFirst({
+        where: { shop: { userId } },
+        select: orderSelect,
+        orderBy: { orderedAt: 'desc' },
+      })
+      // confidence 는 'low' 유지 (기본값)
+    }
+
+    if (matchedOrder) {
+      ctx.order = {
+        orderNumber: matchedOrder.orderNumber,
+        status: matchedOrder.status,
+        totalAmount: Number(matchedOrder.totalAmount),
+        items: matchedOrder.items,
+      }
+      ctx.orderMatchConfidence = confidence
     }
   }
 
@@ -181,6 +233,7 @@ export async function shouldEscalate(messageId: number): Promise<{
   escalate: boolean
   reason: string | null
 }> {
+  // Phase 8: content 도 함께 select 하여 비속어 검사 시 추가 조회 제거
   const msg = await prisma.inboxMessage.findUnique({
     where: { id: messageId },
     select: {
@@ -189,6 +242,7 @@ export async function shouldEscalate(messageId: number): Promise<{
       senderId: true,
       userId: true,
       metadata: true,
+      content: true,
     },
   })
   if (!msg || !msg.intent || !isValidIntent(msg.intent)) {
@@ -228,15 +282,9 @@ export async function shouldEscalate(messageId: number): Promise<{
     return { escalate: true, reason: `같은 고객 ${repeatCount}회 재질문 — AI 해결 불가 판단` }
   }
 
-  // 5. 욕설/비속어 (단순 키워드 검사)
+  // 5. 욕설/비속어 — 위에서 이미 select 한 msg.content 직접 사용
   const profanity = ['씨발', 'ㅅㅂ', '좆', '병신', '개새끼']
-  const meta_ = msg.metadata as any
-  // 비속어 검사는 content 가 필요하므로 별도 조회
-  const content = await prisma.inboxMessage.findUnique({
-    where: { id: messageId },
-    select: { content: true },
-  })
-  if (content && profanity.some((w) => content.content.includes(w))) {
+  if (profanity.some((w) => msg.content.includes(w))) {
     return { escalate: true, reason: '비속어 감지 — AI 응답 차단' }
   }
 

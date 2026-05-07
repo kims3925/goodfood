@@ -13,29 +13,12 @@ import { authOptions } from '@/modules/auth/auth.config'
 import { getCartService } from '@/modules/cart/services/cart.service'
 import { calculateItemPrice } from '@/lib/price-calculator'
 
-// 주문번호 생성
-function generateOrderNumber(): string {
-  const date = new Date()
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase()
-  return `ORD-${dateStr}-${random}`
-}
-
-// 현재 로그인한 사용자 ID 가져오기
-async function getCurrentUserId(): Promise<number | null> {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) return null
-    return typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
-  } catch {
-    return null
-  }
-}
-
-// 세션 ID 가져오기
-function getSessionId(req: NextRequest): string | null {
-  return req.cookies.get('cart_session')?.value || null
-}
+// Phase 7: 공통 유틸로 이전 — @/lib/order-utils
+import {
+  generateOrderNumber,
+  getCurrentUserId,
+  getSessionId,
+} from '@/lib/order-utils'
 
 interface OrderPrepareData {
   orderId: string
@@ -389,9 +372,9 @@ export async function POST(req: NextRequest) {
       },
     }
 
-    // 쿠키에 주문 정보 저장 (암호화된 JSON)
-    const prepareDataJson = JSON.stringify(prepareData)
-    const encodedData = Buffer.from(prepareDataJson).toString('base64')
+    // Phase 4: HMAC 서명으로 무결성 보장 (totalAmount 변조 방지) + 30분 만료 stamp
+    const { signOrderData } = await import('@/lib/order-signature')
+    const encodedData = signOrderData({ ...prepareData, _ts: Date.now() })
 
     const response = NextResponse.json({
       success: true,

@@ -13,36 +13,17 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
 import { calculateItemPrice } from '@/lib/price-calculator'
 
-// 주문번호 생성
-function generateOrderNumber(): string {
-  const date = new Date()
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase()
-  return `ORD-${dateStr}-${random}`
-}
+// Phase 7: 공통 유틸로 이전
+import { generateOrderNumber, getCurrentUserId } from '@/lib/order-utils'
 
-// 결제키 생성 (무통장입금용)
+// 결제키 생성 (무통장입금용 — bank-transfer 전용 로직)
 function generatePaymentKey(): string {
   const timestamp = Date.now().toString(36)
   const random = Math.random().toString(36).substring(2, 10)
   return `BT-${timestamp}-${random}`.toUpperCase()
 }
 
-// 현재 로그인한 사용자 ID 가져오기
-async function getCurrentUserId(): Promise<number | null> {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) return null
-    return typeof session.user.id === 'string' ? parseInt(session.user.id) : session.user.id
-  } catch {
-    return null
-  }
-}
-
-// 세션 ID 가져오기
-function getSessionId(req: NextRequest): string | null {
-  return req.cookies.get('cart_session')?.value || null
-}
+import { getSessionId } from '@/lib/order-utils'
 
 // 입금 기한 계산 (3시간 후)
 function getDepositDeadline(): Date {

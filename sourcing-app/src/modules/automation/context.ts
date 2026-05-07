@@ -7,14 +7,22 @@
  * BatchContext를 통해 사용자 정보를 주입하여 처리.
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks'
 import prisma, { WorkflowStatus } from '@bandauto/db'
 import { BatchContext } from './types'
 
 // =============================================
-// BATCH CONTEXT STORAGE (AsyncLocalStorage alternative)
+// BATCH CONTEXT STORAGE (AsyncLocalStorage)
 // =============================================
+// Phase 2: Node.js AsyncLocalStorage 로 요청별 격리.
+// 다중 사용자가 동시에 자동화 실행 시 컨텍스트 덮어씌움 방지.
 
-let currentContext: BatchContext | null = null
+const contextStorage = new AsyncLocalStorage<BatchContext>()
+
+// 레거시 setBatchContext 호출 시에만 사용되는 globalThis 폴백 (제거 예정)
+function getLegacyContext(): BatchContext | null {
+  return ((globalThis as any).__legacyBatchContext as BatchContext | undefined) ?? null
+}
 
 // =============================================
 // CANCELLATION CHECK
@@ -66,26 +74,26 @@ export class CancellationError extends Error {
 }
 
 /**
- * 배치 컨텍스트 설정
- * 배치 작업 시작 전에 호출
+ * @deprecated Phase 2: withBatchContext 사용. 동시성 안전 X.
+ * 호출자가 남아있어 BC 를 위해 globalThis 에 임시 저장.
  */
 export function setBatchContext(context: BatchContext): void {
-  currentContext = context
+  ;(globalThis as any).__legacyBatchContext = context
 }
 
 /**
- * 배치 컨텍스트 가져오기
+ * 배치 컨텍스트 가져오기 — AsyncLocalStorage 우선, 폴백으로 legacy globalThis.
+ * 새 호출 경로(withBatchContext)는 격리된 store, 옛 setBatchContext 경로는 글로벌 공유.
  */
 export function getBatchContext(): BatchContext | null {
-  return currentContext
+  return contextStorage.getStore() ?? getLegacyContext()
 }
 
 /**
- * 배치 컨텍스트 클리어
- * 배치 작업 완료 후 호출
+ * @deprecated Phase 2: withBatchContext 사용 시 자동으로 정리됨.
  */
 export function clearBatchContext(): void {
-  currentContext = null
+  ;(globalThis as any).__legacyBatchContext = null
 }
 
 // =============================================
@@ -166,19 +174,14 @@ export async function getActiveAutomationContexts(): Promise<BatchContext[]> {
 // =============================================
 
 /**
- * 배치 컨텍스트 내에서 작업 실행
- * 자동으로 컨텍스트 설정 및 정리
+ * 배치 컨텍스트 내에서 작업 실행 (Phase 2: AsyncLocalStorage)
+ * 다중 사용자가 동시에 호출해도 각자의 fn 콜백 내에서 자기 context 만 접근.
  */
 export async function withBatchContext<T>(
   context: BatchContext,
   fn: () => Promise<T>
 ): Promise<T> {
-  try {
-    setBatchContext(context)
-    return await fn()
-  } finally {
-    clearBatchContext()
-  }
+  return contextStorage.run(context, fn)
 }
 
 /**

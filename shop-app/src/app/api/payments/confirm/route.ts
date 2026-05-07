@@ -64,16 +64,34 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 2. 쿠키에서 주문 준비 데이터 확인
+    // 2. 쿠키에서 주문 준비 데이터 확인 (Phase 4: HMAC 서명 검증 + 30분 만료)
     const orderPrepareCookie = req.cookies.get('order_prepare')?.value
     let prepareData: OrderPrepareData | null = null
 
     if (orderPrepareCookie) {
-      try {
-        const decodedData = Buffer.from(orderPrepareCookie, 'base64').toString('utf-8')
-        prepareData = JSON.parse(decodedData)
-      } catch (e) {
-        console.error('주문 준비 데이터 파싱 실패:', e)
+      const { verifyOrderData } = await import('@/lib/order-signature')
+      const verified = verifyOrderData<OrderPrepareData & { _ts?: number }>(
+        orderPrepareCookie
+      )
+      if (!verified) {
+        // 신규 서명 형식 검증 실패 → 옛 base64 형식 폴백 (점진 마이그레이션)
+        try {
+          const decoded = Buffer.from(orderPrepareCookie, 'base64').toString('utf-8')
+          prepareData = JSON.parse(decoded)
+        } catch (e) {
+          console.error('주문 준비 데이터 파싱 실패 (legacy):', e)
+        }
+      } else {
+        // 30분 만료 검증
+        const ts = (verified as any)._ts
+        if (typeof ts === 'number' && Date.now() - ts > 30 * 60 * 1000) {
+          return createErrorResponse(
+            TOSS_ERROR_CODES.BELOW_ZERO_AMOUNT,
+            '주문 정보가 만료되었습니다. 다시 결제를 진행해 주세요.',
+            400
+          )
+        }
+        prepareData = verified
       }
     }
 
