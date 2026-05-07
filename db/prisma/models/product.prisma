@@ -36,6 +36,9 @@ model Product {
   pageJobs           PageGenerationJob[] @relation("ProductPageJobs")
   generatedPages     GeneratedPage[]     @relation("ProductGeneratedPages")
 
+  // 외부 쇼핑몰 연동 (2026-05-07): 외부몰 소싱처/결제처 매핑
+  externalSourced    ExternalSourcedProduct[] @relation("ProductExternalSourced")
+
   @@index([userId], name: "product_user_id_idx")
   @@index([channelId], name: "product_channel_id_idx")
   @@index([collectedPostId], name: "product_collected_post_id_idx")

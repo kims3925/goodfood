@@ -1,0 +1,131 @@
+// 외부 쇼핑몰 연동 모델 (2026-05-07)
+// 작업지시서: 외부쇼핑몰_연동_소싱결제_개발계획_작업지침서.md
+//
+// 시나리오:
+// - A: 카페24 소싱 → 밴드 발행 → 카페24 결제 (소싱처 = 결제처)
+// - B: 오너클랜 소싱 → 자사 카페24 결제 (소싱처 ≠ 결제처)
+//
+// 외부몰 상품은 CollectedProduct 단계를 SKIP 하고 직접 Product 와 매핑됨.
+// (CollectedProduct.postId 가 NOT NULL 이므로 외부몰 소싱은 다른 경로)
+
+/// 외부 쇼핑몰 연결 설정 (소싱용/결제용/양쪽)
+model ExternalMallConnection {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+
+  // 기본 정보
+  name            String    @db.VarChar(255)        // "내 카페24 쇼핑몰", "오너클랜 계정"
+  platform        String    @db.VarChar(20)         // CAFE24 | OWNERCLAN | SHOPIFY | NAVER_STORE | CUSTOM_API
+  purpose         String    @db.VarChar(20)         // 'sourcing' | 'checkout' | 'both'
+
+  // API 자격증명 (암호화 미적용 — 향후 enc 적용 권장)
+  apiBaseUrl      String?   @map("api_base_url") @db.VarChar(500)
+  apiKey          String?   @map("api_key") @db.VarChar(500)
+  apiSecret       String?   @map("api_secret") @db.VarChar(500)
+  accessToken     String?   @map("access_token") @db.Text
+  refreshToken    String?   @map("refresh_token") @db.Text
+  tokenExpiresAt  DateTime? @map("token_expires_at") @db.Timestamp(0)
+
+  // 쇼핑몰 정보
+  mallId          String?   @map("mall_id") @db.VarChar(100)  // 카페24 mall_id, Shopify domain
+  shopUrl         String?   @map("shop_url") @db.VarChar(500)
+
+  // 소싱/결제 설정
+  sourcingConfig  Json?     @map("sourcing_config")    // { autoSync, syncInterval, categoryFilter, minPrice, maxPrice }
+  checkoutConfig  Json?     @map("checkout_config")    // { urlPattern, affiliateParam, responseMapping }
+
+  // 상태
+  isActive        Boolean   @default(true) @map("is_active")
+  lastSyncAt      DateTime? @map("last_sync_at") @db.Timestamp(0)
+  lastError       String?   @map("last_error") @db.Text
+
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamp(0)
+
+  user                User                     @relation("UserExternalMallConnections", fields: [userId], references: [id], onDelete: Cascade)
+  sourcedProducts     ExternalSourcedProduct[] @relation("SourcingConnection")
+  checkoutForProducts ExternalSourcedProduct[] @relation("CheckoutConnection")
+  externalOrders      ExternalOrder[]          @relation("CheckoutMallOrders")
+
+  @@index([userId, isActive])
+  @@index([platform])
+  @@index([purpose])
+  @@map("external_mall_connection")
+}
+
+/// 외부몰 → 내부 Product 매핑 (소싱처와 결제처가 다를 수 있음)
+model ExternalSourcedProduct {
+  id                   Int       @id @default(autoincrement())
+  userId               Int       @map("user_id")
+  connectionId         Int       @map("connection_id")          // 어디서 소싱했는지
+
+  // 외부몰 정보
+  externalProductId    String    @map("external_product_id") @db.VarChar(100)
+  externalUrl          String    @map("external_url") @db.VarChar(1000)
+  externalData         Json?     @map("external_data")          // 원본 데이터 스냅샷 (옵션/이미지)
+
+  // 내부 매핑
+  productId            Int?      @map("product_id")              // 가공 후 Product (NULL=가공 전)
+
+  // 결제 연결 (소싱처와 다를 수 있음)
+  checkoutConnectionId Int?      @map("checkout_connection_id")  // 시나리오 B: 별도 결제몰
+  checkoutProductId    String?   @map("checkout_product_id") @db.VarChar(100)
+  checkoutUrl          String?   @map("checkout_url") @db.VarChar(1000)
+
+  // 동기화/추적
+  lastSyncAt           DateTime? @map("last_sync_at") @db.Timestamp(0)
+  priceAtSource        Int?      @map("price_at_source")
+  priceAtCheckout      Int?      @map("price_at_checkout")
+  stockStatus          String?   @map("stock_status") @db.VarChar(20)  // 'in_stock' | 'low' | 'out_of_stock'
+
+  isActive             Boolean   @default(true) @map("is_active")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  connection           ExternalMallConnection  @relation("SourcingConnection", fields: [connectionId], references: [id], onDelete: Cascade)
+  checkoutConnection   ExternalMallConnection? @relation("CheckoutConnection", fields: [checkoutConnectionId], references: [id], onDelete: SetNull)
+  product              Product?                @relation("ProductExternalSourced", fields: [productId], references: [id], onDelete: SetNull)
+  externalOrders       ExternalOrder[]
+
+  @@unique([connectionId, externalProductId])
+  @@index([userId])
+  @@index([productId])
+  @@index([checkoutConnectionId])
+  @@map("external_sourced_product")
+}
+
+/// 외부몰 결제 추적 (밴드 → 외부몰 결제 후)
+model ExternalOrder {
+  id                   Int       @id @default(autoincrement())
+  userId               Int       @map("user_id")
+
+  checkoutConnectionId Int       @map("checkout_connection_id")
+  externalOrderId      String?   @map("external_order_id") @db.VarChar(100)
+  sourcedProductId     Int       @map("sourced_product_id")
+
+  productName          String    @map("product_name") @db.VarChar(500)
+  quantity             Int       @default(1)
+  orderAmount          Int?      @map("order_amount")
+  status               String    @default("pending") @db.VarChar(20)  // pending|confirmed|shipped|delivered|cancelled
+
+  customerName         String?   @map("customer_name") @db.VarChar(100)
+  customerPhone        String?   @map("customer_phone") @db.VarChar(20)
+  shippingAddress      String?   @map("shipping_address") @db.VarChar(500)
+
+  trackingCode         String?   @map("tracking_code") @db.VarChar(100)  // 클릭 추적 코드
+  clickedAt            DateTime? @map("clicked_at") @db.Timestamp(0)
+  orderedAt            DateTime? @map("ordered_at") @db.Timestamp(0)
+
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  connection           ExternalMallConnection @relation("CheckoutMallOrders", fields: [checkoutConnectionId], references: [id], onDelete: Cascade)
+  sourcedProduct       ExternalSourcedProduct @relation(fields: [sourcedProductId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([sourcedProductId])
+  @@index([trackingCode])
+  @@index([createdAt])
+  @@map("external_order")
+}

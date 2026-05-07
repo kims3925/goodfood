@@ -106,6 +106,13 @@ export const sourcingMenuItems: MenuItem[] = [
     ],
   },
   {
+    label: '외부몰 연동',
+    icon: Link2,
+    children: [
+      { label: '연결 관리', href: '/sourcing/external-mall', icon: Store },
+    ],
+  },
+  {
     label: '설정',
     icon: Settings,
     children: [
@@ -260,6 +267,7 @@ export const sourcingPathToMenuMap: Record<string, string> = {
   '/sourcing/automation': '자동화',
   '/sourcing/inbox': 'AI 채팅',
   '/sourcing/shop-builder': 'AI 페이지 빌더',
+  '/sourcing/external-mall': '외부몰 연동',
   '/sourcing/notification': '설정',
   '/sourcing/settings': '설정',
   '/sourcing/user': '설정',

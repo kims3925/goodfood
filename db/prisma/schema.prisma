@@ -32,6 +32,11 @@ enum ChannelPlatform {
   SMARTSTORE
   COUPANG
   CUSTOM
+  // 외부 쇼핑몰 연동 (2026-05-07)
+  CAFE24
+  OWNERCLAN
+  SHOPIFY
+  CUSTOM_API
 }
 
 enum AiProvider {

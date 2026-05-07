@@ -75,6 +75,9 @@ model User {
   // AI 쇼핑몰 페이지 빌더 (2026-05-07)
   pageJobs              PageGenerationJob[]    @relation("UserPageJobs")
 
+  // 외부 쇼핑몰 연동 (2026-05-07): 카페24 등 외부몰 소싱+결제
+  externalMallConnections ExternalMallConnection[] @relation("UserExternalMallConnections")
+
   @@index([shopId])
   @@index([email])
   @@index([phone])
