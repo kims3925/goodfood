@@ -85,6 +85,7 @@ export default function InboxPage() {
   const [thread, setThread] = useState<InboxMessage[]>([])
   const [busy, setBusy] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [aiStatus, setAiStatus] = useState<{ hasKey: boolean; model: string | null } | null>(null)
 
   async function load() {
     setLoading(true)
@@ -130,6 +131,16 @@ export default function InboxPage() {
   useEffect(() => {
     load()
   }, [filterChannel, filterStatus])
+
+  // Claude API 키 상태 1회 조회 — 미등록 시 헤더 배너 표시
+  useEffect(() => {
+    fetch('/api/inbox/ai-status', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success) setAiStatus(res.data)
+      })
+      .catch(() => {})
+  }, [])
 
   // ?messageId= 딥링크 — 알림에서 진입 시 자동으로 해당 메시지 스레드 표시
   useEffect(() => {
@@ -197,6 +208,24 @@ export default function InboxPage() {
 
   return (
     <div className="p-6">
+      {aiStatus && !aiStatus.hasKey && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-2 text-sm">
+          <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-semibold text-orange-900">Claude API 키가 등록되어 있지 않습니다</div>
+            <div className="text-orange-800 mt-0.5 text-xs">
+              AI 의도 분류와 응답 생성을 사용하려면{' '}
+              <a
+                href="/sourcing/settings/ai"
+                className="underline font-medium"
+              >
+                AI / API 설정
+              </a>{' '}
+              페이지에서 본인 Claude API 키를 등록해 주세요.
+            </div>
+          </div>
+        </div>
+      )}
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -206,6 +235,11 @@ export default function InboxPage() {
           <p className="text-sm text-gray-600 mt-1">
             4채널 (밴드댓글/밴드채팅/카톡/SMS) 메시지를 한 곳에서 관리. AI가 의도 분류 + 응답
             생성합니다.
+            {aiStatus?.hasKey && aiStatus.model && (
+              <span className="ml-2 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                {aiStatus.model}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">

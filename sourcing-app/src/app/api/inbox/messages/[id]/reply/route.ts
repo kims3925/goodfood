@@ -13,18 +13,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { generateAndSaveReply } from '@/modules/inbox/inbox.service'
-import { hasClaudeApiKey } from '@/modules/ai/claude.client'
+import { hasClaudeConfig } from '@/modules/ai/claude.client'
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const me = await getCurrentUser()
   if (!me) return NextResponse.json({ success: false, error: '로그인 필요' }, { status: 401 })
-
-  if (!hasClaudeApiKey()) {
-    return NextResponse.json(
-      { success: false, error: 'ANTHROPIC_API_KEY 환경변수가 필요합니다.' },
-      { status: 500 }
-    )
-  }
 
   const id = Number(params.id)
   if (!Number.isFinite(id)) {
@@ -54,6 +47,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   let reply = msg.aiReply || null
   if (regenerate || !reply) {
+    if (!(await hasClaudeConfig(me.userId))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Claude API 키가 등록되어 있지 않습니다. /sourcing/settings/ai 페이지에서 Claude 키를 등록해 주세요.',
+          code: 'NO_CLAUDE_CONFIG',
+        },
+        { status: 400 }
+      )
+    }
     try {
       reply = await generateAndSaveReply(id)
     } catch (err: any) {

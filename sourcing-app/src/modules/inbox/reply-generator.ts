@@ -134,6 +134,7 @@ const INTENT_GUIDES: Record<Intent, string> = {
 }
 
 export async function generateReply(
+  userId: number,
   intent: Intent,
   customerMessage: string,
   context: ReplyContext = {}
@@ -159,7 +160,7 @@ ${[shopCtx, productCtx, orderCtx].filter(Boolean).join('\n\n') || '(컨텍스트
 
 위 컨텍스트만 사용하여 한국어로 친근한 응답을 작성하세요. 없는 정보는 추측 금지.`
 
-  return callClaude(prompt, {
+  return callClaude(userId, prompt, {
     system: SYSTEM_PROMPT,
     temperature: 0.5,
     maxTokens: 600,

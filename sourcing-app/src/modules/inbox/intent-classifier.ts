@@ -30,6 +30,7 @@ const INTENT_LIST_FOR_PROMPT = INTENTS.map(
 ).join('\n')
 
 export async function classifyIntent(
+  userId: number,
   customerMessage: string,
   context?: { recentMessages?: string[]; recentProductName?: string | null }
 ): Promise<IntentClassification> {
@@ -59,7 +60,7 @@ ${customerMessage}
   "amount": 금액 숫자 또는 null
 }`
 
-  const result = await callClaudeJson<IntentClassification>(prompt, {
+  const result = await callClaudeJson<IntentClassification>(userId, prompt, {
     system: SYSTEM_PROMPT,
     maxTokens: 512,
   })

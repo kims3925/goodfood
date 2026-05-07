@@ -35,10 +35,15 @@ export default function InboxHelpPage() {
       {/* 0. 빠른 시작 */}
       <Section title="🚀 빠른 시작 (3단계)">
         <ol className="space-y-3 text-sm">
-          <Step n={1} title="환경 준비">
-            관리자가 운영에 <code className="bg-gray-100 px-1.5 py-0.5 rounded">ANTHROPIC_API_KEY</code>
-            를 설정해야 AI 분류·응답이 동작합니다. 미설정 시 인박스 UI는 보이지만 AI 호출만
-            500 에러를 냅니다.
+          <Step n={1} title="Claude API 키 등록">
+            <Link
+              href="/sourcing/settings/ai"
+              className="text-blue-600 hover:underline inline-flex items-center gap-0.5"
+            >
+              AI / API 설정 <ArrowRight className="w-3 h-3" />
+            </Link>{' '}
+            페이지에서 본인 Claude API 키를 등록해야 AI 분류·응답이 동작합니다. 미등록 시 인박스
+            UI 는 보이지만 AI 호출만 400 에러를 냅니다 (셀러별 독립 키).
           </Step>
           <Step n={2} title="자동응답 설정 검토">
             <Link
@@ -249,9 +254,12 @@ export default function InboxHelpPage() {
           </thead>
           <tbody>
             <tr>
-              <td className="border px-3 py-2">&quot;AI 의도 분류&quot; 클릭 시 500 에러</td>
+              <td className="border px-3 py-2">&quot;AI 의도 분류&quot; 클릭 시 400 (NO_CLAUDE_CONFIG)</td>
               <td className="border px-3 py-2">
-                ANTHROPIC_API_KEY 미설정. 운영 .env 에 등록 후 컨테이너 재시작.
+                <Link href="/sourcing/settings/ai" className="text-blue-600 hover:underline">
+                  /sourcing/settings/ai
+                </Link>{' '}
+                에서 Claude API 키 등록. 셀러별 독립 키.
               </td>
             </tr>
             <tr>

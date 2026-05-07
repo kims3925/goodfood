@@ -41,7 +41,7 @@ export async function classifyMessage(messageId: number) {
     take: 5,
   })
 
-  const result = await classifyIntent(msg.content, {
+  const result = await classifyIntent(msg.userId, msg.content, {
     recentMessages: recentMessages.map(
       (m) => `[${m.direction === 'INBOUND' ? '고객' : '셀러'}] ${m.content}`
     ),
@@ -82,7 +82,7 @@ export async function generateAndSaveReply(messageId: number) {
   }
 
   const ctx = await resolveContext(msg.userId, msg.intent, msg.metadata as any)
-  const reply = await generateReply(msg.intent, msg.content, ctx)
+  const reply = await generateReply(msg.userId, msg.intent, msg.content, ctx)
 
   await prisma.inboxMessage.update({
     where: { id: messageId },
