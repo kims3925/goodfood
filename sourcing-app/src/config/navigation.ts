@@ -99,6 +99,13 @@ export const sourcingMenuItems: MenuItem[] = [
     ],
   },
   {
+    label: 'AI 페이지 빌더',
+    icon: LayoutGrid,
+    children: [
+      { label: '쇼핑몰 빌더', href: '/sourcing/shop-builder', icon: Store },
+    ],
+  },
+  {
     label: '설정',
     icon: Settings,
     children: [
@@ -252,6 +259,7 @@ export const sourcingPathToMenuMap: Record<string, string> = {
   '/sourcing/publish': '상품',
   '/sourcing/automation': '자동화',
   '/sourcing/inbox': 'AI 채팅',
+  '/sourcing/shop-builder': 'AI 페이지 빌더',
   '/sourcing/notification': '설정',
   '/sourcing/settings': '설정',
   '/sourcing/user': '설정',

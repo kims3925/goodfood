@@ -1,0 +1,107 @@
+// AI 쇼핑몰 페이지 자동생성 (2026-05-07)
+// 작업지시서: AI_쇼핑몰_상세페이지_자동생성_VSCode_작업지침서.md
+//
+// PageGenerationJob: 입력→AI분석→생성 작업 1건의 전체 흐름 추적
+// PageTemplate: 재사용 HTML 템플릿 (basic/premium/seafood 등)
+// GeneratedPage: 발행 완료 페이지 (slug 기반 URL 라우팅)
+
+model PageGenerationJob {
+  id            Int       @id @default(autoincrement())
+
+  // 입력 소스
+  sourceType    String    @map("source_type") @db.VarChar(20)  // 'html' | 'url' | 'file' | 'band_post'
+  sourceUrl     String?   @map("source_url") @db.VarChar(1000)
+  sourceHtml    String?   @map("source_html") @db.LongText
+  sourceFiles   Json?     @map("source_files")
+
+  // AI 분석 결과
+  extractedData  Json?    @map("extracted_data")     // { name, price, options, images, ... }
+  screenshot     String?  @db.LongText              // base64 또는 URL
+  layoutAnalysis Json?    @map("layout_analysis")   // Vision API 결과
+
+  // 생성 결과
+  generatedHtml  String?  @map("generated_html") @db.LongText
+  generatedCss   String?  @map("generated_css") @db.LongText
+  previewImage   String?  @map("preview_image") @db.VarChar(1000)
+  templateId     Int?     @map("template_id")
+
+  // 상태
+  status         String   @default("pending") @db.VarChar(20)  // pending|parsing|analyzing|generating|completed|failed
+  errorMessage   String?  @map("error_message") @db.Text
+
+  // 연결
+  productId      Int?     @map("product_id")
+  shopId         Int?     @map("shop_id")
+  createdBy      Int      @map("created_by")
+
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  product        Product?      @relation("ProductPageJobs", fields: [productId], references: [id], onDelete: SetNull)
+  shop           Shop?         @relation("ShopPageJobs", fields: [shopId], references: [id], onDelete: SetNull)
+  template       PageTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  user           User          @relation("UserPageJobs", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([createdBy, createdAt])
+  @@index([status])
+  @@index([shopId])
+  @@index([productId])
+  @@map("page_generation_job")
+}
+
+model PageTemplate {
+  id            Int       @id @default(autoincrement())
+
+  name          String    @db.VarChar(255)        // "수산물 프리미엄", "기본 상세"
+  type          String    @db.VarChar(20)         // 'detail' | 'catalog' | 'landing' | 'banner'
+  category      String?   @db.VarChar(50)         // 'seafood' | 'fruit' | 'meat' | 'general'
+
+  htmlTemplate  String    @map("html_template") @db.LongText
+  cssStyles     String?   @map("css_styles") @db.LongText
+  thumbnail     String?   @db.VarChar(1000)
+
+  variables     Json?                              // [{name, type, default}]
+  colorScheme   Json?     @map("color_scheme")    // 기본 색상 팔레트
+
+  isActive      Boolean   @default(true) @map("is_active")
+  isDefault     Boolean   @default(false) @map("is_default")
+  sortOrder     Int       @default(0) @map("sort_order")
+
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  jobs          PageGenerationJob[]
+
+  @@index([type, isActive])
+  @@map("page_template")
+}
+
+model GeneratedPage {
+  id            Int       @id @default(autoincrement())
+
+  shopId        Int       @map("shop_id")
+  type          String    @db.VarChar(20)         // 'product_detail' | 'category' | 'landing' | 'event'
+  slug          String    @db.VarChar(200)
+  title         String    @db.VarChar(500)
+
+  htmlContent   String    @map("html_content") @db.LongText
+  cssContent    String?   @map("css_content") @db.LongText
+  metaTitle     String?   @map("meta_title") @db.VarChar(500)
+  metaDesc      String?   @map("meta_desc") @db.VarChar(1000)
+  ogImage       String?   @map("og_image") @db.VarChar(1000)
+
+  productId     Int?      @map("product_id")
+
+  isPublished   Boolean   @default(false) @map("is_published")
+  publishedAt   DateTime? @map("published_at") @db.Timestamp(0)
+
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  shop          Shop      @relation("ShopGeneratedPages", fields: [shopId], references: [id], onDelete: Cascade)
+  product       Product?  @relation("ProductGeneratedPages", fields: [productId], references: [id], onDelete: SetNull)
+
+  @@unique([shopId, slug])
+  @@index([shopId, type, isPublished])
+  @@map("generated_page")
+}
