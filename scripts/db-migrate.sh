@@ -31,6 +31,9 @@ ALTER TABLE guest_order ADD COLUMN IF NOT EXISTS external_kind VARCHAR(20) NULL;
 ALTER TABLE guest_order ADD COLUMN IF NOT EXISTS external_memo TEXT NULL;
 ALTER TABLE guest_order ADD COLUMN IF NOT EXISTS inbox_message_id INT NULL;
 
+-- 채널별 푸터 이미지 (RETAIL 채널 발행글 맨 마지막 이미지 자동 첨부)
+ALTER TABLE channel ADD COLUMN IF NOT EXISTS footer_image_url VARCHAR(1000) NULL;
+
 CREATE TABLE IF NOT EXISTS bank_account (
   id              INT AUTO_INCREMENT PRIMARY KEY,
   user_id         INT NOT NULL,

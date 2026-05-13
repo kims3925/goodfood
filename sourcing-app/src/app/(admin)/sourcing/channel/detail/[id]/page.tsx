@@ -56,6 +56,8 @@ interface Channel {
   minSourcingPrice: number | null
   maxSourcingPrice: number | null
   orderDeadline: string | null
+  // 소매 채널 전용: 발행글 푸터 이미지 (모든 게시글 이미지 맨 마지막 자동 첨부)
+  footerImageUrl: string | null
 }
 
 const PLATFORM_LABELS: { [key: string]: string } = {
@@ -128,6 +130,9 @@ export default function ChannelDetailPage({
   const [faviconUrl, setFaviconUrl] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
   const [footerText, setFooterText] = useState('')
+
+  // 발행글 푸터 이미지 (RETAIL 채널 전용)
+  const [isUploadingFooter, setIsUploadingFooter] = useState(false)
 
 
   // Shop URL 기본 주소 (경로 기반 라우팅)
@@ -359,6 +364,52 @@ export default function ChannelDetailPage({
       }
     }
     setIsEditMode(false)
+  }
+
+  // 발행글 푸터 이미지 업로드 (RETAIL 채널 전용)
+  const handleFooterImageUpload = async (file: File) => {
+    if (!channel) return
+    setIsUploadingFooter(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(`/api/channel/${channel.id}/footer-image`, {
+        method: 'POST',
+        body: fd,
+      })
+      const data = await res.json()
+      if (data.success && data.data?.url) {
+        setChannel({ ...channel, footerImageUrl: data.data.url })
+        toast.success('푸터 이미지가 등록되었습니다.')
+      } else {
+        toast.error(data.error || '푸터 이미지 업로드에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('푸터 이미지 업로드 실패:', error)
+      toast.error('푸터 이미지 업로드 중 오류가 발생했습니다.')
+    } finally {
+      setIsUploadingFooter(false)
+    }
+  }
+
+  const handleFooterImageDelete = async () => {
+    if (!channel) return
+    if (!confirm('푸터 이미지를 해제하시겠습니까? (파일은 보존됩니다)')) return
+    try {
+      const res = await fetch(`/api/channel/${channel.id}/footer-image`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (data.success) {
+        setChannel({ ...channel, footerImageUrl: null })
+        toast.success('푸터 이미지가 해제되었습니다.')
+      } else {
+        toast.error(data.error || '푸터 이미지 해제에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('푸터 이미지 해제 실패:', error)
+      toast.error('푸터 이미지 해제 중 오류가 발생했습니다.')
+    }
   }
 
   const formatDateTimeKST = (dateString: string) => {
@@ -778,6 +829,76 @@ export default function ChannelDetailPage({
                               )}
                             </div>
                           </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 발행글 푸터 이미지 (RETAIL 채널 전용) */}
+                    {channel.kind === 'RETAIL' && (
+                      <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-base">📎</span>
+                          <span className="text-sm font-semibold text-slate-700">발행글 푸터 이미지</span>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+                            소매 채널
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mb-3">
+                          이 채널에 발행되는 모든 상품의 이미지 맨 마지막에 자동 첨부됩니다.
+                          (밴드 이용 안내사항, 주문방법, 교환환불, 사업자 정보 등)
+                        </p>
+                        {channel.footerImageUrl ? (
+                          <div className="space-y-3">
+                            <div className="rounded-lg overflow-hidden bg-white border border-emerald-100">
+                              <img
+                                src={channel.footerImageUrl}
+                                alt="발행글 푸터 이미지"
+                                className="w-full max-h-80 object-contain"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="inline-flex items-center gap-2 px-3 py-2 bg-white text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium cursor-pointer hover:bg-emerald-50 transition-colors">
+                                <ImageIcon size={14} />
+                                {isUploadingFooter ? '업로드 중...' : '변경'}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  disabled={isUploadingFooter}
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0]
+                                    if (f) handleFooterImageUpload(f)
+                                    e.target.value = ''
+                                  }}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={handleFooterImageDelete}
+                                disabled={isUploadingFooter}
+                                className="inline-flex items-center gap-2 px-3 py-2 bg-white text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+                              >
+                                <Trash2 size={14} />
+                                삭제
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-emerald-600 transition-colors disabled:opacity-50">
+                            <ImageIcon size={16} />
+                            {isUploadingFooter ? '업로드 중...' : '푸터 이미지 등록'}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={isUploadingFooter}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0]
+                                if (f) handleFooterImageUpload(f)
+                                e.target.value = ''
+                              }}
+                            />
+                          </label>
                         )}
                       </div>
                     )}

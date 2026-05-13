@@ -321,9 +321,17 @@ export class PublishService {
       // 5. 게시물 내용 생성 (쇼핑몰URL → 상품내용 → 쇼핑몰URL)
       const postContent = buildPostContent(toProductForPublish(product), { orderLink })
 
-      // 이미지 URL 추출 (최대 20개) — 가격이미지 (isPriceBanner=true) 제외, 결과 0장이면 원본 사용
+      // 이미지 URL 추출 — 가격이미지 (isPriceBanner=true) 제외, 결과 0장이면 원본 사용
+      // 채널 푸터 이미지가 있으면 1자리 예약하여 상품 이미지를 19개로 자르고 푸터를 마지막에 추가.
+      // 푸터 없으면 기존대로 최대 20개. 푸터 추가는 상품 이미지가 1장 이상일 때만 (텍스트만 발행 차단 보존).
       const usableImages = filterOutPriceBanners(product.images || [])
-      const imageUrls = usableImages.map(img => img.url).filter((url): url is string => !!url && url.length > 0).slice(0, 20)
+      const productImageUrls = usableImages
+        .map(img => img.url)
+        .filter((url): url is string => !!url && url.length > 0)
+        .slice(0, channel.footerImageUrl ? 19 : 20)
+      const imageUrls = channel.footerImageUrl && productImageUrls.length > 0
+        ? [...productImageUrls, channel.footerImageUrl]
+        : productImageUrls
 
       // 6. 발행 방식 결정 및 실행
       let postKey: string | undefined
@@ -982,8 +990,16 @@ export class PublishService {
       // 5. 게시물 내용 생성
       const postContent = buildPostContent(toProductForPublish(product), { orderLink })
       // 가격이미지 (isPriceBanner=true) 제외, 결과 0장이면 원본 사용 (최소 1장 보존)
+      // 채널 푸터 이미지가 있으면 1자리 예약 — 상품 이미지 최대 19개 + 푸터 1장 = Band 20개 한도 유지.
+      // 상품 이미지가 0건이면 푸터를 붙이지 않음 (텍스트만 발행 차단 보존).
       const usableImagesProgress = filterOutPriceBanners(product.images || [])
-      const imageUrls = usableImagesProgress.map(img => img.url).filter((url): url is string => !!url && url.length > 0).slice(0, 20)
+      const productImageUrls = usableImagesProgress
+        .map(img => img.url)
+        .filter((url): url is string => !!url && url.length > 0)
+        .slice(0, channel.footerImageUrl ? 19 : 20)
+      const imageUrls = channel.footerImageUrl && productImageUrls.length > 0
+        ? [...productImageUrls, channel.footerImageUrl]
+        : productImageUrls
 
       // 6. 발행 방식 결정 및 실행
       let postKey: string | undefined

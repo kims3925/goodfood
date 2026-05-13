@@ -19,6 +19,11 @@ model Channel {
   // collection 파이프라인이 게시글을 스킵. null이면 해당 방향 무제한.
   minSourcingPrice  Int?             @map("min_sourcing_price")
   maxSourcingPrice  Int?             @map("max_sourcing_price")
+  // GBand SaaS (2026-05-13): 게시글 출처 분류 (자체/외주/공유)
+  postType          PostType?        @map("post_type")
+  // RETAIL 채널 전용: 발행글 이미지 맨 마지막에 자동 첨부되는 푸터 이미지 URL
+  // (예: 밴드 이용 안내사항, 사업자 정보, 교환환불 안내). null이면 첨부 안 함.
+  footerImageUrl    String?          @map("footer_image_url") @db.VarChar(1000)
   shop              Shop?            @relation(fields: [shopId], references: [id])
   user              User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   collectedPosts    CollectedPost[]
