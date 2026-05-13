@@ -1,9 +1,28 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verifyToken } from '@/modules/auth/auth.service'
+import { verifyToken, AUTH_COOKIE_NAMES } from '@/modules/auth/auth.service'
 
 // sourcing-app에 접근 가능한 역할
 const ALLOWED_ROLES = ['ADMIN', 'MANAGER']
+
+/**
+ * 요청에서 토큰을 추출한다.
+ *
+ * - admin path (/admin/*) → admin 쿠키 우선, manager → legacy 순으로 폴백
+ * - 그 외 path → manager 쿠키 우선, admin → legacy 순으로 폴백
+ *
+ * 분리 쿠키가 도입되기 전 발급된 'auth-token' 도 폴백으로 인정.
+ */
+function readAuthToken(request: NextRequest, preferAdmin: boolean): string | null {
+  const order = preferAdmin
+    ? [AUTH_COOKIE_NAMES.ADMIN, AUTH_COOKIE_NAMES.MANAGER, AUTH_COOKIE_NAMES.LEGACY]
+    : [AUTH_COOKIE_NAMES.MANAGER, AUTH_COOKIE_NAMES.ADMIN, AUTH_COOKIE_NAMES.LEGACY]
+  for (const name of order) {
+    const v = request.cookies.get(name)?.value
+    if (v) return v
+  }
+  return null
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -48,16 +67,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // 쿠키에서 토큰 확인
-  const token = request.cookies.get('auth-token')?.value
-
   // /admin/login은 공개 경로 (어드민 전용 로그인 페이지)
   if (pathname === '/admin/login') {
     return NextResponse.next()
   }
 
+  // path 에 따른 쿠키 우선순위 결정
+  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
+  const token = readAuthToken(request, /* preferAdmin */ isAdminPath)
+
   // /admin 또는 /admin/* 경로 처리
-  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+  if (isAdminPath) {
     if (!token) {
       // 비로그인 → 어드민 로그인 페이지로
       return NextResponse.redirect(new URL('/admin/login', request.url))
@@ -72,6 +92,7 @@ export async function middleware(request: NextRequest) {
 
     if (adminPayload.role !== 'ADMIN') {
       // ADMIN이 아닌 역할 → 어드민 로그인 페이지로
+      // (manager 쿠키가 폴백으로 매칭됐지만 role 이 ADMIN 이 아닌 경우)
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 

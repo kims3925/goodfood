@@ -2,7 +2,12 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
-import { verifyPassword, createToken } from '@/modules/auth/auth.service'
+import {
+  verifyPassword,
+  createToken,
+  getTokenNameForRole,
+  AUTH_COOKIE_NAMES,
+} from '@/modules/auth/auth.service'
 
 // POST: 로그인
 export async function POST(request: NextRequest) {
@@ -89,12 +94,24 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // 쿠키 설정 (응답 객체에 직접 설정)
-    response.cookies.set('auth-token', token, {
+    // 쿠키 설정 — role 에 따라 admin/manager 쿠키를 분리하여
+    // 같은 브라우저에서 두 세션이 공존할 수 있도록 한다.
+    const cookieName = getTokenNameForRole(user.role)
+    response.cookies.set(cookieName, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7일
+      path: '/',
+    })
+
+    // 옛 단일 쿠키('auth-token')가 남아 있으면 새 분리 쿠키와 충돌할 수 있으므로 제거.
+    // (분리 전 발급된 쿠키가 verifyToken 으로는 통과하지만 role 매칭이 어긋날 수 있음)
+    response.cookies.set(AUTH_COOKIE_NAMES.LEGACY, '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0,
       path: '/',
     })
 
