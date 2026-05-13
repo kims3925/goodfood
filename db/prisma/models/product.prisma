@@ -83,15 +83,16 @@ model ProductOption {
 }
 
 model ProductImage {
-  id        Int      @id @default(autoincrement())
-  productId Int      @map("product_id")
-  url       String   @db.VarChar(1000)
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  fileHash  String?  @map("file_hash") @db.VarChar(64)
-  fileName  String?  @map("file_name") @db.VarChar(255)
-  fileSize  Int?     @map("file_size")
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id            Int      @id @default(autoincrement())
+  productId     Int      @map("product_id")
+  url           String   @db.VarChar(1000)
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  fileHash      String?  @map("file_hash") @db.VarChar(64)
+  fileName      String?  @map("file_name") @db.VarChar(255)
+  fileSize      Int?     @map("file_size")
+  isPriceBanner Boolean? @map("is_price_banner")
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId], name: "product_image_product_id_idx")
   @@index([fileHash], name: "product_image_file_hash_idx")

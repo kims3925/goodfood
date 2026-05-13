@@ -16,6 +16,7 @@ ALTER TABLE automation_config ADD COLUMN IF NOT EXISTS collection_limit_by_chann
 ALTER TABLE automation_config ADD COLUMN IF NOT EXISTS auto_publish_limit INT NOT NULL DEFAULT 20;
 ALTER TABLE automation_config ADD COLUMN IF NOT EXISTS auto_publish_limit_by_shop LONGTEXT NULL;
 ALTER TABLE automation_config ADD COLUMN IF NOT EXISTS auto_publish_limit_by_channel LONGTEXT NULL;
+ALTER TABLE product_image ADD COLUMN IF NOT EXISTS is_price_banner TINYINT(1) NULL;
 SQL
 
 echo "Migration completed at $(date '+%Y-%m-%d %H:%M:%S %Z')"

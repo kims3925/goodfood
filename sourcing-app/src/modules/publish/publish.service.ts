@@ -15,6 +15,7 @@ import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
 import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
 import { calculateSellingPrice } from '@/lib/price-calculator'
+import { markPriceImagesOnProduct } from '@/modules/utils/priceImageFilter'
 import type {
   PublishToChannelParams,
   PublishToChannelResult,
@@ -143,12 +144,47 @@ function toProductForPublish(product: {
   }
 }
 
+/**
+ * Band 발행 직전 ProductImage 의 가격이미지 여부 분석.
+ * - userId 의 Gemini 키 사용. 없으면 분석 스킵 (이미지 그대로 발행)
+ * - markPriceImagesOnProduct 가 isPriceBanner=NULL 인 것만 분석 → 재발행 시 캐시 활용
+ */
+async function maybeMarkPriceImagesForRetailPublish(userId: number, productId: number): Promise<void> {
+  try {
+    const gemini = await prisma.aiApiConfig.findFirst({
+      where: { userId, provider: 'GEMINI', isActive: true },
+      select: { apiKey: true },
+    })
+    if (!gemini?.apiKey) {
+      // Gemini 키 없으면 분석 스킵 (가격이미지 필터 무력화 — 옛 동작과 동일)
+      return
+    }
+    await markPriceImagesOnProduct(gemini.apiKey, productId)
+  } catch (err) {
+    // 분석 실패는 발행을 막지 않음 (옛 동작 보존)
+    console.error(`[Publish] 가격이미지 마킹 실패 (무시, productId=${productId}):`, (err as Error).message)
+  }
+}
+
+/**
+ * ProductImage 목록에서 isPriceBanner=true 를 제외, 단 결과가 0장이면 원본을 그대로 사용 (최소 1장 보존).
+ */
+function filterOutPriceBanners<T extends { url: string | null; isPriceBanner?: boolean | null }>(
+  images: T[]
+): T[] {
+  const nonBanners = images.filter((i) => i.isPriceBanner !== true)
+  return nonBanners.length > 0 ? nonBanners : images
+}
+
 export class PublishService {
   /**
    * 단일 상품을 단일 채널에 발행 (쿼터 에러 시 재시도)
    */
   async publishToChannel(params: PublishToChannelParams, retryCount: number = 0): Promise<PublishToChannelResult> {
     const { userId, productId, channelId } = params
+
+    // 가격이미지 검출/마킹 (Gemini Vision, isPriceBanner=NULL 인 것만 첫 발행 시 분석)
+    await maybeMarkPriceImagesForRetailPublish(userId, productId)
 
     try {
       // 1. 채널 정보 조회 (연결된 Shop 정보 + Playwright 세션 포함)
@@ -241,7 +277,7 @@ export class PublishService {
           },
           images: {
             orderBy: { sortOrder: 'asc' },
-            select: { url: true },
+            select: { url: true, isPriceBanner: true },
           },
         },
       })
@@ -285,8 +321,9 @@ export class PublishService {
       // 5. 게시물 내용 생성 (쇼핑몰URL → 상품내용 → 쇼핑몰URL)
       const postContent = buildPostContent(toProductForPublish(product), { orderLink })
 
-      // 이미지 URL 추출 (최대 20개)
-      const imageUrls = (product.images?.map(img => img.url).filter((url): url is string => !!url && url.length > 0) || []).slice(0, 20)
+      // 이미지 URL 추출 (최대 20개) — 가격이미지 (isPriceBanner=true) 제외, 결과 0장이면 원본 사용
+      const usableImages = filterOutPriceBanners(product.images || [])
+      const imageUrls = usableImages.map(img => img.url).filter((url): url is string => !!url && url.length > 0).slice(0, 20)
 
       // 6. 발행 방식 결정 및 실행
       let postKey: string | undefined
@@ -782,6 +819,9 @@ export class PublishService {
       }
     }
 
+    // 가격이미지 검출/마킹 (Gemini Vision, isPriceBanner=NULL 인 것만 첫 발행 시 분석)
+    await maybeMarkPriceImagesForRetailPublish(userId, productId)
+
     try {
       // 1. 채널 정보 조회
       const channel = await prisma.channel.findFirst({
@@ -889,7 +929,7 @@ export class PublishService {
           },
           images: {
             orderBy: { sortOrder: 'asc' },
-            select: { url: true },
+            select: { url: true, isPriceBanner: true },
           },
         },
       })
@@ -941,7 +981,9 @@ export class PublishService {
 
       // 5. 게시물 내용 생성
       const postContent = buildPostContent(toProductForPublish(product), { orderLink })
-      const imageUrls = (product.images?.map(img => img.url).filter((url): url is string => !!url && url.length > 0) || []).slice(0, 20)
+      // 가격이미지 (isPriceBanner=true) 제외, 결과 0장이면 원본 사용 (최소 1장 보존)
+      const usableImagesProgress = filterOutPriceBanners(product.images || [])
+      const imageUrls = usableImagesProgress.map(img => img.url).filter((url): url is string => !!url && url.length > 0).slice(0, 20)
 
       // 6. 발행 방식 결정 및 실행
       let postKey: string | undefined
