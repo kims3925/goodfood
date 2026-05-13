@@ -26,6 +26,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Cpu,
+  Building2,
+  CreditCard,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -38,6 +40,15 @@ interface NavItem {
 
 const adminNav: NavItem[] = [
   { label: '플랫폼 현황', href: '/admin/dashboard', icon: LayoutDashboard },
+  {
+    label: 'SaaS 운영',
+    icon: Building2,
+    children: [
+      { label: '테넌트 관리', href: '/admin/tenants', icon: Building2 },
+      { label: '사용량 모니터링', href: '/admin/usage', icon: BarChart3 },
+      { label: '결제 관리', href: '/admin/billing', icon: CreditCard },
+    ],
+  },
   {
     label: '에이전트 관리',
     icon: Bot,
