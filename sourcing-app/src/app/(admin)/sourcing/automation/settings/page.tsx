@@ -799,6 +799,12 @@ export default function AutomationSettingsPage() {
             <p className="text-gray-500 text-xs">워크플로우 스케줄 및 파이프라인 설정</p>
           </div>
         </div>
+        <a
+          href="/sourcing/automation/sourcing-conditions"
+          className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
+        >
+          소싱조건 설정에서 보기 <ExternalLink size={11} />
+        </a>
       </div>
 
       {/* CSS for shake animation */}
@@ -1706,7 +1712,7 @@ export default function AutomationSettingsPage() {
       {/* Row 1: Shop Selection + AI Settings - 2 Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Shop Selection Section */}
-        <Card className={`overflow-hidden transition-all ${warningSections.includes('shop') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasShopProblem ? 'ring-2 ring-red-300' : ''}`}>
+        <Card id="section-shop" className={`overflow-hidden transition-all ${warningSections.includes('shop') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasShopProblem ? 'ring-2 ring-red-300' : ''}`}>
           <div className="p-4 pb-5 flex flex-col">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
@@ -1819,7 +1825,7 @@ export default function AutomationSettingsPage() {
         </Card>
 
         {/* AI Settings - 간소화된 버전 */}
-        <Card className={`overflow-hidden transition-all ${warningSections.includes('ai') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasAiProblem ? 'ring-2 ring-red-300' : ''}`}>
+        <Card id="section-ai" className={`overflow-hidden transition-all ${warningSections.includes('ai') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasAiProblem ? 'ring-2 ring-red-300' : ''}`}>
           <div className="p-4 pb-5 flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -1932,7 +1938,7 @@ export default function AutomationSettingsPage() {
       {/* Row 2: Collection + Publish Settings - 2 Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Collection Settings - Wholesale Channel Cards */}
-      <Card className={`overflow-hidden transition-all ${warningSections.includes('collection') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasCollectionProblem ? 'ring-2 ring-red-300' : ''}`}>
+      <Card id="section-collection" className={`overflow-hidden transition-all ${warningSections.includes('collection') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasCollectionProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
@@ -2208,7 +2214,7 @@ export default function AutomationSettingsPage() {
       </Card>
 
         {/* Publish Settings - Retail Channel Cards */}
-      <Card className={`overflow-hidden transition-all ${warningSections.includes('publish') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasPublishProblem ? 'ring-2 ring-red-300' : ''}`}>
+      <Card id="section-publish" className={`overflow-hidden transition-all ${warningSections.includes('publish') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasPublishProblem ? 'ring-2 ring-red-300' : ''}`}>
         <div className="p-4 pb-5 flex flex-col">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">

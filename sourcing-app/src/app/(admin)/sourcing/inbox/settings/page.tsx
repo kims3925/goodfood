@@ -5,7 +5,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Bot, Save, Power, AlertTriangle } from 'lucide-react'
+import { Bot, Save, Power, AlertTriangle, Beaker, Send, KeyRound, Radio, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 
 const INTENT_LABELS: Record<string, { label: string; desc: string }> = {
   ORDER: { label: '🛒 주문하기', desc: '주문 의사 표현' },
@@ -34,10 +34,32 @@ interface ConfigRow {
   dirty?: boolean
 }
 
+interface TestResult {
+  intent: string
+  confidence: number
+  reasoning: string
+  productName?: string | null
+  quantity?: number | null
+  amount?: number | null
+  replyDraft: string
+  escalate: boolean
+  reason: string | null
+}
+
 export default function InboxSettingsPage() {
   const [rows, setRows] = useState<ConfigRow[]>([])
   const [loading, setLoading] = useState(true)
   const [savedKey, setSavedKey] = useState<string | null>(null)
+
+  // 상단 상태 카드
+  const [aiStatus, setAiStatus] = useState<{ hasKey: boolean; model: string | null } | null>(null)
+  const [retailChannelCount, setRetailChannelCount] = useState<number | null>(null)
+
+  // 테스트 섹션
+  const [testMessage, setTestMessage] = useState('')
+  const [testRunning, setTestRunning] = useState(false)
+  const [testResult, setTestResult] = useState<TestResult | null>(null)
+  const [testError, setTestError] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -51,8 +73,53 @@ export default function InboxSettingsPage() {
     }
   }
 
+  async function loadStatus() {
+    try {
+      const [aiRes, chRes] = await Promise.all([
+        fetch('/api/inbox/ai-status', { credentials: 'include' }).then((r) => r.json()),
+        fetch('/api/channel?kind=RETAIL&limit=200', { credentials: 'include' }).then((r) => r.json()),
+      ])
+      if (aiRes.success) setAiStatus({ hasKey: aiRes.data.hasKey, model: aiRes.data.model })
+      if (chRes.success) {
+        const active = (chRes.data || []).filter((c: any) => c.isActive !== false)
+        setRetailChannelCount(active.length)
+      }
+    } catch {
+      // 무시
+    }
+  }
+
+  async function runTest() {
+    const msg = testMessage.trim()
+    if (!msg) {
+      setTestError('테스트할 메시지를 입력하세요.')
+      return
+    }
+    setTestError(null)
+    setTestResult(null)
+    setTestRunning(true)
+    try {
+      const res = await fetch('/api/inbox/test-classify', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg }),
+      }).then((r) => r.json())
+      if (res.success) {
+        setTestResult(res.data)
+      } else {
+        setTestError(res.error || '분류 실패')
+      }
+    } catch (e: any) {
+      setTestError(e?.message || '네트워크 오류')
+    } finally {
+      setTestRunning(false)
+    }
+  }
+
   useEffect(() => {
     load()
+    loadStatus()
   }, [])
 
   function update(intent: string, patch: Partial<ConfigRow>) {
@@ -100,6 +167,196 @@ export default function InboxSettingsPage() {
           설정합니다.
         </p>
       </header>
+
+      {/* 상단 활성 상태 카드 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+        <div className="p-4 bg-white border border-gray-200 rounded-lg flex items-center gap-3">
+          <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+            <Radio className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="flex-1">
+            <div className="text-xs text-gray-500">활성 AI 챗 채널 (소매밴드)</div>
+            <div className="text-lg font-bold text-gray-900">
+              {retailChannelCount === null ? '—' : `${retailChannelCount} 개`}
+            </div>
+          </div>
+          <a
+            href="/sourcing/channel/list"
+            className="text-xs text-blue-600 hover:underline"
+          >
+            관리
+          </a>
+        </div>
+        <div className="p-4 bg-white border border-gray-200 rounded-lg flex items-center gap-3">
+          <div
+            className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              aiStatus?.hasKey ? 'bg-green-100' : 'bg-orange-100'
+            }`}
+          >
+            <KeyRound
+              className={`w-5 h-5 ${aiStatus?.hasKey ? 'text-green-600' : 'text-orange-600'}`}
+            />
+          </div>
+          <div className="flex-1">
+            <div className="text-xs text-gray-500">Claude API 키</div>
+            <div className="text-sm font-semibold text-gray-900">
+              {aiStatus === null ? (
+                '확인 중...'
+              ) : aiStatus.hasKey ? (
+                <span className="text-green-700">
+                  등록됨 {aiStatus.model && <span className="text-xs text-gray-500">({aiStatus.model})</span>}
+                </span>
+              ) : (
+                <span className="text-orange-700">미등록</span>
+              )}
+            </div>
+          </div>
+          <a
+            href="/sourcing/settings/ai"
+            className="text-xs text-blue-600 hover:underline"
+          >
+            {aiStatus?.hasKey ? '변경' : '등록'}
+          </a>
+        </div>
+      </div>
+
+      {/* 테스트 섹션 */}
+      <section className="mb-6 bg-white border border-gray-200 rounded-lg p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-900">
+              <Beaker className="w-5 h-5 text-indigo-500" /> 분류 테스트
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              실제 고객 메시지처럼 입력하면 분류된 intent · 신뢰도 · AI 응답 초안 · 에스컬레이션 여부를 즉시 확인합니다. (DB 저장 X)
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={testMessage}
+            onChange={(e) => setTestMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !testRunning) runTest()
+            }}
+            placeholder='예: "포항물회 2개 보내주세요"'
+            className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
+            disabled={testRunning}
+          />
+          <button
+            onClick={runTest}
+            disabled={testRunning || !testMessage.trim()}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {testRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            분류 테스트
+          </button>
+        </div>
+
+        {testError && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center gap-2">
+            <XCircle className="w-4 h-4 flex-shrink-0" />
+            {testError}
+          </div>
+        )}
+
+        {testResult && (
+          <div className="mt-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="text-xs text-blue-700 mb-1">분류된 intent</div>
+                <div className="font-bold text-blue-900">
+                  {INTENT_LABELS[testResult.intent]?.label || testResult.intent}
+                </div>
+                <div className="text-[10px] text-blue-600 mt-0.5">{testResult.intent}</div>
+              </div>
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+                <div className="text-xs text-gray-500 mb-1">신뢰도</div>
+                <div className="font-bold text-gray-900">
+                  {(testResult.confidence * 100).toFixed(0)}%
+                </div>
+                <div className="w-full h-1.5 bg-gray-200 rounded-full mt-1.5 overflow-hidden">
+                  <div
+                    className={`h-full ${
+                      testResult.confidence >= 0.6 ? 'bg-green-500' : 'bg-orange-500'
+                    }`}
+                    style={{ width: `${Math.round(testResult.confidence * 100)}%` }}
+                  />
+                </div>
+              </div>
+              <div
+                className={`p-3 border rounded ${
+                  testResult.escalate
+                    ? 'bg-orange-50 border-orange-200'
+                    : 'bg-green-50 border-green-200'
+                }`}
+              >
+                <div
+                  className={`text-xs mb-1 ${
+                    testResult.escalate ? 'text-orange-700' : 'text-green-700'
+                  }`}
+                >
+                  에스컬레이션
+                </div>
+                <div
+                  className={`font-bold flex items-center gap-1 ${
+                    testResult.escalate ? 'text-orange-900' : 'text-green-900'
+                  }`}
+                >
+                  {testResult.escalate ? (
+                    <>
+                      <AlertTriangle className="w-4 h-4" />
+                      사장님 검토 필요
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      자동 응답 가능
+                    </>
+                  )}
+                </div>
+                {testResult.reason && (
+                  <div className="text-[10px] text-orange-700 mt-1">{testResult.reason}</div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+              <div className="text-xs text-gray-500 mb-1">분류 사유</div>
+              <div className="text-sm text-gray-800">{testResult.reasoning || '—'}</div>
+              {(testResult.productName || testResult.quantity || testResult.amount) && (
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  {testResult.productName && (
+                    <span className="px-2 py-0.5 bg-white border border-gray-200 rounded">
+                      상품: <strong>{testResult.productName}</strong>
+                    </span>
+                  )}
+                  {testResult.quantity != null && (
+                    <span className="px-2 py-0.5 bg-white border border-gray-200 rounded">
+                      수량: <strong>{testResult.quantity}</strong>
+                    </span>
+                  )}
+                  {testResult.amount != null && (
+                    <span className="px-2 py-0.5 bg-white border border-gray-200 rounded">
+                      금액: <strong>{testResult.amount.toLocaleString('ko-KR')}원</strong>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded">
+              <div className="text-xs text-indigo-700 mb-1 flex items-center gap-1">
+                <Bot className="w-3 h-3" /> 생성된 자동 응답 초안
+              </div>
+              <div className="text-sm text-gray-800 whitespace-pre-wrap">
+                {testResult.replyDraft || '(응답 없음)'}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       {loading && <div className="text-center text-gray-500 py-12">로딩 중...</div>}
 

@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import {
   Target, Plus, Trash2, Save, Loader2, CheckCircle2, AlertCircle,
   Package, Search, DollarSign, ToggleLeft, ToggleRight, Clock,
+  ShoppingBag, Sparkles, Download, Upload, ArrowRight,
+  Percent, Bot, Wallet, Tag, ExternalLink, Construction,
 } from 'lucide-react'
 
 interface Channel {
@@ -149,6 +152,76 @@ export default function SourcingConditionsPage() {
           <Plus size={16} />
           조건 추가
         </button>
+      </div>
+
+      {/* 자동화 파이프라인 4개 섹션 빠른 진입 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-blue-500" /> 자동화 파이프라인 설정
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              실제 발행/AI/수집/쇼핑몰 세부 옵션은 아래 4개 섹션에서 관리합니다. 클릭하면 해당 섹션으로 이동합니다.
+            </p>
+          </div>
+          <Link
+            href="/sourcing/automation/settings"
+            className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
+          >
+            전체 설정 열기 <ExternalLink size={11} />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Link
+            href="/sourcing/automation/settings#section-shop"
+            className="group p-3 border border-gray-200 rounded-lg hover:border-rose-300 hover:bg-rose-50 transition-colors"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 bg-rose-100 rounded flex items-center justify-center">
+                <ShoppingBag className="w-4 h-4 text-rose-600" />
+              </div>
+              <span className="text-xs font-semibold text-gray-900">쇼핑몰 발행</span>
+            </div>
+            <p className="text-[10px] text-gray-500">발행 대상 쇼핑몰 선택</p>
+          </Link>
+          <Link
+            href="/sourcing/automation/settings#section-ai"
+            className="group p-3 border border-gray-200 rounded-lg hover:border-amber-300 hover:bg-amber-50 transition-colors"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 bg-amber-100 rounded flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-amber-600" />
+              </div>
+              <span className="text-xs font-semibold text-gray-900">AI 변환 설정</span>
+            </div>
+            <p className="text-[10px] text-gray-500">AI/가격 정책 현황</p>
+          </Link>
+          <Link
+            href="/sourcing/automation/settings#section-collection"
+            className="group p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 bg-blue-100 rounded flex items-center justify-center">
+                <Download className="w-4 h-4 text-blue-600" />
+              </div>
+              <span className="text-xs font-semibold text-gray-900">수집 설정</span>
+            </div>
+            <p className="text-[10px] text-gray-500">도매밴드 선택/한도</p>
+          </Link>
+          <Link
+            href="/sourcing/automation/settings#section-publish"
+            className="group p-3 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 bg-green-100 rounded flex items-center justify-center">
+                <Upload className="w-4 h-4 text-green-600" />
+              </div>
+              <span className="text-xs font-semibold text-gray-900">발행 설정</span>
+            </div>
+            <p className="text-[10px] text-gray-500">소매밴드 선택/한도</p>
+          </Link>
+        </div>
       </div>
 
       {message && (
@@ -309,6 +382,106 @@ export default function SourcingConditionsPage() {
             </div>
           ))
         )}
+      </div>
+
+      {/* GBand SaaS Phase 신규 설정 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-500" /> GBand 신규 설정
+          </h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            GBand SaaS Phase 단계에서 추가되는 운영 설정들. 일부는 준비 중입니다.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* tierRules 마진 정책 */}
+          <Link
+            href="/sourcing/policy/list"
+            className="group p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-colors flex items-start gap-3"
+          >
+            <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Percent className="w-5 h-5 text-purple-600" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-900">tierRules 마진 정책</span>
+                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-purple-600" />
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1">
+                채널별 PricingPolicy.tierRules JSON 으로 차등 마진을 설정합니다.
+              </p>
+            </div>
+          </Link>
+
+          {/* 외부주문 + AI 챗 자동주문화 (준비 중) */}
+          <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 flex items-start gap-3 opacity-90">
+            <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Bot className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-900">외부주문 + AI 챗 자동주문화</span>
+                <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full inline-flex items-center gap-1">
+                  <Construction className="w-3 h-3" /> 준비 중
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1">
+                AI 챗에서 ORDER 의도가 잡히면 자동으로 주문 처리합니다. (DB 필드 추가 후 활성화)
+              </p>
+              <div className="mt-2 inline-flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled
+                  className="px-2 py-1 text-[11px] bg-white border border-gray-300 rounded text-gray-400 cursor-not-allowed inline-flex items-center gap-1"
+                >
+                  <ToggleLeft size={14} /> 비활성
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 은행통장 입금 매칭 */}
+          <Link
+            href="/admin/bank-accounts"
+            className="group p-4 border border-gray-200 rounded-lg hover:border-emerald-300 hover:bg-emerald-50 transition-colors flex items-start gap-3"
+          >
+            <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Wallet className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-900">은행통장 입금 매칭</span>
+                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-600" />
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1">
+                무통장 주문과 실시간 입금 내역을 자동 매칭. 본인 통장은 여기에서 관리합니다.
+              </p>
+            </div>
+          </Link>
+
+          {/* postType 분류 */}
+          <Link
+            href="/sourcing/channel/list"
+            className="group p-4 border border-gray-200 rounded-lg hover:border-orange-300 hover:bg-orange-50 transition-colors flex items-start gap-3"
+          >
+            <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Tag className="w-5 h-5 text-orange-600" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-900">postType 분류</span>
+                <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full inline-flex items-center gap-1">
+                  <Construction className="w-3 h-3" /> 준비 중
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1">
+                채널별 Channel.postType (SELF / OUTSOURCE / SHARED) 분류. 채널 상세에서 편집 예정.
+              </p>
+            </div>
+          </Link>
+        </div>
       </div>
     </div>
   )
