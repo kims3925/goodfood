@@ -617,7 +617,7 @@ export default function PolicyModal({
             </label>
             <p className="text-[11px] text-gray-500 mb-2 leading-relaxed">
               💡 게시글 유형(자체/외주/공유)별 차등 마진을 적용합니다. 위에서부터 평가되어
-              첫 매칭 규칙의 마진이 적용됩니다. 조건 예: <code className="bg-gray-100 px-1">postType == 'self'</code>,{' '}
+              첫 매칭 규칙의 마진이 적용됩니다. 조건 예: <code className="bg-gray-100 px-1">postType == &apos;self&apos;</code>,{' '}
               <code className="bg-gray-100 px-1">price &gt;= 100000</code>, <code className="bg-gray-100 px-1">default</code>.
               마진 예: <code className="bg-gray-100 px-1">30%</code> (백분율) 또는{' '}
               <code className="bg-gray-100 px-1">5000</code> (고정 가산).

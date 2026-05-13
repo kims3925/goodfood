@@ -72,7 +72,6 @@ export async function GET(request: NextRequest) {
             channels: true,
             shops: true,
             products: true,
-            staff: true,
           },
         },
         subscription: {
@@ -86,9 +85,10 @@ export async function GET(request: NextRequest) {
     }),
   ])
 
-  // 이번 달 주문 수 (매니저별) — 별도 집계 후 매핑
+  // 이번 달 주문 수 + 스태프 수 (매니저별) — 별도 집계
   const managerIds = managers.map((m: any) => m.id)
   const orderCounts: Record<number, number> = {}
+  const staffCounts: Record<number, number> = {}
   if (managerIds.length > 0) {
     const grouped = await prisma.order.groupBy({
       by: ['userId'],
@@ -100,6 +100,18 @@ export async function GET(request: NextRequest) {
     })
     for (const g of grouped) {
       orderCounts[g.userId] = g._count._all
+    }
+    // managerId 기반 스태프 수 (Prisma _count.staff 가 CI 환경에서 인식 안 되는 케이스 회피)
+    const staffGrouped = await prisma.user.groupBy({
+      by: ['managerId'],
+      where: {
+        managerId: { in: managerIds },
+        deletedAt: null,
+      },
+      _count: { _all: true },
+    })
+    for (const g of staffGrouped) {
+      if (g.managerId != null) staffCounts[g.managerId] = g._count._all
     }
   }
 
@@ -114,7 +126,7 @@ export async function GET(request: NextRequest) {
     createdAt: m.createdAt,
     signupCompletedAt: m.signupCompletedAt,
     stats: {
-      staffCount: m._count?.staff ?? 0,
+      staffCount: staffCounts[m.id] ?? 0,
       channelCount: m._count?.channels ?? 0,
       shopCount: m._count?.shops ?? 0,
       productCount: m._count?.products ?? 0,
