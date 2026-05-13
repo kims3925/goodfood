@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, Save, FileText, Plus, Trash2 } from 'lucide-react'
+import { validateTierRulesJson } from '@/modules/pricing/tier-rules.service'
 
 // ── 정책 유형 (4가지) ─────────────────────────────────
 type PolicyType = 'ZERO_MARGIN' | 'BRACKET_MARGIN' | 'BRACKET_MARGIN_EXTENDED' | 'SD_FOOD_SPECIAL'
@@ -30,6 +31,9 @@ interface PricingPolicy {
   content: string
   isActive: boolean
   channel?: Channel
+  // GBand SaaS Phase 3 (2026-05-13): postType별 차등 마진 규칙 (JSON 또는 stringified)
+  // 비어있으면 옛 content (마진 구간표) 기반 로직 그대로 사용.
+  tierRules?: string | Record<string, unknown> | null
 }
 
 interface PolicyModalProps {
@@ -199,6 +203,10 @@ export default function PolicyModal({
   const [excludeAbove, setExcludeAbove] = useState('')
   const [shippingType, setShippingType] = useState<'free' | 'included' | 'separate'>('separate')
 
+  // GBand SaaS Phase 3 — tierRules JSON 편집기 상태
+  const [tierRulesText, setTierRulesText] = useState('')
+  const [tierRulesError, setTierRulesError] = useState<string | null>(null)
+
   // 도매채널 목록 로드
   useEffect(() => {
     if (isOpen) {
@@ -234,6 +242,18 @@ export default function PolicyModal({
       setBrackets(parsed.brackets)
       setExcludeAbove(parsed.excludeAbove)
       setShippingType(parsed.shippingType)
+      // tierRules — 객체면 stringify, 문자열이면 그대로
+      if (policy.tierRules == null || policy.tierRules === '') {
+        setTierRulesText('')
+      } else if (typeof policy.tierRules === 'string') {
+        setTierRulesText(policy.tierRules)
+      } else {
+        try {
+          setTierRulesText(JSON.stringify(policy.tierRules, null, 2))
+        } catch {
+          setTierRulesText('')
+        }
+      }
     } else {
       setChannelId('')
       setName('')
@@ -243,8 +263,10 @@ export default function PolicyModal({
       setBrackets([])
       setExcludeAbove('')
       setShippingType('separate')
+      setTierRulesText('')
     }
     setError(null)
+    setTierRulesError(null)
   }, [policy, mode, isOpen])
 
   // 정책 유형 변경 → 기본 구간 자동 채움
@@ -312,6 +334,23 @@ export default function PolicyModal({
 
     const content = serializeContent(policyType, brackets, excludeAbove, shippingType)
 
+    // GBand SaaS Phase 3 — tierRules JSON 검증 (비어있으면 통과)
+    let tierRulesPayload: string | null = null
+    const trimmedTierRules = tierRulesText.trim()
+    if (trimmedTierRules) {
+      const v = validateTierRulesJson(trimmedTierRules)
+      if (!v.ok) {
+        setTierRulesError(v.error)
+        setError(`tierRules JSON 오류: ${v.error}`)
+        return
+      }
+      // 정규화된 JSON 문자열 저장 (DB Json 컬럼은 stringified 도 그대로 수용)
+      tierRulesPayload = JSON.stringify(v.payload)
+      setTierRulesError(null)
+    } else {
+      setTierRulesError(null)
+    }
+
     setIsSaving(true)
     try {
       await onSave({
@@ -321,6 +360,7 @@ export default function PolicyModal({
         description: description.trim() || null,
         content,
         isActive,
+        tierRules: tierRulesPayload, // null = 옛 로직 fallthrough
       })
       onClose()
     } catch (err) {
@@ -567,6 +607,58 @@ export default function PolicyModal({
                 </label>
               ))}
             </div>
+          </div>
+
+          {/* GBand SaaS Phase 3 — postType별 차등 마진 (tierRules JSON) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              차등 마진 규칙 (tierRules JSON)
+              <span className="text-gray-400 text-xs ml-2">(선택 — 비워두면 위 마진 구간표만 사용)</span>
+            </label>
+            <p className="text-[11px] text-gray-500 mb-2 leading-relaxed">
+              💡 게시글 유형(자체/외주/공유)별 차등 마진을 적용합니다. 위에서부터 평가되어
+              첫 매칭 규칙의 마진이 적용됩니다. 조건 예: <code className="bg-gray-100 px-1">postType == 'self'</code>,{' '}
+              <code className="bg-gray-100 px-1">price &gt;= 100000</code>, <code className="bg-gray-100 px-1">default</code>.
+              마진 예: <code className="bg-gray-100 px-1">30%</code> (백분율) 또는{' '}
+              <code className="bg-gray-100 px-1">5000</code> (고정 가산).
+            </p>
+            <textarea
+              value={tierRulesText}
+              onChange={(e) => {
+                setTierRulesText(e.target.value)
+                if (tierRulesError) setTierRulesError(null)
+              }}
+              onBlur={() => {
+                const t = tierRulesText.trim()
+                if (!t) {
+                  setTierRulesError(null)
+                  return
+                }
+                const v = validateTierRulesJson(t)
+                setTierRulesError(v.ok ? null : v.error)
+              }}
+              rows={10}
+              spellCheck={false}
+              placeholder={`예시:
+{
+  "type": "tiered",
+  "rules": [
+    { "condition": "postType == 'self'",      "margin": "30%",   "desc": "자체발송" },
+    { "condition": "postType == 'outsource'", "margin": "20%",   "desc": "외주발송" },
+    { "condition": "price >= 100000",         "margin": "15%",   "desc": "고가 상품" },
+    { "condition": "default",                 "margin": "25%",   "desc": "기본 마진" }
+  ]
+}`}
+              className={`w-full px-3 py-2 border rounded-lg font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                tierRulesError ? 'border-red-400 bg-red-50' : 'border-gray-300'
+              }`}
+            />
+            {tierRulesError && (
+              <p className="mt-1.5 text-xs text-red-600">⚠ {tierRulesError}</p>
+            )}
+            {!tierRulesError && tierRulesText.trim() && (
+              <p className="mt-1.5 text-xs text-green-600">✓ 유효한 tierRules JSON</p>
+            )}
           </div>
 
           {/* 저장 전 미리보기 */}
