@@ -101,17 +101,12 @@ export async function GET(request: NextRequest) {
     for (const g of grouped) {
       orderCounts[g.userId] = g._count._all
     }
-    // managerId 기반 스태프 수 (Prisma _count.staff 가 CI 환경에서 인식 안 되는 케이스 회피)
-    const staffGrouped = await prisma.user.groupBy({
-      by: ['managerId'],
-      where: {
-        managerId: { in: managerIds },
-        deletedAt: null,
-      },
-      _count: { _all: true },
-    })
-    for (const g of staffGrouped) {
-      if (g.managerId != null) staffCounts[g.managerId] = g._count._all
+    // managerId 기반 스태프 수 — raw SQL 로 회피 (Prisma client schema 동기화 이슈)
+    const staffRows = await prisma.$queryRawUnsafe<Array<{ manager_id: number; cnt: bigint }>>(
+      `SELECT manager_id, COUNT(*) AS cnt FROM user WHERE manager_id IN (${managerIds.join(',')}) AND deleted_at IS NULL GROUP BY manager_id`
+    )
+    for (const row of staffRows) {
+      staffCounts[row.manager_id] = Number(row.cnt)
     }
   }
 
