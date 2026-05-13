@@ -113,8 +113,11 @@ export async function tryCreateAutoOrder(messageId: number): Promise<AutoOrderRe
   const phoneRe = /^[\d\-\s]{9,15}$/
   const guestPhone = phoneRe.test(msg.senderId) ? msg.senderId : '미입력'
 
+  // Phase 4: source 매핑 (KAKAO 채널은 'KAKAO', 그 외 밴드/SMS 등은 'CHAT')
+  const source: 'CHAT' | 'KAKAO' = msg.channel === 'KAKAO' ? 'KAKAO' : 'CHAT'
+
   const created = await prisma.$transaction(async (tx) => {
-    const order = await tx.guestOrder.create({
+    const order = await (tx as any).guestOrder.create({
       data: {
         shopId: shop.id,
         orderNumber,
@@ -124,6 +127,10 @@ export async function tryCreateAutoOrder(messageId: number): Promise<AutoOrderRe
         subtotalAmount: subtotal,
         discountAmount: 0,
         totalAmount,
+        // Phase 4 — 자동변환 경로 식별 + inbox 메시지 역참조
+        source,
+        externalKind: 'RETAIL',
+        inboxMessageId: messageId,
       },
     })
     await tx.guestOrderItem.create({

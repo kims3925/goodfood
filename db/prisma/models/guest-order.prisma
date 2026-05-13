@@ -22,6 +22,12 @@ model GuestOrder {
   wholesaleOrderStatus  WholesaleOrderStatus? @map("wholesale_order_status")
   wholesaleChannelId    Int?                  @map("wholesale_channel_id")
   wholesaleOrderedAt    DateTime?             @map("wholesale_ordered_at") @db.Timestamp(0)
+  // BandAuto SaaS Phase 4 — 주문 발생 경로 (외부주문/AI 챗 자동변환)
+  source                OrderSource           @default(SHOP)
+  externalKind          ExternalOrderKind?    @map("external_kind")
+  externalMemo          String?               @map("external_memo") @db.Text
+  // 메시지 발신자 정보 (CHAT/KAKAO 자동변환 시 inbox_message 와 연결용)
+  inboxMessageId        Int?                  @map("inbox_message_id")
   shop                  Shop?                 @relation(fields: [shopId], references: [id])
   wholesaleChannel      Channel?              @relation("GuestOrderWholesaleChannel", fields: [wholesaleChannelId], references: [id])
   items                 GuestOrderItem[]
@@ -38,6 +44,8 @@ model GuestOrder {
   @@index([deliveredAt])
   @@index([shopId, status])
   @@index([wholesaleOrderStatus])
+  @@index([source])
+  @@index([inboxMessageId])
   @@map("guest_order")
 }
 

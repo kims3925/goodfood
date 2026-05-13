@@ -184,3 +184,24 @@ enum BundleShippingType {
   INCLUDED  // 배송비 포함형: 소매가에 배송비 포함, 합배송 시 할인
   SEPARATE  // 배송비 별도형: 소매가 + 배송비, 합배송 시 배송비 절약
 }
+
+// GBand SaaS (2026-05-13): 게시글 출처 분류 - 채널/정책 차등 마진용
+enum PostType {
+  SELF        // 자체 발행
+  OUTSOURCE   // 외주 발행
+  SHARED      // 공유 게시글
+}
+
+// GBand SaaS (2026-05-13): 주문 출처 추적
+enum OrderSource {
+  SHOP    // 쇼핑몰 (기본)
+  CHAT    // 밴드 채팅
+  KAKAO   // 카카오톡
+  MANUAL  // 수동 입력
+}
+
+// GBand SaaS Phase 4 (2026-05-13): 외부주문 분류 (소매 vs 도매발주)
+enum ExternalOrderKind {
+  RETAIL     // 소매주문 (고객에게 받음)
+  WHOLESALE  // 도매발주 (도매처에 직접 발주)
+}

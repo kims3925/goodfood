@@ -17,9 +17,14 @@ model Order {
   createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamp(0)
   shopId                Int?                  @map("shop_id")
+  // GBand SaaS (2026-05-13): 주문 출처 추적 (SHOP/CHAT/KAKAO/MANUAL)
+  source                OrderSource           @default(SHOP) @map("source")
   wholesaleOrderStatus  WholesaleOrderStatus? @map("wholesale_order_status")
   wholesaleChannelId    Int?                  @map("wholesale_channel_id")
   wholesaleOrderedAt    DateTime?             @map("wholesale_ordered_at") @db.Timestamp(0)
+  // BandAuto SaaS Phase 4 — 주문 발생 경로 (외부주문/AI 챗 자동변환)
+  externalKind          ExternalOrderKind?    @map("external_kind")
+  externalMemo          String?               @map("external_memo") @db.Text
   shop                  Shop?                 @relation(fields: [shopId], references: [id])
   wholesaleChannel      Channel?              @relation("OrderWholesaleChannel", fields: [wholesaleChannelId], references: [id])
   user                  User                  @relation(fields: [userId], references: [id])
@@ -40,6 +45,7 @@ model Order {
   @@index([userId, status])
   @@index([shopId, status])
   @@index([wholesaleOrderStatus])
+  @@index([source])
   @@map("order")
 }
 

@@ -1,0 +1,66 @@
+// 은행통장 연결 + 거래내역 매칭 (BandAuto SaaS Phase 4)
+//
+// 셀러가 자신의 거래 은행계좌를 등록하면, 입금 거래내역을 수동/자동으로
+// 가져와서 PENDING 상태의 외부주문(GuestOrder)과 자동 매칭한다.
+//
+// - apiProvider=NONE  : 수동 등록 전용 (UI 에서 거래내역 직접 입력)
+// - apiProvider=TOSS / KAKAOBANK / KFTC : 향후 실연동용 (인터페이스만 정의)
+//   * apiCredentials Json? — 인증정보(키/토큰) 암호화 저장
+//
+// 매칭 로직 (bank-matching.service.ts):
+//   새 BankTransaction(입금) → 같은 userId 의 PENDING GuestOrder 중
+//   `totalAmount === amount` 이고
+//   `guestName` 또는 `shippingAddress.recipientName` 이 `senderName` 과 매칭되면
+//   자동으로 status=PAID 전환 + matchedOrderId/matchedAt 기록.
+
+enum BankApiProvider {
+  NONE        // 수동 등록 전용
+  TOSS        // 토스 오픈뱅킹
+  KAKAOBANK   // 카카오뱅크
+  KFTC        // 금융결제원 오픈뱅킹
+  CUSTOM      // 직접 연동
+
+  @@map("bank_api_provider")
+}
+
+model BankAccount {
+  id              Int             @id @default(autoincrement())
+  userId          Int             @map("user_id")
+  bankName        String          @map("bank_name") @db.VarChar(50)
+  accountNumber   String          @map("account_number") @db.VarChar(50)
+  accountHolder   String          @map("account_holder") @db.VarChar(100)
+  apiProvider     BankApiProvider @default(NONE) @map("api_provider")
+  apiCredentials  Json?           @map("api_credentials")  // 키/토큰 (암호화 저장 권장)
+  isActive        Boolean         @default(true) @map("is_active")
+  lastSyncedAt    DateTime?       @map("last_synced_at") @db.Timestamp(0)
+  deletedAt       DateTime?       @map("deleted_at") @db.Timestamp(0)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  transactions    BankTransaction[]
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@map("bank_account")
+}
+
+model BankTransaction {
+  id              Int          @id @default(autoincrement())
+  bankAccountId   Int          @map("bank_account_id")
+  transactionDate DateTime     @map("transaction_date") @db.Timestamp(0)
+  amount          Decimal      @db.Decimal(12, 2)        // 양수=입금, 음수=출금
+  senderName      String?      @map("sender_name") @db.VarChar(100)
+  description     String?      @db.VarChar(500)
+  matchedOrderId  Int?         @map("matched_order_id")  // GuestOrder.id (소매주문 시)
+  matchedAt       DateTime?    @map("matched_at") @db.Timestamp(0)
+  raw             Json?        // API/수동 등록 원본 데이터
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
+
+  bankAccount     BankAccount  @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  @@index([bankAccountId])
+  @@index([transactionDate])
+  @@index([matchedOrderId])
+  @@index([senderName])
+  @@map("bank_transaction")
+}
