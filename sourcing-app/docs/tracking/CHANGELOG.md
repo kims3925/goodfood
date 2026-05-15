@@ -21,6 +21,19 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260515-013 | Done | 2026-05-15 | - | SD푸드 정책 시 가격이미지 필터 자동 스킵 (실 상품 사진 과탐 방지) | Low | Claude |
+| TR-20260515-012 | Done | 2026-05-15 | - | MarketingAgent 멀티테넌트 fan-out — BandNoticeConfig.isEnabled 사용자별 발화 + scheduleTimes ±5분 매칭 | Medium | Claude |
+| TR-20260515-011 | Done | 2026-05-15 | - | 다른 페이지 server-side 잡 마이그 — /sourcing/publish 재발행, /sourcing/post/list Stage2 (탭 닫아도 진행) | Medium | Claude |
+| TR-20260515-010 | Done | 2026-05-15 | - | SaaS 예방책 Phase 2 — 발행 헬스 워치독 (1h success_rate 모니터 + 자동 OFF) + Phase 4 — 세션 만료 +14일 자동 + D-3/D-1/EXPIRED 알림 | Large | Claude |
+| TR-20260515-009 | Done | 2026-05-15 | - | SaaS 예방책 Phase 1+3 — 매니저 대시보드 세션 헬스 배너 + pre-flight 차단 (cookie 길이 < 1000 catch) | Medium | Claude |
+| TR-20260515-008 | Done | 2026-05-15 | - | 주문 엑셀 저장 — 소매밴드 + 결제 정보 4컬럼 추가 + 금액/배송비 실제 주문 값으로 수정 (상품 마스터 폴백 버그 fix) | Medium | Claude |
+| TR-20260515-007 | Done | 2026-05-15 | - | 푸터 이미지 발행 0% 실패 hotfix — 내부 API 이미지 로컬 파일 직접 읽기 + 부분 실패 허용 | Critical | Claude |
+| TR-20260515-006 | Done | 2026-05-15 | - | 인기상품 popularity 서비스 + ETL + ProductManagerAgent bestseller 이벤트 (5년 데이터 활용 백엔드) | Large | Claude |
+| TR-20260515-005 | Done | 2026-05-15 | - | 광고&마케팅 메뉴 + 밴드공지 설정 페이지 + GET/PUT /api/admin/band-notice/config | Medium | Claude |
+| TR-20260515-004 | Done | 2026-05-15 | - | BandNoticeConfig + LegacyOrder Prisma 모델 + db push (운영 적용 완료) | Medium | Claude |
+| TR-20260515-003 | Done | 2026-05-15 | - | 가공상품 발행을 서버 사이드 백그라운드 잡으로 (POST /api/publish/processed-job, 탭 닫아도 진행) | Large | Claude |
+| TR-20260515-002 | Done | 2026-05-15 | - | 자동화설정 흐름 제어 패널 (실행중 다건 표시 + 전체중지/재등록/stuck 정리/영구비활성화) | Medium | Claude |
+| TR-20260515-001 | Done | 2026-05-15 | - | Band 세션 만료 진단 — 모든 RETAIL 채널 cookie NULL 확인, Extension 재저장 가이드 | Low | Claude |
 | TR-20260424-002 | Done | 2026-04-24 | - | 카카오톡 광고 자동 생성 기능 + 신규 광고 페이지 (콜라주 발행/카톡 광고 2탭) + '상품및광고' 메뉴 재편 | Large | Claude |
 | TR-20260424-001 | Done | 2026-04-24 | - | 종합발행 콜라주(Collage) 모드 추가 - 12개 상품을 배경 제거된 포스터 1장으로 합성 + 쇼핑몰 카테고리 페이지 신설 | Medium | Claude |
 | TR-20260406-001 | Done | 2026-04-06 | - | 수집상품/가공상품 페이지 통합 (탭 구조), 수집게시물 AI미가공 필터링, 네비게이션 메뉴 정리 | Medium | Claude |
