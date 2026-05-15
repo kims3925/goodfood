@@ -28,7 +28,7 @@ import Loading from '@/components/ui/Loading'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import { checkExtensionInstalled, saveSessionViaExtension } from '@/lib/band-extension'
-import { scheduleDelayedPublish, formatScheduledTime } from '@/lib/delayed-publish'
+import { formatScheduledTime } from '@/lib/delayed-publish'
 import { CATEGORY_LIST } from '@/modules/category/category.keywords'
 
 const BandIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
@@ -1298,14 +1298,17 @@ function PublishPageContent() {
   const [republishAvailableShops, setRepublishAvailableShops] = useState<{ id: number; name: string }[]>([])
   const [republishSelectedChannelIds, setRepublishSelectedChannelIds] = useState<Set<number>>(new Set())
   const [republishSelectedShopIds, setRepublishSelectedShopIds] = useState<Set<number>>(new Set())
-  // 자동발행 경로 사용 — 기본 ON. 켜면 /api/automation/execute (자동발행 cron과 동일한
-  // runPublishPipeline 경로) 호출, 끄면 기존 per-channel template/publish 루프.
-  const [useAutoPath, setUseAutoPath] = useState(true)
+  // 재발행 모드 (개별/종합) — ProcessedProductTab 패턴과 동일.
+  const [republishMode, setRepublishMode] = useState<{ individual: boolean; digest: boolean }>({
+    individual: true,
+    digest: false,
+  })
   // 재발행 지연 (분). 0 = 즉시.
   const [republishDelayMinutes, setRepublishDelayMinutes] = useState<number>(0)
-  // 예약된 재발행 취소 핸들러.
+  // 예약된 재발행 — 서버 측 workflow 의 메타데이터. delayMinutes > 0 일 때만 set.
+  // 취소는 DELETE /api/automation/execute?workflowId=N 로 서버 측 워크플로우를 취소.
   const [pendingRepublishCancel, setPendingRepublishCancel] = useState<{
-    cancel: () => void
+    workflowId: number
     scheduledAt: number
   } | null>(null)
 
@@ -1343,208 +1346,91 @@ function PublishPageContent() {
     }
   }
 
-  // 모달에서 "재발행 시작" 클릭 → 선택된 채널/쇼핑몰만 발행
+  // 모달에서 "재발행 시작" 클릭 → 서버 측 백그라운드 잡 등록.
+  // 옛 흐름: retail(auto-execute) + per-shop loop + republish-mark 클라이언트 처리
+  //         → 탭 닫으면 도중 중단.
+  // 새 흐름: /api/publish/processed-job 1회 호출 → 서버 setImmediate 로 처리.
+  //         진행률은 WorkflowLog 영속화 → AutomationFlowControl 패널에서 확인/취소.
   const confirmRepublish = async () => {
     setRepublishModalOpen(false)
 
-    const targetIds = [...selectedProductIds]
-    const retailChannels = republishAvailableChannels.filter((c) =>
-      republishSelectedChannelIds.has(c.id)
-    )
-    const activeShops = republishAvailableShops.filter((s) =>
-      republishSelectedShopIds.has(s.id)
-    )
+    if (!republishMode.individual && !republishMode.digest) {
+      toast.error('개별발행 또는 종합발행 중 하나 이상을 선택하세요.')
+      return
+    }
 
-    if (retailChannels.length === 0 && activeShops.length === 0) {
+    const delay = Math.max(0, Math.floor(republishDelayMinutes || 0))
+    await runRepublishNow(delay)
+  }
+
+  // 서버 사이드 백그라운드 잡 등록 — 탭이 닫혀도 진행됨.
+  const runRepublishNow = async (delayMinutes: number = 0) => {
+    const targetIds = [...selectedProductIds]
+    const retailChannelIds = republishAvailableChannels
+      .filter((c) => republishSelectedChannelIds.has(c.id))
+      .map((c) => c.id)
+    const shopIds = republishAvailableShops
+      .filter((s) => republishSelectedShopIds.has(s.id))
+      .map((s) => s.id)
+
+    if (targetIds.length === 0) {
+      toast.error('재발행할 상품을 선택해주세요.')
+      return
+    }
+    if (retailChannelIds.length === 0 && shopIds.length === 0) {
       toast.error('발행할 대상(소매밴드 또는 쇼핑몰)을 1개 이상 선택해주세요.')
       return
     }
 
-    // 지연 발행 분기: delayMinutes > 0 → setTimeout 으로 예약
-    const delay = Math.max(0, Math.floor(republishDelayMinutes || 0))
-    if (delay > 0) {
-      const scheduledAt = Date.now() + delay * 60 * 1000
-      const summary = `${targetIds.length}개 상품 / 밴드 ${retailChannels.length} + 쇼핑몰 ${activeShops.length}`
-      const cancel = scheduleDelayedPublish(
-        delay,
-        () => {
-          setPendingRepublishCancel(null)
-          void runRepublishNow(targetIds, retailChannels, activeShops)
-        },
-        { jobKey: 'republish', jobLabel: '재발행', payloadSummary: summary }
-      )
-      setPendingRepublishCancel({ cancel, scheduledAt })
-      toast.success(
-        `${delay}분 후 재발행 예약됨 (${formatScheduledTime(scheduledAt)}) — 탭을 닫으면 취소됩니다.`
-      )
-      return
-    }
-
-    await runRepublishNow(targetIds, retailChannels, activeShops)
-  }
-
-  // 실제 재발행 실행 (즉시 또는 지연 후 호출)
-  const runRepublishNow = async (
-    targetIds: number[],
-    retailChannels: { id: number; name: string }[],
-    activeShops: { id: number; name: string }[]
-  ) => {
     setIsPublishing(true)
     setRepublishingIds(new Set(targetIds))
     setRepublishProgress({ current: 0, total: targetIds.length, success: 0, failed: 0 })
-    setSelectedProductIds([])
-    setSelectAllProducts(false)
-
-    let successCount = 0
-    let failCount = 0
-
-    // 🚀 자동발행 경로 사용: /api/automation/execute(type=publish)로 단일 호출.
-    // 이 경로는 자동발행 cron이 사용하는 runPublishPipeline → publishService.publishBatch
-    // 와 100% 동일하므로 포맷(폰트/이미지 순서)이 자동발행과 일치.
-    if (useAutoPath && retailChannels.length > 0) {
-      try {
-        const res = await fetch('/api/automation/execute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            type: 'publish',
-            config: {
-              channelIds: retailChannels.map((c) => c.id),
-              productIds: targetIds,
-              publishReadyOnly: false, // 재발행이므로 이미 발행된 채널도 다시 발행
-            },
-          }),
-        })
-        const data = await res.json()
-        if (data.success) {
-          const stage = data.data?.stages?.publish
-          successCount += stage?.successCount || 0
-          failCount += stage?.failedCount || 0
-        } else {
-          failCount += targetIds.length
-          toast.error(`자동발행 경로 발행 실패: ${data.error || '알 수 없음'}`)
-        }
-      } catch (err: any) {
-        failCount += targetIds.length
-        toast.error(`자동발행 경로 발행 오류: ${err?.message || '네트워크'}`)
-      } finally {
-        // 쇼핑몰만 자동발행 경로 외에 별도 처리 (auto execute는 automationConfig.shopIds만 사용)
-        if (activeShops.length > 0) {
-          for (const productId of targetIds) {
-            for (const shop of activeShops) {
-              try {
-                await fetch('/api/shop/publish', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
-                })
-              } catch (e) {
-                console.warn(`재발행(자동경로) - 쇼핑몰 발행 실패 (shopId=${shop.id})`, e)
-              }
-            }
-          }
-        }
-        // republish-mark
-        for (const productId of targetIds) {
-          try {
-            await fetch(`/api/product/${productId}/republish-mark`, {
-              method: 'POST',
-              credentials: 'include',
-            })
-          } catch (e) {
-            console.warn(`재발행(자동경로) - republish-mark 실패 (productId=${productId})`, e)
-          }
-        }
-        setIsPublishing(false)
-        setRepublishingIds(new Set())
-        setRepublishProgress({ current: 0, total: 0, success: 0, failed: 0 })
-        if (successCount > 0) toast.success(`${successCount}개 재발행 완료 (자동발행 경로)`)
-        if (failCount > 0) toast.error(`${failCount}개 재발행 실패`)
-        loadProducts()
-      }
-      return
-    }
 
     try {
-      // 기존 폴백 경로 — 자동발행 경로 OFF 시 사용
-      // 자동발행과 동일한 순서로 발행: 각 상품마다 밴드 먼저 → 쇼핑몰 나중
-      for (let i = 0; i < targetIds.length; i++) {
-        const productId = targetIds[i]
-        setRepublishProgress(prev => ({ ...prev, current: i + 1 }))
-        let productOk = true
+      const res = await fetch('/api/publish/processed-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          productIds: targetIds,
+          retailChannelIds,
+          shopIds,
+          mode: {
+            individual: republishMode.individual,
+            digest: republishMode.digest,
+          },
+          digestMaxImagesPerProduct: 4,
+          delayMinutes,
+        }),
+      })
+      const data = await res.json()
 
-        // 2-1) 소매밴드 발행 (Playwright 템플릿)
-        for (const channel of retailChannels) {
-          try {
-            const res = await fetch('/api/publish/template/publish', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ productId, channelId: channel.id }),
-            })
-            const data = await res.json()
-            if (!(data.success || data.publishId)) {
-              console.warn(`재발행 - 밴드 발행 실패 (channelId=${channel.id}):`, data.message || data.error)
-              productOk = false
-            }
-          } catch (e) {
-            console.warn(`재발행 - 밴드 발행 오류 (channelId=${channel.id})`, e)
-            productOk = false
-          }
-        }
-
-        // 2-2) 쇼핑몰 발행 (Shop별 ShopProduct 생성/갱신)
-        for (const shop of activeShops) {
-          try {
-            await fetch('/api/shop/publish', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
-            })
-          } catch (e) {
-            console.warn(`재발행 - 쇼핑몰 발행 실패 (shopId=${shop.id})`, e)
-          }
-        }
-
-        // 2-3) 성공 시 republishedAt 마킹 (가공상품 목록 "재발행완료" 표시용)
-        if (productOk) {
-          try {
-            await fetch(`/api/product/${productId}/republish-mark`, {
-              method: 'POST',
-              credentials: 'include',
-            })
-          } catch (e) {
-            console.warn(`재발행 - republish-mark 실패 (productId=${productId})`, e)
-          }
-          successCount++
-        } else {
-          failCount++
-        }
-
-        setRepublishProgress(prev => ({ ...prev, success: successCount, failed: failCount }))
-        setRepublishingIds(prev => {
-          const next = new Set(prev)
-          next.delete(productId)
-          return next
-        })
+      if (!data.success) {
+        toast.error(`발행 작업 등록 실패: ${data.error || '알 수 없음'}`)
+        return
       }
+
+      if (delayMinutes > 0 && data.scheduledAt) {
+        const scheduledAt = new Date(data.scheduledAt).getTime()
+        setPendingRepublishCancel({ workflowId: data.workflowId, scheduledAt })
+        toast.success(
+          `${delayMinutes}분 후 재발행 예정 (${formatScheduledTime(scheduledAt)}) — 탭을 닫아도 서버에서 진행됩니다. (워크플로우 #${data.workflowId})`
+        )
+      } else {
+        toast.success(
+          `발행 작업이 시작되었습니다 (워크플로우 #${data.workflowId}) — 탭을 닫아도 진행됩니다. ` +
+          `자동화설정에서 진행상황 확인`
+        )
+      }
+
+      setSelectedProductIds([])
+      setSelectAllProducts(false)
     } catch (err: any) {
-      toast.error(`재발행 중 오류: ${err?.message || '알 수 없는 오류'}`)
+      toast.error(`발행 작업 등록 중 오류: ${err?.message || '알 수 없는 오류'}`)
     } finally {
       setIsPublishing(false)
       setRepublishingIds(new Set())
       setRepublishProgress({ current: 0, total: 0, success: 0, failed: 0 })
-
-      if (successCount > 0) {
-        toast.success(`${successCount}개 재발행 완료 (쇼핑몰 + 밴드)`)
-      }
-      if (failCount > 0) {
-        toast.error(`${failCount}개 재발행 실패`)
-      }
-      loadProducts()
     }
   }
 
@@ -1648,18 +1534,34 @@ function PublishPageContent() {
             </span>
           )}
 
-          {/* 재발행 예약 안내 (대기 중) */}
+          {/* 재발행 예약 안내 (서버 측 워크플로우 — 탭 닫아도 유지) */}
           {pendingRepublishCancel && (
             <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-md">
               <span className="text-xs text-amber-900">
                 ⏳ <strong>{formatScheduledTime(pendingRepublishCancel.scheduledAt)}</strong> 재발행 예약됨
+                <span className="ml-1 text-[10px] text-amber-700">
+                  (워크플로우 #{pendingRepublishCancel.workflowId} · 탭 닫아도 진행)
+                </span>
               </span>
               <button
                 type="button"
-                onClick={() => {
-                  pendingRepublishCancel.cancel()
-                  setPendingRepublishCancel(null)
-                  toast.success('예약된 재발행이 취소되었습니다.')
+                onClick={async () => {
+                  const wid = pendingRepublishCancel.workflowId
+                  try {
+                    const res = await fetch(`/api/automation/execute?workflowId=${wid}`, {
+                      method: 'DELETE',
+                      credentials: 'include',
+                    })
+                    const json = await res.json().catch(() => ({}))
+                    if (res.ok && json?.success) {
+                      setPendingRepublishCancel(null)
+                      toast.success('예약된 재발행이 취소되었습니다.')
+                    } else {
+                      toast.error(json?.error || '취소 실패')
+                    }
+                  } catch (e: any) {
+                    toast.error(`취소 실패: ${e?.message || '네트워크 오류'}`)
+                  }
                 }}
                 className="px-2 py-0.5 text-[11px] bg-amber-600 hover:bg-amber-700 text-white rounded"
               >
@@ -2404,21 +2306,35 @@ function PublishPageContent() {
                 선택한 <strong>{selectedProductIds.length}개</strong> 상품을 어디에 재발행할지 고르세요.
                 밴드/쇼핑몰 각각 다중 선택 가능. 1개 이상 선택해야 발행됩니다.
               </p>
-              <label className="mt-2 flex items-start gap-2 text-xs cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={useAutoPath}
-                  onChange={(e) => setUseAutoPath(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600"
-                />
-                <span>
-                  <strong className="text-blue-700">자동발행 경로 사용 (권장)</strong>
-                  <span className="ml-1 text-gray-600">
-                    — 자동발행 cron과 동일한 runPublishPipeline 호출. 폰트/이미지 첨부 등 포맷이
-                    자동발행 결과와 일치. 끄면 기존 template/publish 경로(폴백) 사용.
-                  </span>
+              {/* 발행 모드 (개별/종합) — ProcessedProductTab 패턴과 동일 */}
+              <div className="mt-3 flex items-center gap-4 text-xs">
+                <span className="font-semibold text-gray-700">발행 방식:</span>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={republishMode.individual}
+                    onChange={(e) =>
+                      setRepublishMode((prev) => ({ ...prev, individual: e.target.checked }))
+                    }
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                  />
+                  <span className="text-gray-800">📌 개별 발행</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={republishMode.digest}
+                    onChange={(e) =>
+                      setRepublishMode((prev) => ({ ...prev, digest: e.target.checked }))
+                    }
+                    className="w-4 h-4 rounded border-gray-300 text-purple-600"
+                  />
+                  <span className="text-gray-800">📚 종합 발행</span>
+                </label>
+                <span className="text-[11px] text-gray-500">
+                  탭 닫아도 서버에서 진행됩니다.
                 </span>
-              </label>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-5">

@@ -899,9 +899,11 @@ export default function PostsManagePage() {
   }, [])
 
   // 상품 발행 (Stage 2 → 소매밴드 + 활성 쇼핑몰)
-  // 자동발행/재발행과 동일한 /api/automation/execute(type=publish) 단일 호출 경로 사용.
-  // 이전엔 per-product per-channel 로 /api/publish/template/publish 를 호출해 카드 포맷
-  // 깨짐(제목 카드가 본문 사이에 끼임 / 댓글에 쇼핑몰 링크 누락) 사고가 발생했음.
+  // 서버 사이드 백그라운드 잡 등록 — 탭이 닫혀도 진행됨.
+  // 옛 흐름: 클라이언트가 retail(자동경로) + per-shop loop 직접 호출 → 탭 닫으면 중단.
+  // 새 흐름: /api/publish/processed-job 1회 호출 → 서버에서 setImmediate 로 처리.
+  //         진행률은 WorkflowLog 영속화 → 자동화설정 페이지의 AutomationFlowControl 패널에서
+  //         확인/취소 가능.
   const handlePublishProducts = async () => {
     if (selectedProductIds.length === 0) {
       toast.error('발행할 상품을 선택해주세요.')
@@ -911,15 +913,8 @@ export default function PostsManagePage() {
     setIsPublishing(true)
     setPublishProgress({ current: 0, total: selectedProductIds.length, failed: 0 })
 
-    let bandSuccess = 0
-    let bandFail = 0
-    let shopSuccess = 0
-    let shopFail = 0
-    let shopSkipped = 0
-    const errorMessages: string[] = []
-
     try {
-      // 1) 소매밴드 채널 + 활성 쇼핑몰 동시 조회
+      // 1) 소매밴드 채널 + 활성 쇼핑몰 동시 조회 (target id 목록 산출)
       const [chRes, shopRes] = await Promise.all([
         fetch('/api/channel?kind=RETAIL&limit=100', { credentials: 'include' }),
         fetch('/api/shop?isActive=true&limit=100', { credentials: 'include' }),
@@ -932,88 +927,43 @@ export default function PostsManagePage() {
 
       if (retailChannels.length === 0 && activeShops.length === 0) {
         toast.error('등록된 소매밴드 또는 쇼핑몰이 없습니다.')
-        setIsPublishing(false)
         return
       }
 
-      // 2) 소매밴드 발행 — 단일 자동경로 호출 (자동발행 cron 과 동일 결과)
-      if (retailChannels.length > 0) {
-        try {
-          const res = await fetch('/api/automation/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              type: 'publish',
-              config: {
-                channelIds: retailChannels.map((c) => c.id),
-                productIds: selectedProductIds,
-                publishReadyOnly: false,
-              },
-            }),
-          })
-          const data = await res.json()
-          if (data.success) {
-            const stage = data.data?.stages?.publish
-            bandSuccess += stage?.successCount || 0
-            bandFail += stage?.failedCount || 0
-          } else {
-            bandFail += selectedProductIds.length
-            errorMessages.push(`[밴드 자동경로] ${data.error || '알 수 없음'}`)
-          }
-        } catch (err: any) {
-          bandFail += selectedProductIds.length
-          errorMessages.push(`[밴드 자동경로] ${err?.message || '네트워크 오류'}`)
-        }
+      // 2) 서버 사이드 백그라운드 잡 등록 (개별 발행 모드 — Stage2 기본)
+      const res = await fetch('/api/publish/processed-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          productIds: selectedProductIds,
+          retailChannelIds: retailChannels.map((c) => c.id),
+          shopIds: activeShops.map((s) => s.id),
+          mode: { individual: true, digest: false },
+          digestMaxImagesPerProduct: 4,
+          delayMinutes: 0,
+        }),
+      })
+      const data = await res.json()
+
+      if (!data.success) {
+        toast.error(`발행 작업 등록 실패: ${data.error || '알 수 없음'}`)
+        return
       }
 
-      // 3) 쇼핑몰 발행 — product × shop 루프 (자동/재발행 흐름과 동일)
-      for (const productId of selectedProductIds) {
-        for (const shop of activeShops) {
-          try {
-            const res = await fetch('/api/shop/publish', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
-            })
-            const data = await res.json()
-            if (data.success && data.summary) {
-              shopSuccess += data.summary.success || 0
-              shopSkipped += data.summary.skipped || 0
-              shopFail += data.summary.failed || 0
-              if (data.summary.failed > 0 && data.results) {
-                data.results
-                  .filter((r: any) => r.status === 'FAILED')
-                  .forEach((r: any) => errorMessages.push(`[쇼핑몰:${shop.name}] ${r.message || '발행 실패'}`))
-              }
-            } else {
-              shopFail++
-              errorMessages.push(`[쇼핑몰:${shop.name}] ${data.error || data.message || '알 수 없음'}`)
-            }
-          } catch (err: any) {
-            shopFail++
-            errorMessages.push(`[쇼핑몰:${shop.name}] ${err?.message || '네트워크 오류'}`)
-          }
-        }
-      }
+      toast.success(
+        `발행 작업이 시작되었습니다 (워크플로우 #${data.workflowId}) — 탭을 닫아도 진행됩니다. ` +
+        `자동화설정에서 진행상황 확인`
+      )
+
+      setSelectedProductIds([])
+      // 발행 화면으로 이동 — 진행상황은 자동화설정 패널에서 확인.
+      router.push('/sourcing/publish')
+    } catch (err: any) {
+      toast.error(`발행 작업 등록 중 오류: ${err?.message || '알 수 없는 오류'}`)
     } finally {
       setIsPublishing(false)
-      setSelectedProductIds([])
-
-      const totalSuccess = bandSuccess + shopSuccess
-      const totalFail = bandFail + shopFail
-
-      if (totalSuccess > 0) {
-        const summary = `밴드 ${bandSuccess} + 쇼핑몰 ${shopSuccess}${shopSkipped > 0 ? ` (이미발행 ${shopSkipped})` : ''}`
-        toast.success(`발행 완료: ${summary}`)
-        router.push('/sourcing/publish')
-      }
-      if (totalFail > 0) {
-        const firstError = errorMessages[0] || ''
-        toast.error(`발행 실패 ${totalFail}건: ${firstError}`)
-        console.error('[Stage2 발행] 전체 실패 목록:', errorMessages)
-      }
+      setPublishProgress({ current: 0, total: 0, failed: 0 })
     }
   }
 
@@ -1207,10 +1157,7 @@ export default function PostsManagePage() {
                 className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
               >
                 <Send size={15} />
-                {isPublishing
-                  ? `발행 중... (${publishProgress.current}/${publishProgress.total})`
-                  : '상품발행하기'
-                }
+                {isPublishing ? '발행 작업 등록 중...' : '상품발행하기'}
               </button>
             </>
           )}
