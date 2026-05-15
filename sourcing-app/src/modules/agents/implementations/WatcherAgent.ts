@@ -22,6 +22,13 @@ import prisma from '@bandauto/db'
 import { AgentBase } from '../AgentBase'
 import { AgentLayer, type AgentEvent, type AgentResult } from '../types'
 import { TaskQueue } from '../TaskQueue'
+import {
+  evaluatePublishHealth,
+  listActiveAutomationUserIds,
+  disableAutomationForUser,
+  type PublishHealth,
+} from '@/modules/publish-watchdog/publish-watchdog.service'
+import { createErrorNotification } from '@/services/notification.service'
 
 // ─── 임계값 상수 ───
 const API_TIMEOUT_MS = 5000
@@ -53,11 +60,19 @@ interface AgentStatusCheckResult {
   inactiveAgents: string[]
 }
 
+interface PublishWatchdogCheckResult {
+  evaluatedUsers: number
+  criticalUsers: number
+  autoDisabledUsers: number
+  details: PublishHealth[]
+}
+
 interface SystemCheckResult {
   apiChecks: ApiCheckResult[]
   queueCheck: QueueCheckResult | null
   agentCheck: AgentStatusCheckResult
   dbConnected: boolean
+  publishWatchdog: PublishWatchdogCheckResult | null
   allHealthy: boolean
   alertsFired: number
 }
@@ -70,6 +85,7 @@ export class WatcherAgent extends AgentBase {
     return [
       'schedule.system.watch',
       'agent.health.check',
+      'publish.watchdog.evaluate',
     ]
   }
 
@@ -151,9 +167,22 @@ export class WatcherAgent extends AgentBase {
       alertsFired++
     }
 
+    // 5. 발행 헬스 워치독 (Phase 2)
+    let publishWatchdog: PublishWatchdogCheckResult | null = null
+    try {
+      publishWatchdog = await this.checkPublishWatchdog()
+      alertsFired += publishWatchdog.criticalUsers
+    } catch (error: any) {
+      await this.log('ERROR', `발행 워치독 평가 실패: ${error.message}`)
+    }
+
     // KPI 기록
-    await this.recordKpi('checks_performed', 4) // API, Queue, Agent, DB
+    await this.recordKpi('checks_performed', 5) // API, Queue, Agent, DB, PublishWatchdog
     await this.recordKpi('alerts_fired', alertsFired)
+    if (publishWatchdog) {
+      await this.recordKpi('publish_watchdog_critical', publishWatchdog.criticalUsers)
+      await this.recordKpi('publish_watchdog_auto_off', publishWatchdog.autoDisabledUsers)
+    }
 
     // 평균 API 응답 시간 기록
     const avgResponseMs = apiChecks.length > 0
@@ -167,7 +196,8 @@ export class WatcherAgent extends AgentBase {
       apiChecks.every((c) => c.status === 'ok') &&
       (!queueCheck || !queueCheck.overflow) &&
       agentCheck.errorAgents.length === 0 &&
-      agentCheck.inactiveAgents.length === 0
+      agentCheck.inactiveAgents.length === 0 &&
+      (!publishWatchdog || publishWatchdog.criticalUsers === 0)
 
     if (allHealthy) {
       await this.emitEvent('system.healthy', {
@@ -188,9 +218,102 @@ export class WatcherAgent extends AgentBase {
       queueCheck,
       agentCheck,
       dbConnected,
+      publishWatchdog,
       allHealthy,
       alertsFired,
     }
+  }
+
+  // ══════════════════════════════════════════════════
+  //  SKILL 6: 발행 워치독 (Phase 2)
+  // ══════════════════════════════════════════════════
+
+  /**
+   * 활성 자동화 사용자별로 최근 1시간 발행 실패율을 평가.
+   *
+   * - CRITICAL 이면 알림 생성 (사용자 단위)
+   * - shouldAutoDisable (시도 ≥ 20 AND 실패율 ≥ 0.9) 이면 AutomationConfig.isEnabled=false
+   *
+   * 사용자 한 명의 실패가 다른 사용자에게 영향 없도록 try/catch 로 격리.
+   */
+  async checkPublishWatchdog(): Promise<PublishWatchdogCheckResult> {
+    const result: PublishWatchdogCheckResult = {
+      evaluatedUsers: 0,
+      criticalUsers: 0,
+      autoDisabledUsers: 0,
+      details: [],
+    }
+
+    let userIds: number[] = []
+    try {
+      userIds = await listActiveAutomationUserIds()
+    } catch (error: any) {
+      await this.log('ERROR', `활성 자동화 사용자 조회 실패: ${error.message}`)
+      return result
+    }
+
+    for (const userId of userIds) {
+      try {
+        const health = await evaluatePublishHealth(userId)
+        result.evaluatedUsers++
+        result.details.push(health)
+
+        if (health.severity !== 'CRITICAL') continue
+
+        result.criticalUsers++
+
+        // 자동 OFF 평가 (보수적 조건 — 시도 ≥ 20, 실패율 ≥ 0.9)
+        let autoDisabled = false
+        if (health.shouldAutoDisable) {
+          autoDisabled = await disableAutomationForUser(
+            userId,
+            `최근 ${health.windowHours}시간 발행 실패율 ${Math.round(health.failRate * 100)}%`,
+          )
+          if (autoDisabled) result.autoDisabledUsers++
+        }
+
+        const pct = Math.round(health.failRate * 100)
+        const notificationMessage = autoDisabled
+          ? `최근 ${health.windowHours}시간 발행 실패율 ${pct}% — 자동 비활성화됨. 세션 점검 후 수동 재활성화 필요`
+          : `최근 ${health.windowHours}시간 발행 실패율 ${pct}% (${health.totalAttempts}건 중 ${health.failedCount}건 실패) — 세션/네트워크 점검 권장`
+
+        try {
+          await createErrorNotification(userId, {
+            errorType: 'PUBLISH_WATCHDOG',
+            errorMessage: notificationMessage,
+          })
+        } catch (notifyErr: any) {
+          await this.log('WARN', `워치독 알림 생성 실패 (userId=${userId}): ${notifyErr.message}`)
+        }
+
+        await this.sendAlert('publish.watchdog.critical', {
+          userId,
+          windowHours: health.windowHours,
+          totalAttempts: health.totalAttempts,
+          failedCount: health.failedCount,
+          failRate: health.failRate,
+          autoDisabled,
+        })
+
+        await this.log(
+          autoDisabled ? 'ERROR' : 'WARN',
+          `발행 워치독 CRITICAL (userId=${userId}): ${notificationMessage}`,
+          {
+            userId,
+            totalAttempts: health.totalAttempts,
+            failRate: health.failRate,
+            autoDisabled,
+          },
+        )
+      } catch (error: any) {
+        await this.log(
+          'ERROR',
+          `사용자 ${userId} 발행 헬스 평가 실패: ${error.message}`,
+        )
+      }
+    }
+
+    return result
   }
 
   // ══════════════════════════════════════════════════
