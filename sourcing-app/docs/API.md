@@ -1678,3 +1678,22 @@ interface PipelineDashboardResponse {
 
 **변경 이력:**
 - TR-20260318-001: API 엔드포인트 추가
+
+
+## 2026-05-15 변경사항
+
+자세한 내역은 docs/tracking/CHANGELOG.md TR-20260515-001 ~ TR-20260515-013 참조.
+
+### 신규 API
+
+| 엔드포인트 | 메서드 | 설명 |
+|---|---|---|
+| `/api/admin/band-notice/config` | GET/PUT | 밴드공지 1일 N회 설정 upsert |
+| `/api/admin/band-session/health` | GET | 사용자 RETAIL 채널 세션 헬스 요약 |
+| `/api/admin/publish-watchdog/status` | GET | 1h 슬라이딩 윈도우 발행 success_rate 평가 |
+| `/api/publish/processed-job` | POST | 가공상품 발행 백그라운드 잡 등록 (탭 닫아도 진행) |
+
+### 응답 확장 (신규 errorType)
+
+- `SESSION_MISSING` — pre-flight 차단 시 `{ invalidChannels[], guideUrl }` 추가 반환 (HTTP 400)
+- 푸터 이미지 hotfix: 내부 API 이미지(`/api/images/{channel|product|post}/file/*`) 는 발행 시 로컬 파일에서 직접 읽음 (HTTP self-loop 회피)

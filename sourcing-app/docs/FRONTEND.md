@@ -405,3 +405,28 @@ const finalAmount = customTotalAmount ?? calculateAutoTotal()
 **변경 이력:**
 - TR-20260318-001: 페이지 추가
 
+
+
+## 2026-05-15 변경사항
+
+자세한 내역은 docs/tracking/CHANGELOG.md TR-20260515-001 ~ TR-20260515-013 참조.
+
+### 신규 페이지
+
+- `/sourcing/publish/ad/notice` — 밴드공지 설정 (광고&마케팅 메뉴 하위)
+  · 활성화 토글, 공지 시간(HH:MM 다건), Top N, 중요공지, 발행 대상 소매밴드, 도매방 출처 필터, 카테고리 필터, 톤 힌트
+
+### 신규 컴포넌트
+
+- `components/automation/AutomationFlowControl.tsx` — 자동화설정 페이지의 흐름 제어 패널
+  · 실행 중 워크플로우 다건 표시, 메모리 cron 등록 상태, 액션: 전체 중지/cron 재등록/stuck 정리/영구 비활성화
+- `components/band-session/SessionHealthBanner.tsx` — 매니저 대시보드 최상단 세션 헬스 알림
+  · HEALTHY 면 렌더 안 함, WARNING 노란, CRITICAL 빨강. 30초 폴링
+
+### 메뉴 라벨 변경
+
+- '광고' → '광고&마케팅' (하위메뉴 '밴드공지' 추가)
+
+### 페이지 동작 변경
+
+- `/sourcing/product/list` ProcessedProductTab, `/sourcing/publish` 재발행, `/sourcing/post/list` Stage2 — 모두 백그라운드 잡으로 (탭 닫아도 진행)

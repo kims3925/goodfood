@@ -300,3 +300,38 @@ npx prisma generate --schema prisma
 npx prisma db push --schema prisma
 npx prisma studio --schema prisma
 ```
+
+
+## 2026-05-15 변경사항
+
+자세한 내역은 docs/tracking/CHANGELOG.md TR-20260515-001 ~ TR-20260515-013 참조.
+
+### 신규 폴더/파일
+
+```
+sourcing-app/src/
+├── modules/
+│   ├── analytics/popularity.service.ts           — 인기상품 score 산출 + Top N
+│   ├── band-session/band-session-health.ts       — 세션 헬스 평가 + assert helper
+│   ├── publish/processed-job.runner.ts           — 가공상품 발행 백그라운드 잡 러너
+│   └── publish-watchdog/publish-watchdog.service.ts — 1h 발행 success_rate 워치독
+│
+├── components/
+│   ├── automation/AutomationFlowControl.tsx      — 흐름 제어 패널 (신규)
+│   └── band-session/SessionHealthBanner.tsx      — 대시보드 배너 (신규)
+│
+├── app/(admin)/sourcing/publish/ad/notice/page.tsx — 밴드공지 설정 페이지
+│
+└── app/api/
+    ├── admin/band-notice/config/route.ts         — 밴드공지 설정 upsert
+    ├── admin/band-session/health/route.ts        — 세션 헬스 조회
+    ├── admin/publish-watchdog/status/route.ts    — 워치독 헬스 조회
+    └── publish/processed-job/route.ts            — 가공상품 발행 잡 등록
+
+sourcing-app/scripts/
+└── etl-legacy-orders.ts                          — 5년 주문장 xlsx → LegacyOrder
+
+db/prisma/models/
+├── band-notice.prisma                            — BandNoticeConfig
+└── legacy-order.prisma                           — LegacyOrder
+```

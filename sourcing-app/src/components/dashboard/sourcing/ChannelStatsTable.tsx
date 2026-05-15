@@ -292,13 +292,9 @@ function WholesaleTable({ channels, isLoading }: { channels: ChannelStat[]; isLo
 
 // 소매 채널 테이블 (발행만)
 function RetailTable({ channels, isLoading }: { channels: ChannelStat[]; isLoading: boolean }) {
-  // 쇼핑몰 URL 생성
+  // 쇼핑몰 URL 생성 — 환경변수 미설정 시 운영 도메인으로 폴백 (다른 호출부와 동일 패턴)
   const getShopUrl = (subdomain: string) => {
-    const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL
-    if (!shopBaseUrl) {
-      console.warn('NEXT_PUBLIC_SHOP_BASE_URL is not configured')
-      return `/${subdomain}`
-    }
+    const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'https://shop.abcpharm.net'
     return `${shopBaseUrl}/${subdomain}`
   }
 

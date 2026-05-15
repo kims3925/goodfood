@@ -626,3 +626,29 @@ Low (스키마 메타데이터 변경, 기존 데이터 영향 없음)
 #### Risk Level
 
 Low (신규 테이블 추가, 기존 스키마 영향 없음)
+
+
+## 2026-05-15 변경사항
+
+자세한 내역은 docs/tracking/CHANGELOG.md TR-20260515-001 ~ TR-20260515-013 참조.
+
+### 신규 모델
+
+#### `band_notice_config` (BandNoticeConfig)
+인기상품 1일 N회 자동공지 설정. 사용자당 1행 (`@unique userId`).
+- `scheduleTimes` JSON `["11:00","13:00","17:00"]` — 공지 시각 다건
+- `topN` 1~10 (기본 5), `pinAsImportant` 중요공지 게시 여부
+- `retailChannelIds` / `sourceChannelIds` / `categoryCodes` — JSON 필터
+- `toneHint` — Gemini 프롬프트 보조 텍스트
+
+#### `legacy_order` (LegacyOrder)
+5년치 좋은친구도매방 주문장 (xlsx 6파일). ETL 스크립트로 적재.
+- `@@unique([orderDate, rowIndex, channelName])` — 멱등 ETL 보장
+- `buyerHash` SHA-256 — PII 보호
+- `productName` length(100) 인덱스 — popularity LIKE 매칭용
+
+### 부작용 (운영 적용 시)
+
+운영 DB push (2026-05-15) 시 다음 부작용 발생:
+- `pricing_policy.tier_rules` 컬럼 드롭 — HEAD schema 에 없어서. 데이터 1행 손실
+- 사전 변경(워킹트리 +2줄) 정리 시 함께 부활 필요
