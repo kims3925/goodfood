@@ -5,7 +5,7 @@ import { Save, RefreshCw, Store, Send, Sparkles, Bot, Check, FileText, ChevronLe
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import { useToast } from '@/components/ui/Toast'
-import { PipelineStatusPanel, DisableAutomationModal, SessionMissingModal } from '@/components/automation'
+import { PipelineStatusPanel, DisableAutomationModal, SessionMissingModal, AutomationFlowControl } from '@/components/automation'
 
 interface ChannelShop {
   id: number
@@ -930,6 +930,9 @@ export default function AutomationSettingsPage() {
           isCancelling={isCancelling}
         />
       )}
+
+      {/* 자동화 흐름 제어 — 다건 실행상태 + 전체 중지/재등록/stuck 정리/영구 비활성화 */}
+      <AutomationFlowControl />
 
       {/* Schedule Settings - 독립 섹션 */}
       <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasScheduleProblem ? 'ring-2 ring-red-300' : ''}`}>
