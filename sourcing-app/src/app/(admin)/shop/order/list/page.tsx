@@ -309,13 +309,25 @@ export default function UnifiedOrderListPage() {
         const productNames = items.map((i: any) => i.sourceProductName || i.productName).join('\n')
         const optionSummaries = items.map((i: any) => i.optionSummary || '').join('\n')
         const quantities = items.map((i: any) => i.quantity).join('\n')
-        const productTotal = items.reduce(
-          (sum: number, i: any) => sum + (i.unitPrice * i.quantity), 0
-        )
-        // 합배송: item.shippingFee 중 최대값을 주문 전체 배송비로 1회만 반영
-        const commonShip = items.reduce(
-          (max: number, i: any) => Math.max(max, i.shippingFee ?? 0), 0
-        )
+
+        // ⚠️ 옛 로직: item.shippingFee 중 max → 상품 마스터의 기본 배송비를 가져와
+        //   실제 주문의 배송비(주문 시점에 결정된 값)와 어긋남.
+        //   예) 상품 마스터 4000원, 실제 주문은 0원(합배송 INCLUDED) → 금액이 4000원 부풀어 보이는 사고.
+        // 새 로직: 주문 자체의 totalAmount / subtotalAmount / discountAmount 로 실제 배송비 역산.
+        const subtotal = order.subtotalAmount != null ? Number(order.subtotalAmount) : null
+        const discount = order.discountAmount != null ? Number(order.discountAmount) : 0
+        const total = order.totalAmount != null ? Number(order.totalAmount) : null
+
+        // 상품 합계 — 우선 subtotalAmount, 없으면 item.unitPrice×quantity 합으로 폴백
+        const productTotal = subtotal != null
+          ? subtotal
+          : items.reduce((sum: number, i: any) => sum + (i.unitPrice * i.quantity), 0)
+        // 실제 배송비 — total - subtotal + discount. 음수면 0.
+        const actualShip = total != null && subtotal != null
+          ? Math.max(0, total - subtotal + discount)
+          : items.reduce((max: number, i: any) => Math.max(max, i.shippingFee ?? 0), 0)
+        // 표시 금액 — 실제 청구된 총액(total). 부재 시 productTotal + actualShip.
+        const displayTotal = total != null ? total : productTotal + actualShip
 
         // 결제 정보 — unified API 의 payment 우선, 없으면 top-level paymentMethod 폴백
         const methodRaw = order.payment?.method ?? order.paymentMethod ?? null
@@ -328,8 +340,8 @@ export default function UnifiedOrderListPage() {
           품명: productNames,
           옵션: optionSummaries,
           수량: quantities,
-          금액: productTotal + commonShip, // 배송비 포함 합산 금액
-          배송비: commonShip,
+          금액: displayTotal, // 주문의 실제 청구 총액 (totalAmount)
+          배송비: actualShip, // total - subtotal + discount 로 역산
           받는분: addr?.recipientName || '',
           연락처: addr?.recipientPhone || '',
           주소: addressStr,
