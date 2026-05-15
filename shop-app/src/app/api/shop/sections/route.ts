@@ -103,6 +103,7 @@ export async function GET(req: NextRequest) {
               discount,
               images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
               category: product.categoryId || '',
+              createdAt: product.createdAt, // "오늘의 수산물" 당일 필터용
               rating: 4.5,
               reviews: 100,
             }
@@ -232,6 +233,7 @@ async function getShopProducts(shopId: number, limit: number, search: string | n
         discount,
         images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
         category: product.categoryId || '',
+        createdAt: product.createdAt, // "오늘의 수산물" 당일 필터용
         rating: 4.5,
         reviews: 100,
       }
@@ -326,6 +328,7 @@ async function getChannelProducts(channelId: number, limit: number) {
         discount,
         images: images.length > 0 ? images : [product.thumbnailUrl || '/placeholder.jpg'],
         category: product.categoryId || '',
+        createdAt: product.createdAt, // "오늘의 수산물" 당일 필터용
         rating: 4.5,
         reviews: 100,
       }

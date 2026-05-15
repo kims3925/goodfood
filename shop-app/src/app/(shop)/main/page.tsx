@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package, Search, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package, Search, X, Fish, CalendarDays } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
 import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
@@ -19,6 +19,7 @@ interface Product {
   discount: number
   images: string[]
   category: string
+  createdAt?: string  // ISO 날짜 — "오늘의 수산물" 당일 필터용
   rating?: number
   reviews?: number
   stock?: number
@@ -84,11 +85,26 @@ export default function StorePage() {
         const products = data.products || data.channelProducts || []
         setShopProducts(products)
 
-        // 검색 모드가 아닐 때만 추천 상품 설정
+        // 검색 모드가 아닐 때만 "오늘의 수산물" 추천 설정
         if (!searchQuery) {
-          // 이미지가 있는 상품을 추천 상품으로 사용 (최대 12개)
-          const productsWithImages = products.filter((p: Product) => p.images && p.images.length > 0).slice(0, 12)
-          setFeaturedProducts(productsWithImages.length > 0 ? productsWithImages : products.slice(0, 12))
+          // 당일 00:00 기준 (작업지침서 §1-B)
+          const todayStart = new Date()
+          todayStart.setHours(0, 0, 0, 0)
+
+          // 수산물(SEA) + 이미지 있는 상품
+          const seaWithImages = products.filter(
+            (p: Product) => p.category === 'SEA' && p.images && p.images.length > 0,
+          )
+
+          // 1차: 당일 등록된 SEA 상품
+          const seaToday = seaWithImages.filter(
+            (p: Product) => p.createdAt && new Date(p.createdAt) >= todayStart,
+          )
+
+          // 2차 폴백: 당일 SEA 가 없으면 최신 SEA (최대 12개)
+          const seaFallback = seaWithImages.slice(0, 12)
+
+          setFeaturedProducts(seaToday.length > 0 ? seaToday.slice(0, 12) : seaFallback)
         } else {
           setFeaturedProducts([]) // 검색 모드에서는 추천 상품 숨김
         }
@@ -178,9 +194,9 @@ export default function StorePage() {
         <section className="py-6 md:py-10 bg-gradient-to-b from-amber-50 via-orange-50/50 to-white">
           <div className="kurly-container">
             <div className="flex items-center justify-center gap-2 mb-4 md:mb-6">
-              <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-amber-500" />
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">추천 상품</h2>
-              <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-amber-500" />
+              <Fish className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">오늘의 수산물</h2>
+              <Fish className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
             </div>
             <div className="relative">
               {/* Left Arrow */}
@@ -301,8 +317,10 @@ export default function StorePage() {
                 </>
               ) : (
                 <>
-                  <Package className="w-5 h-5 md:w-6 md:h-6 text-rose-500" />
-                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">전체 상품</h2>
+                  <CalendarDays className="w-5 h-5 md:w-6 md:h-6 text-rose-500" />
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                    {`${new Date().getMonth() + 1}월 ${new Date().getDate()}일 등록상품`}
+                  </h2>
                 </>
               )}
             </div>
