@@ -1,0 +1,36 @@
+// 밴드공지 (1일 N회 인기상품 자동공지) 설정
+// 참조: BandAuto_데이터활용_1일3회공지_개발계획서_v2.docx
+//
+// MarketingAgent 가 cron 으로 scheduleTimes 의 각 시각에 발화 →
+//   popularity.service.getPopularProducts(topN, filters) 로 상품 선정 →
+//   pinAsImportant 옵션에 따라 중요공지로 게시.
+//
+// 단일 사용자당 1개 설정 (단순화). 다중 스케줄 그룹이 필요해지면 별도 모델로 분리.
+model BandNoticeConfig {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique @map("user_id")
+  isEnabled         Boolean  @default(false) @map("is_enabled")
+  // 공지 시간 "HH:MM" 배열 (JSON). 기본 11:00 / 13:00 / 17:00
+  scheduleTimes     String   @default("[\"11:00\",\"13:00\",\"17:00\"]") @map("schedule_times") @db.LongText
+  // 한 번에 노출할 상품 개수 (Top N). 기본 5
+  topN              Int      @default(5) @map("top_n")
+  // 중요공지 게시 여부 (밴드 상단 고정). 기본 true
+  pinAsImportant    Boolean  @default(true) @map("pin_as_important")
+  // 공지 발행 대상 소매밴드 ID 배열 (JSON). 빈 배열 = 전체 RETAIL 채널
+  retailChannelIds  String   @default("[]") @map("retail_channel_ids") @db.LongText
+  // 도매방 출처 필터 — 이 도매방에서 가져온 상품만 후보로 (JSON). 빈 배열 = 전체
+  sourceChannelIds  String   @default("[]") @map("source_channel_ids") @db.LongText
+  // 카테고리 필터 — SEA/AGR/MEA/MKT/PRC/HLT/ETC 중 (JSON). 빈 배열 = 전체
+  categoryCodes     String   @default("[]") @map("category_codes") @db.LongText
+  // 공지 톤/문구 메모 (옵션) — Gemini 프롬프트에 힌트로 전달
+  toneHint          String?  @map("tone_hint") @db.Text
+  // 마지막 발화 메타 (감사/디버그용)
+  lastRunAt         DateTime? @map("last_run_at") @db.Timestamp(0)
+  lastRunMessage    String?  @map("last_run_message") @db.Text
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([isEnabled])
+  @@map("band_notice_config")
+}

@@ -1,0 +1,29 @@
+// 5년치 좋은친구도매방 주문장 데이터 (엑셀 6파일 → DB)
+// 참조: BandAuto_데이터활용_1일3회공지_개발계획서_v2.docx §3, §4.1
+//
+// popularity.service.ts 에서 상품명 LIKE 매칭으로 최근 30일 판매횟수/마진률/시즘성 산출.
+// PII 보호: 받는분 SHA-256 해시, 전화번호는 저장하지 않음.
+model LegacyOrder {
+  id            Int      @id @default(autoincrement())
+  orderDate     DateTime @map("order_date") @db.Date
+  channelName   String   @map("channel_name") @db.VarChar(50)   // 구분 (나은/초록/경영/비그룹/삼대...)
+  productName   String   @map("product_name") @db.VarChar(500)  // 상품명 원문
+  quantity      Int      @default(1)                              // 수량 (텍스트면 1)
+  salePrice     Int      @default(0) @map("sale_price")          // 판매가
+  costPrice     Int      @default(0) @map("cost_price")          // 정산가 (도매가)
+  profit        Int      @default(0)                              // 수익 (판매가 - 정산가)
+  buyerHash     String?  @map("buyer_hash") @db.VarChar(64)      // 받는분 SHA-256 (PII 보호)
+  regionCode    String?  @map("region_code") @db.VarChar(30)     // 주소에서 추출한 시/도
+  rawSheetName  String   @map("raw_sheet_name") @db.VarChar(50)  // 원본 시트명 (추적)
+  sourceFile    String   @map("source_file") @db.VarChar(200)    // 원본 파일명 (추적)
+  rowIndex      Int      @map("row_index")                        // 시트 내 행 번호 (1-based)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+  // (orderDate, rowIndex, productName 처음 100자) 단위로 중복 차단.
+  // 동일 거래가 여러 파일에 중복 저장돼있어도 createMany skipDuplicates 로 자연스럽게 무시.
+  @@unique([orderDate, rowIndex, channelName], map: "uniq_legacy_order_day_row_channel")
+  @@index([orderDate])
+  @@index([productName(length: 100)])
+  @@index([channelName])
+  @@map("legacy_order")
+}

@@ -78,6 +78,9 @@ model User {
   // 외부 쇼핑몰 연동 (2026-05-07): 카페24 등 외부몰 소싱+결제
   externalMallConnections ExternalMallConnection[] @relation("UserExternalMallConnections")
 
+  // 밴드공지 1일 N회 (2026-05-15): 인기상품 자동공지 설정
+  bandNoticeConfig      BandNoticeConfig?
+
   @@index([shopId])
   @@index([email])
   @@index([phone])
