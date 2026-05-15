@@ -42,6 +42,7 @@ import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
 import ChannelStatsTable from '@/components/dashboard/sourcing/ChannelStatsTable'
 import { useChannelStats } from '@/hooks/dashboard/useChannelStats'
+import SessionHealthBanner from '@/components/band-session/SessionHealthBanner'
 
 interface HourlyStats {
   hour: number
@@ -555,6 +556,9 @@ export default function AutomationDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* 세션 헬스 배너 — SaaS 예방책 Phase 1. CRITICAL/WARNING 일 때만 렌더 */}
+      <SessionHealthBanner />
+
       {/* 날짜 필터 + 자동화 상태 (상단, 왼쪽 정렬) */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-start gap-2 sm:gap-3">
