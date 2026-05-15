@@ -254,6 +254,46 @@ export default function UnifiedOrderListPage() {
         console.warn('소매밴드 목록 조회 실패 — 빈 값으로 진행', e)
       }
 
+      // 결제수단/상태 한글 라벨 매핑
+      // - CARD 결제는 "카드", 무통장입금/가상계좌는 "현금(가상계좌)" 등 사용자 친화 표기.
+      // - payment 자체가 없는 외부 주문(밴드 등)은 결제 데이터 없음 — "외부주문" 표시.
+      const labelPaymentMethod = (method?: string | null): string => {
+        if (!method) return '외부주문'
+        switch (method) {
+          case 'CARD': return '카드'
+          case 'VIRTUAL_ACCOUNT': return '현금(가상계좌)'
+          case 'TRANSFER':
+          case 'BANK_TRANSFER': return '계좌이체'
+          case 'MOBILE': return '휴대폰'
+          case 'CULTURE_GIFT': return '문화상품권'
+          case 'BOOK_GIFT': return '도서상품권'
+          case 'GAME_GIFT': return '게임상품권'
+          case 'CASH': return '현금'
+          default: return method
+        }
+      }
+      const labelPaymentStatus = (status?: string | null): string => {
+        if (!status) return ''
+        switch (status) {
+          case 'DONE': return '결제완료'
+          case 'WAITING_FOR_DEPOSIT': return '입금대기'
+          case 'CANCELED': return '취소'
+          case 'PARTIAL_CANCELED': return '부분취소'
+          case 'EXPIRED': return '기한만료'
+          case 'READY': return '준비'
+          case 'IN_PROGRESS': return '진행중'
+          case 'ABORTED': return '중단'
+          default: return status
+        }
+      }
+      const formatPaidAt = (iso?: string | null): string => {
+        if (!iso) return ''
+        const d = new Date(iso)
+        if (isNaN(d.getTime())) return ''
+        const pad = (n: number) => n.toString().padStart(2, '0')
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+      }
+
       // 주문당 1행. 품목이 여러 개면 품명/옵션/수량은 줄바꿈으로 합치고, 금액·배송비는 합계.
       const rows = details.map((order: any) => {
         const items = order.items || []
@@ -277,6 +317,12 @@ export default function UnifiedOrderListPage() {
           (max: number, i: any) => Math.max(max, i.shippingFee ?? 0), 0
         )
 
+        // 결제 정보 — unified API 의 payment 우선, 없으면 top-level paymentMethod 폴백
+        const methodRaw = order.payment?.method ?? order.paymentMethod ?? null
+        const statusRaw = order.payment?.status ?? null
+        const paidAt = order.payment?.paidAt ?? order.paidAt ?? null
+        const paidAmount = order.payment?.amount != null ? Number(order.payment.amount) : null
+
         return {
           주문번호: order.orderNumber,
           품명: productNames,
@@ -291,6 +337,10 @@ export default function UnifiedOrderListPage() {
           '보내는분 연락처': order.customerPhone || '',
           도매방: wholesaleName,
           소매밴드: retailBandName,
+          결제수단: labelPaymentMethod(methodRaw),
+          결제상태: labelPaymentStatus(statusRaw),
+          결제금액: paidAmount != null ? paidAmount : '',
+          결제일시: formatPaidAt(paidAt),
         }
       })
 
@@ -309,6 +359,10 @@ export default function UnifiedOrderListPage() {
         { wch: 15 }, // 보내는분 연락처
         { wch: 20 }, // 도매방
         { wch: 20 }, // 소매밴드
+        { wch: 14 }, // 결제수단
+        { wch: 10 }, // 결제상태
+        { wch: 10 }, // 결제금액
+        { wch: 18 }, // 결제일시
       ]
       // 품목 수에 맞춰 행 높이 자동 조정 (기본 18pt × 품목수)
       ws['!rows'] = [
