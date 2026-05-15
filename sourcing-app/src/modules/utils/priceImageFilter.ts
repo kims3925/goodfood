@@ -98,9 +98,23 @@ export async function analyzePriceImage(
  *
  * @param apiKey Gemini API 키
  * @param postId 대상 게시물 ID
+ * @param options.skipPolicyContent 가격정책 content — 이 값에
+ *   "공급가_출처: 댓글에서 추출" 가 포함되면 (SD_FOOD_SPECIAL 정책) 필터링을 통째로 스킵.
+ *   SD푸드 게시글은 실 상품 사진에 가격 텍스트가 박혀있어 Gemini Vision 이 가격배너로
+ *   과탐 — 사용자가 원하는 상품 이미지가 사라지는 사고 (옵션 2, 2026-05-15).
  * @returns 삭제된 이미지 수
  */
-export async function filterPriceImages(apiKey: string, postId: number): Promise<number> {
+export async function filterPriceImages(
+  apiKey: string,
+  postId: number,
+  options?: { skipPolicyContent?: string | null },
+): Promise<number> {
+  // ── SD푸드 (SD_FOOD_SPECIAL) 정책 예외 처리 ──
+  if (options?.skipPolicyContent && options.skipPolicyContent.includes('공급가_출처: 댓글에서 추출')) {
+    console.log(`[Image Price Filter] SD푸드 정책 감지 — 필터링 스킵 (postId: ${postId})`)
+    return 0
+  }
+
   const images = await prisma.collectedPostImage.findMany({
     where: { postId },
     orderBy: { sortOrder: 'asc' },
