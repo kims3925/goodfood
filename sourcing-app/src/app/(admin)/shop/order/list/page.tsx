@@ -236,6 +236,24 @@ export default function UnifiedOrderListPage() {
         return
       }
 
+      // 소매밴드는 Channel.shopId 로 Shop 과 연결 — 주문의 shopId 로 매핑.
+      // 한 샵에 여러 RETAIL 채널이 묶여있으면 쉼표로 합쳐 표기.
+      let retailByShop: Map<number, string[]> = new Map()
+      try {
+        const chRes = await fetch('/api/channel?kind=RETAIL&limit=500', { credentials: 'include' })
+        const chJson = await chRes.json()
+        if (chJson?.success && Array.isArray(chJson.data)) {
+          for (const c of chJson.data as Array<{ id: number; name: string; shopId: number | null; deletedAt?: string | null }>) {
+            if (c.deletedAt || !c.shopId) continue
+            const arr = retailByShop.get(c.shopId) || []
+            arr.push(c.name)
+            retailByShop.set(c.shopId, arr)
+          }
+        }
+      } catch (e) {
+        console.warn('소매밴드 목록 조회 실패 — 빈 값으로 진행', e)
+      }
+
       // 주문당 1행. 품목이 여러 개면 품명/옵션/수량은 줄바꿈으로 합치고, 금액·배송비는 합계.
       const rows = details.map((order: any) => {
         const items = order.items || []
@@ -244,6 +262,9 @@ export default function UnifiedOrderListPage() {
           ? `[${addr.postalCode}] ${addr.address}${addr.addressDetail ? ' ' + addr.addressDetail : ''}`
           : ''
         const wholesaleName = items.find((i: any) => i?.channel?.kind === 'WHOLESALE')?.channel?.name || ''
+        // 소매밴드명 — 주문의 shopId 에 연결된 RETAIL 채널들 (다건이면 쉼표 합)
+        const retailNames = (order.shopId && retailByShop.get(order.shopId)) || []
+        const retailBandName = retailNames.length > 0 ? retailNames.join(', ') : (order.shopName || '')
 
         const productNames = items.map((i: any) => i.sourceProductName || i.productName).join('\n')
         const optionSummaries = items.map((i: any) => i.optionSummary || '').join('\n')
@@ -269,6 +290,7 @@ export default function UnifiedOrderListPage() {
           보내는분: order.customerName || '',
           '보내는분 연락처': order.customerPhone || '',
           도매방: wholesaleName,
+          소매밴드: retailBandName,
         }
       })
 
@@ -286,6 +308,7 @@ export default function UnifiedOrderListPage() {
         { wch: 10 }, // 보내는분
         { wch: 15 }, // 보내는분 연락처
         { wch: 20 }, // 도매방
+        { wch: 20 }, // 소매밴드
       ]
       // 품목 수에 맞춰 행 높이 자동 조정 (기본 18pt × 품목수)
       ws['!rows'] = [
