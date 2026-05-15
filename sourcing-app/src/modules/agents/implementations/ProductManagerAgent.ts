@@ -18,6 +18,7 @@ import { AgentLayer, type AgentEvent, type AgentResult } from '../types'
 import { GeminiClient, type AiImagePart } from '@/modules/transformation/ai.client'
 import { AiProvider } from '@bandauto/db'
 import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
+import { getPopularProducts } from '@/modules/analytics/popularity.service'
 
 // ─── 감사 결과 타입 ───
 
@@ -240,6 +241,7 @@ export class ProductManagerAgent extends AgentBase {
       'product.published',              // 발행 직후 자동 검증
       'schedule.product.audit',         // 가격정책 주기 감사 (cron)
       'schedule.product.source.watch',  // 원본 변동 주기 감시 (cron, 1시간)
+      'marketing.bestseller.requested', // MarketingAgent 의 인기상품 Top N 요청
     ]
   }
 
@@ -256,6 +258,12 @@ export class ProductManagerAgent extends AgentBase {
           data: sourceResults as unknown as Record<string, unknown>,
           duration: Date.now() - start,
         }
+      }
+
+      if (event.type === 'marketing.bestseller.requested') {
+        // 인기상품 Top N 산출 (popularity.service) — BandNoticeConfig 필터 자동 적용
+        const data = await this.handleBestsellerRequested(event)
+        return { success: true, data, duration: Date.now() - start }
       }
 
       let result: AuditResult
@@ -1411,6 +1419,87 @@ export class ProductManagerAgent extends AgentBase {
     } catch {
       return null
     }
+  }
+
+  // ─── 인기상품 (MarketingAgent 연계) ──────────────────────────────
+  /**
+   * marketing.bestseller.requested 이벤트 처리.
+   *
+   * 입력 event.data:
+   *   - userId: number (필수)
+   *   - limit?: number (옵션, BandNoticeConfig.topN 또는 5 폴백)
+   *   - timeSlot?: 'morning' | 'noon' | 'evening' (참고용 — 응답에 그대로 전달)
+   *
+   * 처리:
+   *   1. BandNoticeConfig 로드 → 필터(retailChannelIds/sourceChannelIds/categoryCodes) 추출
+   *   2. popularity.service.getPopularProducts(limit, filters) 호출
+   *   3. marketing.bestseller.response 이벤트 emit (products 배열 포함)
+   */
+  private async handleBestsellerRequested(event: AgentEvent): Promise<Record<string, unknown>> {
+    const userId = (event.data.userId as number | undefined) ?? 0
+    if (!userId) {
+      await this.log('WARN', 'marketing.bestseller.requested 에 userId 없음 — 응답 건너뜀')
+      return { ok: false, error: 'userId required', products: [] }
+    }
+
+    // BandNoticeConfig 로드 (없으면 기본값)
+    const cfg = await prisma.bandNoticeConfig.findUnique({
+      where: { userId },
+    })
+
+    const parseJson = (raw: string | null | undefined): any[] => {
+      if (!raw) return []
+      try {
+        const v = JSON.parse(raw)
+        return Array.isArray(v) ? v : []
+      } catch {
+        return []
+      }
+    }
+
+    const cfgTopN = cfg?.topN ?? 5
+    const explicitLimit = event.data.limit as number | undefined
+    const limit = Math.max(1, Math.min(10, explicitLimit ?? cfgTopN))
+
+    const retailChannelIds: number[] = parseJson(cfg?.retailChannelIds).filter((n) => Number.isInteger(n))
+    const sourceChannelIds: number[] = parseJson(cfg?.sourceChannelIds).filter((n) => Number.isInteger(n))
+    const categoryCodes: string[] = parseJson(cfg?.categoryCodes).filter((s) => typeof s === 'string')
+
+    await this.log('INFO', `인기상품 산출 시작 (user=${userId}, limit=${limit})`, {
+      filters: { retailChannelIds, sourceChannelIds, categoryCodes },
+      timeSlot: event.data.timeSlot,
+    })
+
+    const products = await getPopularProducts(limit, {
+      userId,
+      retailChannelIds: retailChannelIds.length > 0 ? retailChannelIds : undefined,
+      sourceChannelIds: sourceChannelIds.length > 0 ? sourceChannelIds : undefined,
+      categoryCodes: categoryCodes.length > 0 ? categoryCodes : undefined,
+    })
+
+    await this.log('INFO', `인기상품 ${products.length}개 산출 완료`)
+    await this.recordKpi('bestseller_returned', products.length)
+
+    const responseData: Record<string, unknown> = {
+      userId,
+      timeSlot: event.data.timeSlot ?? null,
+      limit,
+      products: products.map((p) => ({
+        productId: p.productId,
+        productName: p.productName,
+        categoryId: p.categoryId,
+        price: p.price,
+        thumbnailUrl: p.thumbnailUrl,
+        score: p.score,
+        breakdown: p.breakdown,
+        matchedKeyword: p.matchedKeyword,
+        channelIds: p.channelIds,
+      })),
+    }
+
+    await this.emitEvent('marketing.bestseller.response', responseData)
+
+    return { ok: true, count: products.length, products: responseData.products }
   }
 }
 
