@@ -87,7 +87,8 @@ export class MarketingAgent extends AgentBase {
           }>
           const timeSlot = (event.data.timeSlot as TimeSlot) ?? this.getCurrentTimeSlot()
           const channelId = event.data.channelId as number | undefined
-          await this.handleBestsellerResponse(products, timeSlot, channelId)
+          const userId = event.data.userId as number | undefined
+          await this.handleBestsellerResponse(products, timeSlot, userId, channelId)
           break
         }
 
@@ -95,13 +96,16 @@ export class MarketingAgent extends AgentBase {
           const channelId = event.data.channelId as number
           const content = event.data.content as string | undefined
           const timeSlot = (event.data.timeSlot as TimeSlot) ?? this.getCurrentTimeSlot()
+          const userId = event.data.userId as number | undefined
 
           if (content) {
             // 관리자가 직접 내용 지정
             await this.postImportantNotice(channelId, content)
+          } else if (userId) {
+            // 자동 생성 흐름 (단일 사용자)
+            await this.requestBestsellerRecommendation(timeSlot, userId, channelId)
           } else {
-            // 자동 생성 흐름
-            await this.requestBestsellerRecommendation(timeSlot, channelId)
+            await this.log('WARN', 'marketing.notice.requested 에 userId 와 content 모두 없음 — 처리 불가')
           }
           break
         }
@@ -133,17 +137,20 @@ export class MarketingAgent extends AgentBase {
 
   /**
    * ProductManagerAgent에 베스트셀러 TOP5 추천을 요청합니다.
+   * 멀티테넌트: userId 가 필수 — 어느 사용자의 상품을 인기순위 대상으로 할지 결정.
    */
   async requestBestsellerRecommendation(
     timeSlot: TimeSlot,
+    userId: number,
     channelId?: number
   ): Promise<void> {
-    await this.log('INFO', `베스트셀러 추천 요청: ${timeSlot}`)
+    await this.log('INFO', `베스트셀러 추천 요청: user=${userId} ${timeSlot}`)
 
     await this.emitEvent('marketing.bestseller.requested', {
+      userId,
       timeSlot,
       channelId: channelId ?? null,
-      limit: 5,
+      // limit 은 BandNoticeConfig.topN 사용 — ProductManagerAgent 가 자동 조회
       requestedBy: this.name,
     })
   }
@@ -282,19 +289,75 @@ ${productList}
   // ─── 내부 흐름 메서드 ───
 
   /**
-   * 스케줄 이벤트 처리: 시간대 결정 → 베스트셀러 추천 요청
+   * 스케줄 이벤트 처리:
+   * BandNoticeConfig.isEnabled=true 사용자별로 베스트셀러 추천 요청을 발화.
+   *
+   * 멀티테넌트 fan-out:
+   *  - cron (11/13/17) 1회 발화 → 활성 사용자 N명 iterate
+   *  - 각 사용자마다 marketing.bestseller.requested(userId) emit
+   *  - ProductManagerAgent 가 사용자별 BandNoticeConfig 필터로 popularity 계산 후 response emit
+   *  - 응답마다 handleBestsellerResponse(userId) 가 해당 사용자의 retail 채널에 게시
+   *
+   * scheduleTimes 가 사용자 정의(예: 10:00 / 14:00) 인 경우 본 cron 의 11/13/17 와 어긋날 수 있음.
+   * 현재는 cron 시각에 활성 사용자 모두 발화 — 더 정밀한 매칭은 AgentScheduler 사용자별 cron 재설계 필요(차후).
    */
   private async handleScheduledNotice(timeSlot: TimeSlot): Promise<void> {
     await this.log('INFO', `마케팅 스케줄 실행: ${timeSlot}`)
-    await this.requestBestsellerRecommendation(timeSlot)
+
+    // BandNoticeConfig.isEnabled=true 인 사용자만 대상
+    // (scheduleTimes 매칭은 향후 cron 재설계 시 정밀 적용)
+    const activeConfigs = await prisma.bandNoticeConfig.findMany({
+      where: { isEnabled: true },
+      select: { userId: true, scheduleTimes: true },
+    }).catch((err) => {
+      // 테이블 미배포(db push 안 됨) 등의 경우 안전하게 빈 배열
+      console.warn('[MarketingAgent] bandNoticeConfig 조회 실패, fan-out 스킵:', err?.message)
+      return [] as Array<{ userId: number; scheduleTimes: string }>
+    })
+
+    if (activeConfigs.length === 0) {
+      await this.log('INFO', `활성 BandNoticeConfig 없음 — 공지 발화 스킵`)
+      return
+    }
+
+    // 현재 시각(HH:MM) 과 scheduleTimes 매칭 — 가까운 시간(±5분) 이내면 발화
+    // cron 이 11:00 정각에 발화, 사용자가 10:55 또는 11:05 설정해도 매칭되도록 ±5분 윈도우
+    const now = new Date()
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const matchWindow = 5  // 분
+
+    let firedCount = 0
+    for (const cfg of activeConfigs) {
+      try {
+        const times: string[] = JSON.parse(cfg.scheduleTimes || '[]')
+        const matched = times.some((t) => {
+          const m = t.match(/^(\d{2}):(\d{2})$/)
+          if (!m) return false
+          const target = parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
+          return Math.abs(target - currentMinutes) <= matchWindow
+        })
+
+        if (matched) {
+          await this.requestBestsellerRecommendation(timeSlot, cfg.userId)
+          firedCount++
+        }
+      } catch (err: any) {
+        await this.log('ERROR', `user=${cfg.userId} 발화 실패: ${err.message}`)
+      }
+    }
+
+    await this.log('INFO', `공지 발화 완료: ${firedCount}/${activeConfigs.length}명`)
+    await this.recordKpi('marketing_users_fired', firedCount)
   }
 
   /**
-   * 베스트셀러 응답 수신 시: 공지 문구 생성 → 게시 요청
+   * 베스트셀러 응답 수신 시: 공지 문구 생성 → 게시 요청.
+   * userId 로 사용자의 retail 채널만 필터링 (멀티테넌트 격리).
    */
   private async handleBestsellerResponse(
     products: Array<{ id: number; name: string; price: number }>,
     timeSlot: TimeSlot,
+    userId?: number,
     channelId?: number
   ): Promise<void> {
     if (!products || products.length === 0) {
@@ -306,20 +369,40 @@ ${productList}
     const content = await this.composeNoticeContent(products, timeSlot)
 
     if (!channelId) {
-      // 활성 소매채널 전체에 공지
+      // 활성 소매채널 전체에 공지 — userId 가 있으면 그 사용자 채널만 (멀티테넌트 격리)
       const retailChannels = await prisma.channel.findMany({
         where: {
           deletedAt: null,
           isActive: true,
           kind: 'RETAIL',
+          ...(userId ? { userId } : {}),
         },
         select: { id: true, name: true },
       })
 
-      await this.log('INFO', `소매채널 ${retailChannels.length}개에 공지 게시`)
+      // BandNoticeConfig.retailChannelIds 필터 적용 (있으면 그 채널만)
+      let targetChannels = retailChannels
+      if (userId) {
+        const cfg = await prisma.bandNoticeConfig
+          .findUnique({ where: { userId }, select: { retailChannelIds: true } })
+          .catch(() => null)
+        if (cfg) {
+          try {
+            const ids: number[] = JSON.parse(cfg.retailChannelIds || '[]')
+            if (ids.length > 0) {
+              targetChannels = retailChannels.filter((c) => ids.includes(c.id))
+            }
+          } catch {}
+        }
+      }
+
+      await this.log(
+        'INFO',
+        `user=${userId ?? '?'} 소매채널 ${targetChannels.length}/${retailChannels.length}개에 공지 게시`,
+      )
 
       let successCount = 0
-      for (const channel of retailChannels) {
+      for (const channel of targetChannels) {
         try {
           await this.postImportantNotice(channel.id, content)
           successCount++
@@ -330,7 +413,7 @@ ${productList}
 
       await this.recordKpi(
         'notice_success_rate',
-        retailChannels.length > 0 ? Math.round((successCount / retailChannels.length) * 100) : 0
+        targetChannels.length > 0 ? Math.round((successCount / targetChannels.length) * 100) : 0,
       )
     } else {
       await this.postImportantNotice(channelId, content)
