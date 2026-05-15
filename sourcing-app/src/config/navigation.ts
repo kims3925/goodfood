@@ -72,12 +72,13 @@ export const sourcingMenuItems: MenuItem[] = [
     ],
   },
   {
-    label: '광고',
+    label: '광고&마케팅',
     icon: Megaphone,
     children: [
       { label: '종합발행', href: '/sourcing/publish/digest', icon: LayoutList },
       { label: '콜라주', href: '/sourcing/publish/ad/collage', icon: LayoutGrid },
       { label: '카톡광고', href: '/sourcing/publish/ad/kakao', icon: MessageSquare },
+      { label: '밴드공지', href: '/sourcing/publish/ad/notice', icon: Bell },
     ],
   },
   {
@@ -251,9 +252,9 @@ export const sourcingPathToMenuMap: Record<string, string> = {
   '/pipeline': '대시보드',
   '/sourcing/channel': '채널 관리',
   '/sourcing/guide': '채널 관리',
-  // 광고 (구체 경로 — /sourcing/publish 보다 먼저)
-  '/sourcing/publish/digest': '광고',
-  '/sourcing/publish/ad': '광고',
+  // 광고&마케팅 (구체 경로 — /sourcing/publish 보다 먼저)
+  '/sourcing/publish/digest': '광고&마케팅',
+  '/sourcing/publish/ad': '광고&마케팅',
   // 상품
   '/sourcing/post': '상품',
   '/sourcing/collected-product': '상품',
