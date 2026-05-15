@@ -16,7 +16,7 @@ import ProductFormModal from '@/components/product/ProductFormModal'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
 import ThumbnailImage from '@/components/ui/ThumbnailImage'
-import { scheduleDelayedPublish, formatScheduledTime } from '@/lib/delayed-publish'
+import { formatScheduledTime } from '@/lib/delayed-publish'
 
 interface Channel {
   id: number
@@ -185,9 +185,10 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
   })
   // 자동발행 지연 (분). 0 = 즉시.
   const [autoPublishDelayMinutes, setAutoPublishDelayMinutes] = useState<number>(0)
-  // 예약된 자동발행 취소 핸들러. 예약이 활성 동안 set.
+  // 예약된 자동발행 — 서버 측 workflow 의 메타데이터. delayMinutes > 0 일 때만 set.
+  // 취소는 DELETE /api/automation/execute?workflowId=N 로 서버 측 워크플로우를 취소.
   const [pendingAutoPublishCancel, setPendingAutoPublishCancel] = useState<{
-    cancel: () => void
+    workflowId: number
     scheduledAt: number
   } | null>(null)
   // 자동발행 — 발행 대상(소매밴드/쇼핑몰) 다중선택. 재발행 모달과 동일 패턴.
@@ -1192,207 +1193,74 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
       return
     }
 
-    // 지연 발행 분기: delayMinutes > 0 → setTimeout 으로 예약
     const delay = Math.max(0, Math.floor(autoPublishDelayMinutes || 0))
-    if (delay > 0) {
-      const scheduledAt = Date.now() + delay * 60 * 1000
-      const summary = `${selectedProductIds.length}개 상품`
-      const cancel = scheduleDelayedPublish(
-        delay,
-        () => {
-          setPendingAutoPublishCancel(null)
-          void runAutoPublishNow()
-        },
-        { jobKey: 'auto-publish', jobLabel: '자동발행', payloadSummary: summary }
-      )
-      setPendingAutoPublishCancel({ cancel, scheduledAt })
-      toast.success(
-        `${delay}분 후 자동발행 예약됨 (${formatScheduledTime(scheduledAt)}) — 탭을 닫으면 취소됩니다.`
-      )
-      return
-    }
-
-    await runAutoPublishNow()
+    await runAutoPublishNow(delay)
   }
 
-  const runAutoPublishNow = async () => {
+  // 서버 사이드 백그라운드 잡 등록 — 탭이 닫혀도 진행됨.
+  // 옛 흐름: 클라이언트가 retail + shop + digest 루프를 직접 돌림 (탭 닫으면 중단).
+  // 새 흐름: /api/publish/processed-job 한 번 호출 → 서버에서 setImmediate 로 처리.
+  //          진행률은 WorkflowLog 로 영속화되어 자동화설정 페이지의
+  //          AutomationFlowControl 패널에서 확인/취소 가능.
+  const runAutoPublishNow = async (delayMinutes: number = 0) => {
     setIsAutoPublishing(true)
 
-    let bandSuccessCount = 0
-    let bandFailCount = 0
-    let shopSuccessCount = 0
-    let shopFailCount = 0
-    let shopSkippedCount = 0
-    const errorMessages: string[] = []
-
-    // 종합발행 결과 집계
-    let digestSuccessCount = 0
-    let digestFailCount = 0
-    let digestPostCount = 0 // 생성된 게시글 수
-
     try {
-      // 1) 모달에서 사용자가 체크한 채널/쇼핑몰만 대상 (재발행 모달과 동일 패턴).
-      // handleAutoPublish 시점에 fetched된 목록을 그대로 사용.
-      const retailChannels = autoPublishAvailableChannels.filter((c) =>
-        autoPublishSelectedChannelIds.has(c.id)
-      )
-      const activeShops = autoPublishAvailableShops.filter((s) =>
-        autoPublishSelectedShopIds.has(s.id)
-      )
+      const retailChannelIds = autoPublishAvailableChannels
+        .filter((c) => autoPublishSelectedChannelIds.has(c.id))
+        .map((c) => c.id)
+      const shopIds = autoPublishAvailableShops
+        .filter((s) => autoPublishSelectedShopIds.has(s.id))
+        .map((s) => s.id)
 
-      console.log('[자동발행] 선택된 채널:', retailChannels.length, '쇼핑몰:', activeShops.length)
-
-      if (retailChannels.length === 0 && activeShops.length === 0) {
+      if (retailChannelIds.length === 0 && shopIds.length === 0) {
         toast.error('발행할 대상(소매밴드 또는 쇼핑몰)을 1개 이상 선택해주세요.')
-        setIsAutoPublishing(false)
         return
       }
 
+      // 서버 사이드 백그라운드 잡 등록 — 응답은 즉시(workflowId), 실제 발행은 서버 진행.
+      const res = await fetch('/api/publish/processed-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          productIds: selectedProductIds,
+          retailChannelIds,
+          shopIds,
+          mode: {
+            individual: autoPublishMode.individual,
+            digest: autoPublishMode.digest,
+          },
+          digestMaxImagesPerProduct: 4,
+          delayMinutes,
+        }),
+      })
+      const data = await res.json()
 
-      // 2) 개별발행 (선택 시) — 재발행과 100% 동일한 경로 사용.
-      //    이전엔 per-product per-channel 로 /api/publish/template/publish 를 호출했으나
-      //    제목 카드가 본문 텍스트 사이에 끼이고 댓글에 쇼핑몰 링크가 안 달리는 사고 발생.
-      //    /api/automation/execute (type=publish) 는 자동 cron 과 동일한
-      //    runPublishPipeline → publishService.publishBatch 경로라 포맷이 일치한다.
-      if (autoPublishMode.individual) {
-        // 2-1) 소매밴드 발행 — 단일 호출 (재발행 로직과 동일)
-        if (retailChannels.length > 0) {
-          try {
-            const res = await fetch('/api/automation/execute', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                type: 'publish',
-                config: {
-                  channelIds: retailChannels.map((c) => c.id),
-                  productIds: selectedProductIds,
-                  publishReadyOnly: false,
-                },
-              }),
-            })
-            const data = await res.json()
-            if (data.success) {
-              const stage = data.data?.stages?.publish
-              bandSuccessCount += stage?.successCount || 0
-              bandFailCount += stage?.failedCount || 0
-            } else {
-              bandFailCount += selectedProductIds.length
-              errorMessages.push(`[밴드 자동경로] ${data.error || '알 수 없음'}`)
-            }
-          } catch (err: any) {
-            bandFailCount += selectedProductIds.length
-            errorMessages.push(`[밴드 자동경로] ${err?.message || '네트워크 오류'}`)
-          }
-        }
-
-        // 2-2) 쇼핑몰 발행 (Shop별 ShopProduct 생성) — 재발행과 동일하게 product × shop 루프
-        for (const productId of selectedProductIds) {
-          for (const shop of activeShops) {
-            try {
-              const res = await fetch('/api/shop/publish', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ productIds: [productId], shopId: shop.id }),
-              })
-              const data = await res.json()
-              console.log(`[자동발행] shopId=${shop.id} (${shop.name}) 응답:`, data)
-
-              if (data.success && data.summary) {
-                shopSuccessCount += data.summary.success || 0
-                shopSkippedCount += data.summary.skipped || 0
-                shopFailCount += data.summary.failed || 0
-                if (data.summary.failed > 0 && data.results) {
-                  data.results
-                    .filter((r: any) => r.status === 'FAILED')
-                    .forEach((r: any) => errorMessages.push(`[쇼핑몰:${shop.name}] ${r.message || '발행 실패'}`))
-                }
-              } else {
-                shopFailCount++
-                const errMsg = data.error || data.message || '알 수 없는 오류'
-                errorMessages.push(`[쇼핑몰:${shop.name}] ${errMsg}`)
-              }
-            } catch (err: any) {
-              shopFailCount++
-              errorMessages.push(`[쇼핑몰:${shop.name}] ${err?.message || '네트워크 오류'}`)
-            }
-          }
-        }
-      } // end if (autoPublishMode.individual)
-
-      // 3) 종합발행 (선택 시) — 개별발행 완료 후 실행
-      //    카테고리별로 그룹화 → 20개씩 청크 → 각 청크를 각 채널에 POST /api/publish/digest
-      if (autoPublishMode.digest && retailChannels.length > 0) {
-        const CHUNK_SIZE = 20
-        // 선택 상품 → 카테고리별 그룹핑
-        const byCategory: Record<string, number[]> = {}
-        for (const pid of selectedProductIds) {
-          const p = products.find((x) => x.id === pid)
-          const cat = (p?.categoryId && /^(SEA|AGR|MEA|MKT|PRC|HLT|ETC)$/.test(p.categoryId)) ? p.categoryId : 'ETC'
-          if (!byCategory[cat]) byCategory[cat] = []
-          byCategory[cat].push(pid)
-        }
-
-        for (const [category, ids] of Object.entries(byCategory)) {
-          for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-            const chunk = ids.slice(i, i + CHUNK_SIZE)
-            digestPostCount++
-            for (const channel of retailChannels) {
-              try {
-                const res = await fetch('/api/publish/digest', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    categoryId: category,
-                    productIds: chunk,
-                    channelId: channel.id,
-                    maxImagesPerProduct: 4,
-                  }),
-                })
-                const data = await res.json()
-                if (data.success && data.result?.status === 'SUCCESS') {
-                  digestSuccessCount++
-                } else {
-                  digestFailCount++
-                  const msg = data.result?.message || data.error || '종합발행 실패'
-                  errorMessages.push(`[종합:${channel.name}/${category}] ${msg}`)
-                }
-              } catch (err: any) {
-                digestFailCount++
-                errorMessages.push(`[종합:${channel.name}/${category}] ${err?.message || '네트워크 오류'}`)
-              }
-            }
-          }
-        }
+      if (!data.success) {
+        toast.error(`발행 작업 등록 실패: ${data.error || '알 수 없음'}`)
+        return
       }
-    } catch (err: any) {
-      toast.error(`자동발행 중 오류: ${err?.message || '알 수 없는 오류'}`)
-    } finally {
-      setIsAutoPublishing(false)
+
+      if (delayMinutes > 0 && data.scheduledAt) {
+        const scheduledAt = new Date(data.scheduledAt).getTime()
+        setPendingAutoPublishCancel({ workflowId: data.workflowId, scheduledAt })
+        toast.success(
+          `${delayMinutes}분 후 발행 예정 (${formatScheduledTime(scheduledAt)}) — 탭을 닫아도 서버에서 진행됩니다. (워크플로우 #${data.workflowId})`
+        )
+      } else {
+        toast.success(
+          `발행 작업이 시작되었습니다 (워크플로우 #${data.workflowId}) — 탭을 닫아도 서버에서 계속 진행됩니다. ` +
+          `자동화설정 페이지의 '자동화 흐름 제어' 패널에서 진행상황·취소가 가능합니다.`
+        )
+      }
+
       setSelectedProductIds([])
       setSelectAll(false)
-      loadProducts()
-
-      const totalSuccess = bandSuccessCount + shopSuccessCount + digestSuccessCount
-      const totalFail = bandFailCount + shopFailCount + digestFailCount
-      if (totalSuccess > 0) {
-        const parts: string[] = []
-        if (autoPublishMode.individual) {
-          parts.push(`소매밴드 ${bandSuccessCount}`)
-          parts.push(`쇼핑몰 ${shopSuccessCount}`)
-        }
-        if (autoPublishMode.digest) {
-          parts.push(`종합 ${digestSuccessCount}건/${digestPostCount}게시글`)
-        }
-        toast.success(`발행 완료: ${parts.join(', ')}${shopSkippedCount > 0 ? ` (이미 발행 ${shopSkippedCount}건)` : ''}`)
-      }
-      if (totalFail > 0) {
-        // 첫 번째 에러 메시지를 사용자에게 표시
-        const firstError = errorMessages[0] || ''
-        toast.error(`발행 실패 ${totalFail}건: ${firstError}`)
-        console.error('[자동발행] 전체 실패 목록:', errorMessages)
-      }
+    } catch (err: any) {
+      toast.error(`발행 작업 등록 중 오류: ${err?.message || '알 수 없는 오류'}`)
+    } finally {
+      setIsAutoPublishing(false)
     }
   }
 
@@ -1717,18 +1585,33 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
           )}
         </div>
 
-        {/* 자동발행 예약 안내 (대기 중) */}
+        {/* 자동발행 예약 안내 (서버 측 워크플로우 — 탭 닫아도 유지) */}
         {pendingAutoPublishCancel && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 flex items-center justify-between">
             <span className="text-sm text-amber-900">
               ⏳ <strong>{formatScheduledTime(pendingAutoPublishCancel.scheduledAt)}</strong> 에 자동발행 예약됨
-              <span className="ml-2 text-xs text-amber-700">(탭 닫으면 취소)</span>
+              <span className="ml-2 text-xs text-amber-700">
+                (워크플로우 #{pendingAutoPublishCancel.workflowId} · 탭 닫아도 진행)
+              </span>
             </span>
             <button
-              onClick={() => {
-                pendingAutoPublishCancel.cancel()
-                setPendingAutoPublishCancel(null)
-                toast.success('예약된 자동발행이 취소되었습니다.')
+              onClick={async () => {
+                const wid = pendingAutoPublishCancel.workflowId
+                try {
+                  const res = await fetch(`/api/automation/execute?workflowId=${wid}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                  })
+                  const json = await res.json().catch(() => ({}))
+                  if (res.ok && json?.success) {
+                    setPendingAutoPublishCancel(null)
+                    toast.success('예약된 자동발행이 취소되었습니다.')
+                  } else {
+                    toast.error(json?.error || '취소 실패')
+                  }
+                } catch (e: any) {
+                  toast.error(`취소 실패: ${e?.message || '네트워크 오류'}`)
+                }
               }}
               className="px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded-md font-medium"
             >
