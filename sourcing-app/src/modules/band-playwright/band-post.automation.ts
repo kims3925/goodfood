@@ -578,14 +578,18 @@ export class BandPostAutomation {
         tempFiles.push(...downloadedImages)
         console.log(`[밴드자동화] ${downloadedImages.length}/${totalImages}개 이미지 다운로드 완료`)
 
-        // 이미지 다운로드 실패 확인 - 하나라도 실패하면 전체 실패
+        // 이미지 다운로드 실패 확인 (HOTFIX 2026-05-15)
+        // 옛 동작: 한 장이라도 실패 → 전체 throw. 푸터 이미지 한 장 fetch 실패가 모든 발행을 죽임.
+        // 새 동작: 성공한 이미지가 1개 이상이면 그대로 진행. 0개일 때만 throw.
         const failedCount = totalImages - downloadedImages.length
         if (failedCount > 0) {
-          console.error(`[밴드자동화] 이미지 다운로드 실패: ${failedCount}/${totalImages}개 실패`)
-          throw new BandPlaywrightError(
-            `이미지 다운로드 실패: ${failedCount}개 이미지를 다운로드할 수 없습니다.`,
-            BandPlaywrightErrorCode.UPLOAD_TIMEOUT
-          )
+          console.warn(`[밴드자동화] 이미지 다운로드 부분 실패: ${failedCount}/${totalImages}개 실패 (성공 ${downloadedImages.length}개로 진행)`)
+          if (downloadedImages.length === 0) {
+            throw new BandPlaywrightError(
+              `이미지 다운로드 전체 실패: ${totalImages}개 모두 다운로드할 수 없습니다.`,
+              BandPlaywrightErrorCode.UPLOAD_TIMEOUT
+            )
+          }
         }
 
         if (downloadedImages.length > 0) {
@@ -1218,6 +1222,27 @@ export class BandPostAutomation {
       if (looksLocal && fs.existsSync(imageUrl)) {
         console.log(`[밴드자동화] 로컬 파일 사용(abs): ${imageUrl}`)
         return imageUrl
+      }
+
+      // ── 채널 푸터/커버 등 내부 API 이미지 → 로컬 파일 직접 읽기 (HOTFIX 2026-05-15) ──
+      // "/api/images/{channel|product|post}/file/xxx.jpg" 패턴은 HTTP self-loop 대신
+      // CHANNEL_IMAGE_STORAGE_PATH 에서 직접 읽음. 옛 동작: localhost:3001 fetch → 실패 →
+      // 전체 발행 throw 사고 (커밋 4912ec5 의 푸터 이미지 자동 첨부 후 0% 실패).
+      const internalFileMatch = imageUrl.match(/^\/api\/images\/(?:channel|product|post)\/file\/(.+)$/)
+      if (internalFileMatch) {
+        const storageBasePath = process.env.CHANNEL_IMAGE_STORAGE_PATH
+        if (storageBasePath) {
+          const expandedBase = storageBasePath.startsWith('~')
+            ? path.join(os.homedir(), storageBasePath.slice(1))
+            : storageBasePath
+          const localFilePath = path.join(expandedBase, internalFileMatch[1])
+          if (fs.existsSync(localFilePath)) {
+            console.log(`[밴드자동화] 내부 이미지 로컬 파일 직접 사용: ${imageUrl} -> ${localFilePath}`)
+            return localFilePath
+          } else {
+            console.warn(`[밴드자동화] 내부 이미지 로컬 파일 없음: ${localFilePath}, HTTP 폴백 시도`)
+          }
+        }
       }
 
       // 상대 경로를 절대 URL로 변환

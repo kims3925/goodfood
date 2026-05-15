@@ -122,12 +122,15 @@ export async function POST(
     await writeFile(filePath, buffer)
 
     // 채널 cover 이미지와 동일한 서빙 경로 사용
+    // 발행 시 로컬 파일 직접 접근을 위해 상대경로 유지 (band-post.automation.ts 에서 로컬 파일로 매핑)
     const url = `/api/images/channel/file/${filename}`
 
     await prisma.channel.update({
       where: { id: channelId },
       data: { footerImageUrl: url },
     })
+
+    console.log(`[footer-image] 저장 완료: DB=${url}, 파일=${filePath}`)
 
     return NextResponse.json({
       success: true,
