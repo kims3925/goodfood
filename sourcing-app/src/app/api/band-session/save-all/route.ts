@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // 요청 본문에서 쿠키 데이터 추출
     const body = await request.json()
-    const { cookieString } = body
+    const { cookieString, sessionExpiresAt: providedExpiresAt } = body
 
     if (!cookieString) {
       return NextResponse.json(
@@ -77,12 +77,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // band_session 쿠키의 실제 만료일 사용 (세션 쿠키면 null)
-    const cookies: Array<{ name: string; expires: number }> = JSON.parse(cookieString)
-    const bandSessionCookie = cookies.find(c => c.name === 'band_session')
-    const expiresAt = bandSessionCookie && bandSessionCookie.expires > 0
-      ? new Date(bandSessionCookie.expires * 1000)
-      : null
+    // 만료일 결정 우선순위 (Phase 4):
+    //   1) 클라이언트 제공값 (Extension 이 실제 cookie 헤더에서 추출)
+    //   2) cookieString 안의 band_session 쿠키 expires (epoch seconds)
+    //   3) 기본 +14 일 (Band 일반 cycle — 세션쿠키 only 면 null 대신 사용)
+    let expiresAt: Date | null = null
+    if (providedExpiresAt) {
+      const parsed = new Date(providedExpiresAt)
+      if (!isNaN(parsed.getTime()) && parsed.getTime() > Date.now()) {
+        expiresAt = parsed
+      }
+    }
+    if (!expiresAt) {
+      try {
+        const cookies: Array<{ name: string; expires?: number }> = JSON.parse(cookieString)
+        const bandSessionCookie = cookies.find((c) => c?.name === 'band_session')
+        if (bandSessionCookie && typeof bandSessionCookie.expires === 'number' && bandSessionCookie.expires > 0) {
+          const fromCookie = new Date(bandSessionCookie.expires * 1000)
+          if (fromCookie.getTime() > Date.now()) {
+            expiresAt = fromCookie
+          }
+        }
+      } catch {
+        // 옛 raw cookie 문자열 호환 (JSON 이 아니면 무시)
+      }
+    }
+    if (!expiresAt) {
+      // 만료일 정보가 전혀 없으면 (세션 쿠키) Band 일반 cycle 인 14일로 설정.
+      // 세션 헬스 워치독이 D-3/D-1 알림을 발생시키는 데 필요.
+      expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 14)
+    }
 
 
     // 모든 소매 채널에 세션 저장
@@ -106,7 +131,7 @@ export async function POST(request: NextRequest) {
         data: {
           channelCount: updateResult.count,
           channels: retailChannels.map(c => ({ id: c.id, name: c.name })),
-          expiresAt: expiresAt?.toISOString() ?? null,
+          expiresAt: expiresAt.toISOString(),
         },
       },
       { headers: corsHeaders }

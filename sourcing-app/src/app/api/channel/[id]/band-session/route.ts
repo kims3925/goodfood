@@ -96,7 +96,7 @@ export async function PUT(
 
   try {
     const body = await request.json()
-    const { cookieString } = body
+    const { cookieString, sessionExpiresAt: providedExpiresAt } = body
 
     if (!cookieString) {
       return NextResponse.json(
@@ -118,9 +118,37 @@ export async function PUT(
       )
     }
 
-    // 쿠키 저장 (14일 만료)
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + 14)
+    // 만료일 결정 우선순위 (Phase 4):
+    //   1) 클라이언트 제공값 (Extension 이 실제 cookie expires 헤더에서 추출)
+    //   2) cookieString 안의 band_session 쿠키 expires (epoch seconds)
+    //   3) 기본 +14 일 (Band 일반 cycle)
+    let expiresAt: Date | null = null
+    if (providedExpiresAt) {
+      const parsed = new Date(providedExpiresAt)
+      if (!isNaN(parsed.getTime()) && parsed.getTime() > Date.now()) {
+        expiresAt = parsed
+      }
+    }
+    if (!expiresAt) {
+      try {
+        const parsed: Array<{ name: string; expires?: number }> = JSON.parse(cookieString)
+        if (Array.isArray(parsed)) {
+          const band = parsed.find((c) => c?.name === 'band_session')
+          if (band && typeof band.expires === 'number' && band.expires > 0) {
+            const fromCookie = new Date(band.expires * 1000)
+            if (fromCookie.getTime() > Date.now()) {
+              expiresAt = fromCookie
+            }
+          }
+        }
+      } catch {
+        // cookieString 이 JSON 이 아니면 무시 (옛 raw cookie 문자열 호환)
+      }
+    }
+    if (!expiresAt) {
+      expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 14)
+    }
 
     await prisma.channel.update({
       where: { id: channelId },
