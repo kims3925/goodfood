@@ -589,6 +589,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 밴드 세션 유효성 검증 (발행 시 필요 - 소매채널만)
+    // SaaS 예방책 Phase 3: 옛 검사(NULL/만료) + 신규 cookie 길이 점검 추가.
+    // 워크플로우 만들기 전에 차단 → 0/230 같은 헛수고 워크플로우 누적 방지.
     if (type === 'publish' || type === 'full') {
       const sessionValidation = await validateBandSessions(currentUser.userId, type)
       if (!sessionValidation.isValid) {
@@ -605,9 +607,57 @@ export async function POST(request: NextRequest) {
             error: `밴드 세션이 없거나 만료된 채널이 있습니다: ${channelNames}`,
             invalidChannels: sessionValidation.invalidChannels,
             errorType: 'SESSION_MISSING',
+            guideUrl: '/sourcing/guide/band-session',
           },
           { status: 400 }
         )
+      }
+
+      // 신규 health 점검 — cookie 길이 < 1000 (절단/잘못 저장) 까지 잡아냄.
+      // config.channelIds 명시 시 그것만 검사, 아니면 AutomationConfig 기준 (validateBandSessions 와 동일 범위).
+      try {
+        const { assertRetailSessionsHealthy, BandSessionUnhealthyError } = await import(
+          '@/modules/band-session/band-session-health'
+        )
+        // 검사 대상 ID 결정
+        let targetIds: number[] = []
+        if (Array.isArray(config?.channelIds) && config.channelIds.length > 0) {
+          targetIds = config.channelIds.filter((n: any) => Number.isInteger(n))
+        } else {
+          const ac = await prisma.automationConfig.findUnique({
+            where: { userId: currentUser.userId },
+            select: { retailChannelIds: true },
+          })
+          if (ac?.retailChannelIds) {
+            try {
+              const ids = JSON.parse(ac.retailChannelIds)
+              if (Array.isArray(ids)) targetIds = ids.filter((n: any) => Number.isInteger(n))
+            } catch {}
+          }
+        }
+        if (targetIds.length > 0) {
+          await assertRetailSessionsHealthy(currentUser.userId, targetIds)
+        }
+      } catch (e: any) {
+        if (e?.code === 'BAND_SESSION_UNHEALTHY') {
+          const channels = e.criticalChannels as Array<{ channelId: number; channelName: string; message: string }>
+          await createErrorNotification(currentUser.userId, {
+            errorType: '밴드 세션',
+            errorMessage: `pre-flight 차단: ${channels.length}개 채널 세션 점검 필요 (${channels.map((c) => c.channelName).join(', ')})`,
+          })
+          return NextResponse.json(
+            {
+              success: false,
+              error: e.message,
+              invalidChannels: channels.map((c) => ({ id: c.channelId, name: c.channelName, kind: 'RETAIL' })),
+              errorType: 'SESSION_MISSING',
+              guideUrl: '/sourcing/guide/band-session',
+            },
+            { status: 400 },
+          )
+        }
+        // 진단 모듈 자체 에러는 옛 검사 결과만 신뢰 → 발행 진행
+        console.warn('[pre-flight health] 진단 실패 (무시):', e?.message)
       }
     }
 

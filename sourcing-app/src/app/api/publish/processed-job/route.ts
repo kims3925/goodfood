@@ -94,6 +94,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Pre-flight 세션 헬스 점검 (SaaS 예방책 Phase 3) ──
+    // 소매밴드 발행 모드일 때만 — 세션 누락/만료/너무 짧음(절단) 채널이 있으면 워크플로우 생성 거부.
+    if (mode.individual && retailChannelIds.length > 0) {
+      try {
+        const { assertRetailSessionsHealthy } = await import(
+          '@/modules/band-session/band-session-health'
+        )
+        await assertRetailSessionsHealthy(userId, retailChannelIds)
+      } catch (e: any) {
+        if (e?.code === 'BAND_SESSION_UNHEALTHY') {
+          const channels = e.criticalChannels as Array<{ channelId: number; channelName: string; message: string }>
+          return NextResponse.json(
+            {
+              success: false,
+              error: e.message,
+              invalidChannels: channels.map((c) => ({ id: c.channelId, name: c.channelName, kind: 'RETAIL' })),
+              errorType: 'SESSION_MISSING',
+              guideUrl: '/sourcing/guide/band-session',
+            },
+            { status: 400 },
+          )
+        }
+        console.warn('[processed-job pre-flight] 진단 실패 (무시):', e?.message)
+      }
+    }
+
     // ── HTTP 루프백용 base URL + cookie 캡처 (digest 호출에 사용) ──
     const cookieHeader = request.headers.get('cookie') || ''
     const host = request.headers.get('host') || `localhost:${process.env.PORT || 3001}`
