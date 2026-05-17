@@ -175,14 +175,14 @@ export async function PUT(
   } catch (error: any) {
     console.error('세션 저장 실패:', error)
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error.message || '세션 저장 실패' },
       { status: 500, headers: corsHeaders }
     )
   }
 }
 
 /**
- * DELETE: 세션 삭제
+ * DELETE: 세션 삭제 (디버그/관리용)
  */
 export async function DELETE(
   request: NextRequest,
@@ -207,8 +207,6 @@ export async function DELETE(
       },
     })
 
-    console.log(`[BandSession] 세션 삭제 완료: channelId=${channelId}`)
-
     return NextResponse.json(
       { success: true, message: '세션이 삭제되었습니다.' },
       { headers: corsHeaders }
@@ -216,7 +214,7 @@ export async function DELETE(
   } catch (error: any) {
     console.error('세션 삭제 실패:', error)
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error.message || '세션 삭제 실패' },
       { status: 500, headers: corsHeaders }
     )
   }

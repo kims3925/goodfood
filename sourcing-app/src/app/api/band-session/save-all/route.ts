@@ -109,12 +109,10 @@ export async function POST(request: NextRequest) {
       expiresAt.setDate(expiresAt.getDate() + 14)
     }
 
-
-    // 모든 소매 채널에 세션 저장
+    // 모든 소매 채널에 세션 일괄 업데이트
     const updateResult = await prisma.channel.updateMany({
       where: {
-        userId: payload.userId,
-        kind: 'RETAIL',
+        id: { in: retailChannels.map((ch) => ch.id) },
       },
       data: {
         bandSessionCookie: cookieString,
@@ -122,15 +120,17 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    console.log(`[BandSession] 일괄 세션 저장 완료: userId=${payload.userId}, channelCount=${updateResult.count}`)
+    console.log(
+      `[BandSession] 일괄 세션 저장 완료: userId=${payload.userId}, 채널 ${updateResult.count}개, 만료=${expiresAt.toISOString()}`
+    )
 
     return NextResponse.json(
       {
         success: true,
-        message: '모든 소매 채널에 세션이 저장되었습니다.',
+        message: `${updateResult.count}개 채널에 세션이 저장되었습니다.`,
         data: {
-          channelCount: updateResult.count,
-          channels: retailChannels.map(c => ({ id: c.id, name: c.name })),
+          updatedCount: updateResult.count,
+          channels: retailChannels.map((ch) => ({ id: ch.id, name: ch.name })),
           expiresAt: expiresAt.toISOString(),
         },
       },
@@ -139,8 +139,9 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[BandSession] 일괄 세션 저장 실패:', error)
     return NextResponse.json(
-      { success: false, error: error.message || '세션 저장에 실패했습니다.' },
+      { success: false, error: error.message || '세션 저장 중 오류 발생' },
       { status: 500, headers: corsHeaders }
     )
   }
 }
+
