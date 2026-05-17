@@ -14,6 +14,7 @@
 import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
 import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
+import { resetSessionFailureCount } from '@/modules/band-playwright/band-session-manager'
 import { calculateSellingPrice } from '@/lib/price-calculator'
 import { markPriceImagesOnProduct } from '@/modules/utils/priceImageFilter'
 import type {
@@ -375,6 +376,8 @@ export class PublishService {
             publishMethod = 'playwright'
             imageCount = imageUrls.length
             playwrightSuccess = true
+            // 발행 성공 — 누적된 일시 실패 카운터 리셋 (옛 hiccup 의 NULL 처리 방지)
+            resetSessionFailureCount(channelId)
             console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
 
             break
@@ -1071,6 +1074,8 @@ export class PublishService {
             publishMethod = 'playwright'
             imageCount = imageUrls.length
             playwrightSuccess = true
+            // 발행 성공 — 누적된 일시 실패 카운터 리셋 (옛 hiccup 의 NULL 처리 방지)
+            resetSessionFailureCount(channelId)
             console.log(`[PublishService] Playwright 발행 성공: ${postKey} (${imageCount}개 이미지)`)
 
             break

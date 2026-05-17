@@ -134,13 +134,12 @@ export class SessionKeeperAgent extends AgentBase {
    */
   async renewSession(channelId: number): Promise<void> {
     try {
-      // 세션 쿠키 무효화
-      await prisma.channel.update({
-        where: { id: channelId },
-        data: {
-          bandSessionCookie: null,
-          sessionExpiresAt: null,
-        },
+      // 세션 쿠키 무효화 — 만료 확정 케이스(checkSessionValidity 가 already expired 확인 후 호출)
+      // 이므로 force=true 로 즉시 NULL 처리. invalidateSession 보수화 카운터 우회.
+      const { sessionManager } = await import('@/modules/band-playwright/band-session-manager')
+      await sessionManager.invalidateSession(channelId, {
+        force: true,
+        reason: 'SessionKeeperAgent.renewSession (expiry confirmed)',
       })
 
       await this.log('WARN', `세션 무효화 완료: 채널 ${channelId} — 수동 재로그인 필요`)

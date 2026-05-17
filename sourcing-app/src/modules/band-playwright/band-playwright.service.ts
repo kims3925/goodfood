@@ -87,10 +87,11 @@ export class BandPlaywrightService {
         error instanceof BandPlaywrightError &&
         error.code === BandPlaywrightErrorCode.SESSION_EXPIRED
       ) {
-        // 1회 재시도
+        // 1회 재시도 — 일시 오류 가능성. invalidateSession 보수화(force=false) 로
+        // 1-2회 SESSION_EXPIRED 만으로 NULL 처리되지 않도록 함 (band-session-manager 의 임계값 적용).
         if (retryCount < 1) {
           console.log('[BandPlaywrightService] Session expired, retrying with new session')
-          await sessionManager.invalidateSession(channelId)
+          await sessionManager.invalidateSession(channelId, { reason: 'publishWithImages: SESSION_EXPIRED retry' })
           return this.publishWithImages(params, retryCount + 1)
         }
         // 재시도 후에도 실패하면 명확한 메시지 반환
@@ -316,10 +317,10 @@ export class BandPlaywrightService {
         error instanceof BandPlaywrightError &&
         error.code === BandPlaywrightErrorCode.SESSION_EXPIRED
       ) {
-        // 1회 재시도
+        // 1회 재시도 — invalidateSession 보수화(force=false)
         if (retryCount < 1) {
           console.log('[BandPlaywrightService] Session expired, retrying with new session')
-          await sessionManager.invalidateSession(channelId)
+          await sessionManager.invalidateSession(channelId, { reason: 'publishBatchWithImages: SESSION_EXPIRED retry' })
           return this.publishBatchWithImages(params, retryCount + 1)
         }
         // 재시도 후에도 실패하면 명확한 메시지 반환
