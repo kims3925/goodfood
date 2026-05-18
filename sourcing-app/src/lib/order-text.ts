@@ -14,8 +14,9 @@ export interface OrderTextItem {
   sourceProductName?: string | null
   optionSummary: string | null
   quantity: number
-  unitPrice: number
+  unitPrice: number        // 판매가 (소매 가격)
   shippingFee: number
+  wholesalePrice?: number | null // 공급가 (도매원가) — 발주 텍스트 표시용
 }
 
 export interface OrderTextShipping {
@@ -32,6 +33,7 @@ export interface OrderTextData {
   items: OrderTextItem[]
   shipping: OrderTextShipping
   wholesaleChannelName?: string
+  retailChannelName?: string  // 소매밴드 이름 (다건이면 쉼표 합)
   customerName?: string
   customerPhone?: string
 }
@@ -91,16 +93,27 @@ export function generateOrderText(data: OrderTextData): string {
   )
   const ship = commonShipping(data.items)
   const grandTotal = totalItemPrice + ship
-  lines.push(`■ 금액 : ${grandTotal.toLocaleString()}원`)
+  // 공급가 합계 (도매원가 × 수량) — wholesalePrice 없는 품목은 0 처리
+  const totalWholesale = data.items.reduce(
+    (sum, i) => sum + (i.wholesalePrice ?? 0) * i.quantity, 0
+  )
+
+  lines.push(`■ 판매가 : ${totalItemPrice.toLocaleString()}원`)
+  if (totalWholesale > 0) {
+    lines.push(`■ 공급가 : ${totalWholesale.toLocaleString()}원`)
+  }
+  lines.push(`■ 배송비 : ${ship > 0 ? `${ship.toLocaleString()}원` : '무료'}`)
+  lines.push(`■ 합계   : ${grandTotal.toLocaleString()}원`)
 
   // 배송정보
   const { lines: shipLines } = buildShippingBlock(shipping, customerName, customerPhone)
   lines.push(...shipLines)
 
-  // 도매방
-  if (data.wholesaleChannelName) {
+  // 도매방 / 소매밴드
+  if (data.wholesaleChannelName || data.retailChannelName) {
     lines.push('')
-    lines.push(`■ 도매방 : ${data.wholesaleChannelName}`)
+    if (data.wholesaleChannelName) lines.push(`■ 도매방 : ${data.wholesaleChannelName}`)
+    if (data.retailChannelName) lines.push(`■ 소매밴드 : ${data.retailChannelName}`)
   }
 
   return lines.join('\n')
@@ -112,7 +125,7 @@ export function generateOrderText(data: OrderTextData): string {
  * - 여러 품목: 각 발주서 금액 = 해당 품목 상품가, 마지막에 합배송 공통 배송비 안내
  */
 export function generateOrderTextsPerItem(data: OrderTextData): string[] {
-  const { items, shipping, customerName, customerPhone, wholesaleChannelName } = data
+  const { items, shipping, customerName, customerPhone, wholesaleChannelName, retailChannelName } = data
   const ship = commonShipping(items)
   const isSingle = items.length === 1
 
@@ -127,14 +140,20 @@ export function generateOrderTextsPerItem(data: OrderTextData): string[] {
       lines.push(`  수량 : ${item.quantity}개`)
     }
 
+    // 가격 정보 — 판매가, 공급가, 배송비, 합계 (옛은 단일 금액 줄만)
     const itemPrice = item.unitPrice * item.quantity
-    if (isSingle) {
-      // 단일 품목은 배송비 포함한 최종 결제 금액
-      lines.push(`■ 금액 : ${(itemPrice + ship).toLocaleString()}원`)
-    } else {
-      // 여러 품목은 해당 품목 상품가만 (배송비는 공통 안내로 1회)
-      lines.push(`■ 금액 : ${itemPrice.toLocaleString()}원`)
+    const itemWholesale = (item.wholesalePrice ?? 0) * item.quantity
+
+    lines.push(`■ 판매가 : ${itemPrice.toLocaleString()}원`)
+    if (itemWholesale > 0) {
+      lines.push(`■ 공급가 : ${itemWholesale.toLocaleString()}원`)
     }
+    if (isSingle) {
+      // 단일 품목은 배송비 + 합계 (배송비 포함 최종)
+      lines.push(`■ 배송비 : ${ship > 0 ? `${ship.toLocaleString()}원` : '무료'}`)
+      lines.push(`■ 합계   : ${(itemPrice + ship).toLocaleString()}원`)
+    }
+    // 여러 품목은 배송비/합계는 아래 합배송 안내로 처리
 
     const { lines: shipLines } = buildShippingBlock(shipping, customerName, customerPhone)
     lines.push(...shipLines)
@@ -147,9 +166,11 @@ export function generateOrderTextsPerItem(data: OrderTextData): string[] {
       lines.push(`※ ${msg}`)
     }
 
-    if (wholesaleChannelName) {
+    // 도매방 / 소매밴드
+    if (wholesaleChannelName || retailChannelName) {
       lines.push('')
-      lines.push(`■ 도매방 : ${wholesaleChannelName}`)
+      if (wholesaleChannelName) lines.push(`■ 도매방 : ${wholesaleChannelName}`)
+      if (retailChannelName) lines.push(`■ 소매밴드 : ${retailChannelName}`)
     }
 
     return lines.join('\n')

@@ -857,6 +857,7 @@ export default function UnifiedOrderDetailPage() {
                 orderStatus={order.status}
                 customerName={order.customerName}
                 customerPhone={order.customerPhone ?? undefined}
+                retailChannelNames={(order as any).retailChannelNames}
               />
             )}
 

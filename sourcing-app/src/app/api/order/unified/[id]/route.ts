@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { Prisma } from '@bandauto/db'
+import prisma, { Prisma, ChannelKind } from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 
 const Decimal = Prisma.Decimal
@@ -187,6 +187,10 @@ export async function GET(
             shippingFee: item.shopProduct?.product?.shippingFee || 0,
             bundleShippingType: item.shopProduct?.product?.bundleShippingType || 'NONE',
             bundleMaxQty: item.shopProduct?.product?.bundleMaxQty || 1,
+            // 공급가(도매원가) — 발주 텍스트의 공급가 표시용
+            wholesalePrice: item.shopProduct?.product?.wholesalePrice
+              ? Number(item.shopProduct.product.wholesalePrice)
+              : null,
             // 도매처(소싱 출처) 정보
             channel: item.shopProduct?.product?.channel ? {
               id: item.shopProduct.product.channel.id,
@@ -209,6 +213,14 @@ export async function GET(
           } : null,
           shopId: order.shopId,
           shopName: order.shop?.name || null,
+          // 소매밴드 — 해당 shop 에 연결된 RETAIL 채널 이름들 (다건은 쉼표 합)
+          retailChannelNames: order.shopId
+            ? (await prisma.channel.findMany({
+                where: { shopId: order.shopId, kind: ChannelKind.RETAIL, deletedAt: null, isActive: true },
+                select: { name: true },
+                orderBy: { name: 'asc' },
+              })).map((c) => c.name)
+            : [],
           // 환불 계좌 정보 (무통장입금 취소 시)
           refundAccount: order.refundAccount ? {
             bankName: order.refundAccount.bankName,
@@ -341,6 +353,10 @@ export async function GET(
           shippingFee: item.shopProduct?.product?.shippingFee || 0,
           bundleShippingType: item.shopProduct?.product?.bundleShippingType || 'NONE',
           bundleMaxQty: item.shopProduct?.product?.bundleMaxQty || 1,
+          // 공급가(도매원가) — 발주 텍스트의 공급가 표시용
+          wholesalePrice: item.shopProduct?.product?.wholesalePrice
+            ? Number(item.shopProduct.product.wholesalePrice)
+            : null,
           // 도매처(소싱 출처) 정보
           channel: item.shopProduct?.product?.channel ? {
             id: item.shopProduct.product.channel.id,
@@ -359,6 +375,14 @@ export async function GET(
         user: null, // 비회원은 user 정보 없음
         shopId: guestOrder.shopId,
         shopName: guestOrder.shop?.name || null,
+        // 소매밴드 — 해당 shop 에 연결된 RETAIL 채널 이름들
+        retailChannelNames: guestOrder.shopId
+          ? (await prisma.channel.findMany({
+              where: { shopId: guestOrder.shopId, kind: ChannelKind.RETAIL, deletedAt: null, isActive: true },
+              select: { name: true },
+              orderBy: { name: 'asc' },
+            })).map((c) => c.name)
+          : [],
         // 환불 계좌 정보 (무통장입금 취소 시)
         refundAccount: guestOrder.refundAccount ? {
           bankName: guestOrder.refundAccount.bankName,

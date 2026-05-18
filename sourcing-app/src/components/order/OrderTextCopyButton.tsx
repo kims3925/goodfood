@@ -32,6 +32,7 @@ interface OrderItem {
   quantity: number
   unitPrice: number
   shippingFee: number
+  wholesalePrice?: number | null  // 공급가 (도매원가)
   channel: ChannelInfo | null
 }
 
@@ -51,6 +52,7 @@ interface OrderTextCopyButtonProps {
   orderStatus: string
   customerName?: string
   customerPhone?: string
+  retailChannelNames?: string[]  // 주문이 들어온 소매밴드 이름들 (shopId 매핑)
 }
 
 export default function OrderTextCopyButton({
@@ -60,6 +62,7 @@ export default function OrderTextCopyButton({
   orderStatus,
   customerName,
   customerPhone,
+  retailChannelNames,
 }: OrderTextCopyButtonProps) {
   const toast = useToast()
   const [isExpanded, setIsExpanded] = useState(false)
@@ -88,15 +91,19 @@ export default function OrderTextCopyButton({
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         shippingFee: item.shippingFee,
+        wholesalePrice: item.wholesalePrice,
       })),
       shipping: shippingAddress,
       wholesaleChannelName: defaultChannel?.name,
+      retailChannelName: retailChannelNames && retailChannelNames.length > 0
+        ? retailChannelNames.join(', ')
+        : undefined,
       customerName,
       customerPhone,
     }
 
     return generateOrderTextsPerItem(data).join(ORDER_DIVIDER)
-  }, [orderNumber, items, shippingAddress, defaultChannel, customerName, customerPhone])
+  }, [orderNumber, items, shippingAddress, defaultChannel, customerName, customerPhone, retailChannelNames])
 
   // 클립보드 복사
   const handleCopy = async () => {
