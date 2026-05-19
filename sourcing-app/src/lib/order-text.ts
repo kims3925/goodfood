@@ -36,6 +36,12 @@ export interface OrderTextData {
   retailChannelName?: string  // 소매밴드 이름 (다건이면 쉼표 합)
   customerName?: string
   customerPhone?: string
+  // ⚠ 주문 레벨 금액 — item.unitPrice 가 배송비 포함 가격으로 저장되는 케이스 보완용.
+  //   있으면 우선 사용 (판매가 = subtotal, 배송비 = total - subtotal + discount).
+  //   없으면 옛 산식(item.unitPrice * qty + max(shippingFee)) 폴백.
+  orderSubtotal?: number   // 상품 순합계 (Order.subtotalAmount)
+  orderTotal?: number      // 청구 총액 (Order.totalAmount)
+  orderDiscount?: number   // 할인 (Order.discountAmount)
 }
 
 /** 합배송 가정: items 중 최대 shippingFee를 주문 전체 배송비로 간주 */
@@ -87,18 +93,36 @@ export function generateOrderText(data: OrderTextData): string {
     }
   })
 
-  // 금액 (상품가 합계 + 합배송 배송비 1회 포함 단일 값)
-  const totalItemPrice = data.items.reduce(
+  // ⚠ 산식 우선순위:
+  //   1) order 레벨 합계 (subtotal/total/discount) 가 있으면 그걸로 — 가장 정확
+  //   2) 폴백: item.unitPrice * qty + max(shippingFee)
+  //     · item.unitPrice 가 배송비 포함 가격으로 저장된 케이스 (Shop calculateSellingPrice 결과)
+  //       에서는 (1) 이 올바른 판매가/배송비 분리를 보장.
+  const itemsTotal = data.items.reduce(
     (sum, i) => sum + i.unitPrice * i.quantity, 0
   )
-  const ship = commonShipping(data.items)
-  const grandTotal = totalItemPrice + ship
+  const itemsShip = commonShipping(data.items)
+
+  let sellPrice: number  // 판매가 (순 상품가)
+  let ship: number       // 배송비
+  let grandTotal: number // 합계 (실제 청구)
+
+  if (data.orderTotal != null && data.orderSubtotal != null) {
+    sellPrice = data.orderSubtotal
+    ship = Math.max(0, data.orderTotal - data.orderSubtotal + (data.orderDiscount ?? 0))
+    grandTotal = data.orderTotal
+  } else {
+    sellPrice = itemsTotal
+    ship = itemsShip
+    grandTotal = itemsTotal + itemsShip
+  }
+
   // 공급가 합계 (도매원가 × 수량) — wholesalePrice 없는 품목은 0 처리
   const totalWholesale = data.items.reduce(
     (sum, i) => sum + (i.wholesalePrice ?? 0) * i.quantity, 0
   )
 
-  lines.push(`■ 판매가 : ${totalItemPrice.toLocaleString()}원`)
+  lines.push(`■ 판매가 : ${sellPrice.toLocaleString()}원`)
   if (totalWholesale > 0) {
     lines.push(`■ 공급가 : ${totalWholesale.toLocaleString()}원`)
   }
@@ -126,8 +150,19 @@ export function generateOrderText(data: OrderTextData): string {
  */
 export function generateOrderTextsPerItem(data: OrderTextData): string[] {
   const { items, shipping, customerName, customerPhone, wholesaleChannelName, retailChannelName } = data
-  const ship = commonShipping(items)
   const isSingle = items.length === 1
+
+  // ⚠ order 레벨 합계 우선 — item.unitPrice 가 배송비 포함 가격으로 저장된 케이스
+  //    (calculateSellingPrice 결과) 에서 판매가가 부풀려 보이는 사고 보완.
+  //    예: GORD-20260519-9XNVY4 — 판매가 19,000 인데 텍스트에 23,000 표시 (배송비 4,000 포함).
+  const hasOrderTotals = data.orderTotal != null && data.orderSubtotal != null
+  const orderShip = hasOrderTotals
+    ? Math.max(0, data.orderTotal! - data.orderSubtotal! + (data.orderDiscount ?? 0))
+    : commonShipping(items)
+
+  // 단일 품목일 때 판매가 = order.subtotalAmount (배송비 제외)
+  // 다중 품목일 때 각 item.unitPrice * qty 사용 (단, hasOrderTotals 이면 비례 조정 권장 — 옛 로직 유지)
+  const ship = orderShip
 
   return items.map((item) => {
     const lines: string[] = []
@@ -140,8 +175,10 @@ export function generateOrderTextsPerItem(data: OrderTextData): string[] {
       lines.push(`  수량 : ${item.quantity}개`)
     }
 
-    // 가격 정보 — 판매가, 공급가, 배송비, 합계 (옛은 단일 금액 줄만)
-    const itemPrice = item.unitPrice * item.quantity
+    // 판매가 — 단일 품목이고 orderSubtotal 있으면 그 값 우선 (배송비 미포함 보장)
+    const itemPrice = (isSingle && hasOrderTotals && data.orderSubtotal != null)
+      ? data.orderSubtotal
+      : item.unitPrice * item.quantity
     const itemWholesale = (item.wholesalePrice ?? 0) * item.quantity
 
     lines.push(`■ 판매가 : ${itemPrice.toLocaleString()}원`)
@@ -149,9 +186,11 @@ export function generateOrderTextsPerItem(data: OrderTextData): string[] {
       lines.push(`■ 공급가 : ${itemWholesale.toLocaleString()}원`)
     }
     if (isSingle) {
-      // 단일 품목은 배송비 + 합계 (배송비 포함 최종)
+      const finalTotal = hasOrderTotals && data.orderTotal != null
+        ? data.orderTotal
+        : itemPrice + ship
       lines.push(`■ 배송비 : ${ship > 0 ? `${ship.toLocaleString()}원` : '무료'}`)
-      lines.push(`■ 합계   : ${(itemPrice + ship).toLocaleString()}원`)
+      lines.push(`■ 합계   : ${finalTotal.toLocaleString()}원`)
     }
     // 여러 품목은 배송비/합계는 아래 합배송 안내로 처리
 

@@ -53,6 +53,10 @@ interface OrderTextCopyButtonProps {
   customerName?: string
   customerPhone?: string
   retailChannelNames?: string[]  // 주문이 들어온 소매밴드 이름들 (shopId 매핑)
+  // 주문 레벨 합계 — 산식 정확도용 (item.unitPrice 가 배송비 포함이면 이걸 우선 사용)
+  orderSubtotal?: number
+  orderTotal?: number
+  orderDiscount?: number
 }
 
 export default function OrderTextCopyButton({
@@ -63,6 +67,9 @@ export default function OrderTextCopyButton({
   customerName,
   customerPhone,
   retailChannelNames,
+  orderSubtotal,
+  orderTotal,
+  orderDiscount,
 }: OrderTextCopyButtonProps) {
   const toast = useToast()
   const [isExpanded, setIsExpanded] = useState(false)
@@ -100,10 +107,13 @@ export default function OrderTextCopyButton({
         : undefined,
       customerName,
       customerPhone,
+      orderSubtotal,
+      orderTotal,
+      orderDiscount,
     }
 
     return generateOrderTextsPerItem(data).join(ORDER_DIVIDER)
-  }, [orderNumber, items, shippingAddress, defaultChannel, customerName, customerPhone, retailChannelNames])
+  }, [orderNumber, items, shippingAddress, defaultChannel, customerName, customerPhone, retailChannelNames, orderSubtotal, orderTotal, orderDiscount])
 
   // 클립보드 복사
   const handleCopy = async () => {

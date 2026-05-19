@@ -858,6 +858,9 @@ export default function UnifiedOrderDetailPage() {
                 customerName={order.customerName}
                 customerPhone={order.customerPhone ?? undefined}
                 retailChannelNames={(order as any).retailChannelNames}
+                orderSubtotal={(order as any).subtotalAmount}
+                orderTotal={(order as any).totalAmount}
+                orderDiscount={(order as any).discountAmount}
               />
             )}
 
