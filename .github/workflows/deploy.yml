@@ -198,6 +198,10 @@ jobs:
           bash scripts/db-migrate.sh || true
 
           docker compose ps
+
+          echo "==> 구버전 이미지 정리"
+          docker image prune -af
+
           echo "Deploy completed at \$(date '+%Y-%m-%d %H:%M:%S %Z')"
           EOF
           )
