@@ -11,6 +11,81 @@ function generateShortUUID(): string {
   return crypto.randomBytes(8).toString('hex')
 }
 
+// ─── 이미지 최적화 (2026-05-20) ─────────────────────────────────────
+// 디스크 누적 절감 — Band/쇼핑몰 표시에 충분한 최대 1280px 변 + JPEG quality 82.
+// Sharp dynamic import → 모듈 미설치 시 catch 로 원본 폴백 (운영 안전성).
+// IMAGE_OPTIMIZE_ENABLED=false 환경변수로 비활성 가능.
+const IMAGE_OPTIMIZE_MAX_DIM = 1280   // 최대 변 길이 (px)
+const IMAGE_OPTIMIZE_JPEG_Q = 82      // JPEG quality
+const IMAGE_OPTIMIZE_PNG_COMPRESSION = 9
+
+/**
+ * 이미지 버퍼를 리사이즈 + 압축. 원본보다 작아지면 처리본 반환, 아니면 원본 유지.
+ * Sharp 모듈 또는 처리 자체 실패 시 원본 폴백 (안전).
+ *
+ * @returns { buffer: 처리/원본, ext: 확장자 (변환 시 .jpg/.png 로 정규화) }
+ */
+async function optimizeImageBuffer(
+  buffer: Buffer,
+  originalExt: string,
+): Promise<{ buffer: Buffer; ext: string }> {
+  const fallback = { buffer, ext: originalExt }
+  if (process.env.IMAGE_OPTIMIZE_ENABLED === 'false') return fallback
+
+  try {
+    // Sharp dynamic import — 의존성 미설치 환경에서도 빌드/실행 안 깨짐.
+    // type declarations 없을 수 있으니 unknown 으로 받아 안전 사용.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sharpMod: any = await import('sharp' as any).catch(() => null)
+    if (!sharpMod) {
+      console.warn('[Image Optimize] sharp 모듈 없음 — 원본 유지')
+      return fallback
+    }
+    const sharp = sharpMod.default || sharpMod
+
+    const isPng = /^\.png$/i.test(originalExt)
+    const pipeline = sharp(buffer, { failOn: 'none' })
+      .rotate() // EXIF 기반 자동 회전 (모바일 사진 세로/가로 보정)
+      .resize({
+        width: IMAGE_OPTIMIZE_MAX_DIM,
+        height: IMAGE_OPTIMIZE_MAX_DIM,
+        fit: 'inside',
+        withoutEnlargement: true, // 원본이 작으면 그대로
+      })
+
+    let optimized: Buffer
+    let outExt: string
+    if (isPng) {
+      // PNG 는 PNG 로 유지 (투명도 보존). palette 옵션으로 색상 양자화 시도.
+      optimized = await pipeline.png({
+        compressionLevel: IMAGE_OPTIMIZE_PNG_COMPRESSION,
+        palette: true,
+      }).toBuffer()
+      outExt = '.png'
+    } else {
+      // JPEG/WebP/AVIF/기타 → JPEG 로 통일. mozjpeg 인코더 효율 좋음.
+      optimized = await pipeline.jpeg({
+        quality: IMAGE_OPTIMIZE_JPEG_Q,
+        mozjpeg: true,
+      }).toBuffer()
+      outExt = '.jpg'
+    }
+
+    // 처리본이 원본보다 크면 (예: 이미 잘 압축된 작은 이미지) 원본 유지
+    if (optimized.length < buffer.length) {
+      const savedPct = Math.round((1 - optimized.length / buffer.length) * 100)
+      console.log(
+        `[Image Optimize] ${(buffer.length / 1024).toFixed(0)}KB → ${(optimized.length / 1024).toFixed(0)}KB (-${savedPct}%)`,
+      )
+      return { buffer: optimized, ext: outExt }
+    }
+    return fallback
+  } catch (err) {
+    console.warn('[Image Optimize] 실패 (원본 유지):', (err as Error).message)
+    return fallback
+  }
+}
+
 /**
  * 현재 시간을 파일명 형식으로 포맷 (yyyy-mm-dd_HH-mm-ss)
  */
@@ -149,10 +224,8 @@ export async function downloadAndSaveProductImage(imageUrl: string): Promise<{
     // 파일 확장자 추출 (없으면 jpg로 기본 설정)
     let ext: string
     if (postImageFileName) {
-      // 로컬 파일에서 확장자 추출
       ext = path.extname(postImageFileName) || '.jpg'
     } else {
-      // URL에서 확장자 추출
       try {
         const urlPath = new URL(imageUrl).pathname
         ext = path.extname(urlPath) || '.jpg'
@@ -160,6 +233,11 @@ export async function downloadAndSaveProductImage(imageUrl: string): Promise<{
         ext = path.extname(imageUrl) || '.jpg'
       }
     }
+
+    // 이미지 최적화 (리사이즈 + 압축). 실패 시 원본 그대로.
+    const optimized = await optimizeImageBuffer(buffer, ext)
+    buffer = optimized.buffer
+    ext = optimized.ext
 
     // 파일명 생성: uuid_timestamp.ext
     const uuid = generateShortUUID()
@@ -308,9 +386,10 @@ export async function downloadAndSavePostImage(imageUrl: string): Promise<{
     }
 
     const arrayBuffer = await response.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    // 명시적 Buffer 타입 — let 재할당 시 sharp 반환값(Buffer)과 호환 보장
+    let buffer: Buffer = Buffer.from(arrayBuffer)
 
-    // 파일 해시 생성
+    // 파일 해시 생성 (원본 기준 — 중복 감지 일관성)
     const fileHash = generateFileHash(buffer)
 
     // 동일 해시의 기존 이미지 확인
@@ -339,7 +418,12 @@ export async function downloadAndSavePostImage(imageUrl: string): Promise<{
 
     // 파일 확장자 추출 (없으면 jpg로 기본 설정)
     const urlPath = new URL(imageUrl).pathname
-    const ext = path.extname(urlPath) || '.jpg'
+    let ext = path.extname(urlPath) || '.jpg'
+
+    // 이미지 최적화 (리사이즈 + 압축). 실패 시 원본 그대로.
+    const optimized = await optimizeImageBuffer(buffer, ext)
+    buffer = optimized.buffer
+    ext = optimized.ext
 
     // 파일명 생성: uuid_timestamp.ext
     const uuid = generateShortUUID()
