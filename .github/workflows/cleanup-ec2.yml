@@ -1,0 +1,144 @@
+name: EC2 Disk Cleanup (Daily)
+
+# 일일 정기 EC2 디스크 정리 — 5/20 디스크 100% 포화 사고 재발 방지.
+# 매 배포 시 deploy.yml 마지막 단계에서도 정리하지만, 다음 안전망:
+#   - 배포 안 한 날도 정리 (예: 옛 manual docker pull / 백업 / 로그 누적)
+#   - 매일 새벽 정리로 운영 시간대 부하 없음
+#   - 디스크 사용률 임계값 초과 시 GitHub Actions 실패 → 슬랙/이메일 알림 가능
+
+on:
+  schedule:
+    # UTC 17:00 = KST 새벽 02:00. 운영 트래픽 최저 시간대.
+    - cron: '0 17 * * *'
+  workflow_dispatch:  # 수동 실행도 가능
+
+env:
+  INSTANCE_ID: i-0e6ef7c646a61356f
+  DISK_WARN_PCT: 70   # 정리 후에도 이만큼 차있으면 워닝
+  DISK_FAIL_PCT: 85   # 정리 후에도 이만큼 차있으면 실패 (수동 개입 필요 신호)
+
+jobs:
+  cleanup:
+    name: Docker prune + disk usage check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Send cleanup command via SSM
+        id: ssm
+        run: |
+          set -euo pipefail
+
+          REMOTE_SCRIPT=$(cat <<'EOF'
+          set -e
+          export HOME=/root
+
+          echo "==> 정리 전 디스크 상태"
+          df -h /
+
+          echo ""
+          echo "==> Docker 이미지/캐시/컨테이너 정리"
+          echo "  [1/5] dangling + unused images (-a)"
+          docker image prune -af || true
+          echo "  [2/5] stopped containers"
+          docker container prune -f || true
+          echo "  [3/5] build cache (24h+)"
+          docker builder prune -af --filter "until=24h" || true
+          echo "  [4/5] networks"
+          docker network prune -f || true
+          echo "  [5/5] unused volumes (orphan only — 활성 볼륨은 안전)"
+          docker volume prune -f || true
+
+          echo ""
+          echo "==> 시스템 로그 회전 (journald 7일 이상)"
+          sudo journalctl --vacuum-time=7d || true
+
+          echo ""
+          echo "==> 정리 후 디스크 상태"
+          df -h /
+
+          # 사용률 추출 (예: "85%" → 85)
+          USED_PCT=$(df -h / | awk 'NR==2 {gsub("%", "", $5); print $5}')
+          echo ""
+          echo "==> 루트 디스크 사용률: ${USED_PCT}%"
+
+          if [ "$USED_PCT" -ge 85 ]; then
+            echo "🔴 CRITICAL: 정리 후에도 사용률 ${USED_PCT}% — 수동 점검 필요"
+            exit 2
+          elif [ "$USED_PCT" -ge 70 ]; then
+            echo "🟡 WARNING: 정리 후에도 사용률 ${USED_PCT}% — 모니터링 필요"
+            # 워닝은 실패 아님 (exit 0)
+          else
+            echo "🟢 OK: 사용률 ${USED_PCT}%"
+          fi
+          EOF
+          )
+
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "${INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Daily disk cleanup ${GITHUB_RUN_ID}" \
+            --timeout-seconds 300 \
+            --parameters "$(jq -n --arg cmd "$REMOTE_SCRIPT" '{commands: [$cmd], executionTimeout: ["600"]}')" \
+            --query "Command.CommandId" \
+            --output text)
+          echo "cmd_id=$CMD_ID" >> $GITHUB_OUTPUT
+          echo "Command ID: $CMD_ID"
+
+          # 완료 대기 (최대 5분)
+          STATUS=""
+          for i in $(seq 1 30); do
+            sleep 10
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$CMD_ID" \
+              --details \
+              --query "CommandInvocations[0].Status" \
+              --output text 2>/dev/null || echo "Pending")
+            echo "  [$i/30] status=$STATUS"
+            case "$STATUS" in
+              Success|Failed|Cancelled|TimedOut)
+                break
+                ;;
+            esac
+          done
+
+          echo ""
+          echo "==> 최종 상태: $STATUS"
+
+          echo "==> stdout:"
+          aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "${INSTANCE_ID}" \
+            --query "StandardOutputContent" \
+            --output text || true
+
+          echo ""
+          echo "==> stderr:"
+          aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "${INSTANCE_ID}" \
+            --query "StandardErrorContent" \
+            --output text || true
+
+          # ResponseCode 2 = 디스크 사용률 85%+ → 명시적 실패 (알림 트리거)
+          RC=$(aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "${INSTANCE_ID}" \
+            --query "ResponseCode" \
+            --output text 2>/dev/null || echo "0")
+          echo "ResponseCode: $RC"
+
+          if [ "$STATUS" != "Success" ] && [ "$RC" != "2" ]; then
+            echo "::error::Cleanup SSM command failed: $STATUS"
+            exit 1
+          fi
+          if [ "$RC" = "2" ]; then
+            echo "::error::루트 디스크 사용률이 85% 이상 — 수동 점검 필요 (옛 백업/로그/이미지 확인)"
+            exit 1
+          fi
+          echo "Daily cleanup completed."

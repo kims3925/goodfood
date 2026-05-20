@@ -199,8 +199,18 @@ jobs:
 
           docker compose ps
 
-          echo "==> 구버전 이미지 정리"
+          echo "==> 구버전 이미지/캐시/컨테이너 일괄 정리 (디스크 누적 방지 — 5/20 사고 재발 차단)"
+          echo "  - dangling + unused images"
           docker image prune -af
+          echo "  - exited containers"
+          docker container prune -f
+          echo "  - build cache (24h+)"
+          docker builder prune -af --filter "until=24h" || true
+          echo "  - unused volumes (orphan only)"
+          docker volume prune -f || true
+
+          echo "==> 디스크 상태"
+          df -h / | tail -2
 
           echo "Deploy completed at \$(date '+%Y-%m-%d %H:%M:%S %Z')"
           EOF

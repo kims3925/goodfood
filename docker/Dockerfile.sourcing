@@ -81,7 +81,17 @@ ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
 ENV APP_NAME=sourcing
 
-# sharp 설치 (이미지 최적화용)
+# ── Playwright 슬림화 (2026-05-20) ──
+# Band 자동화는 Chromium 만 사용 — Firefox/WebKit 디렉터리 삭제 (~500MB 절감).
+# Microsoft 공식 이미지의 /ms-playwright/ 에 chromium-XXX / firefox-XXX / webkit-XXX 가
+# 함께 존재. find 로 chromium 외 모두 제거. 빈번한 배포 시 디스크 누적 사고 방지.
+RUN if [ -d /ms-playwright ]; then \
+      find /ms-playwright -mindepth 1 -maxdepth 1 -type d ! -name "chromium*" ! -name "ffmpeg*" -exec rm -rf {} + && \
+      echo "✓ Playwright 브라우저 슬림화 — 남은 항목:" && \
+      ls -la /ms-playwright/ ; \
+    fi
+
+# sharp 설치 (이미지 최적화용 — Native libvips, standalone 트래킹 누락 대비)
 RUN npm install --omit=dev sharp
 
 # @imgly/background-removal-node 모델·런타임 (next standalone이 트래킹하지 못하는 native ONNX)
