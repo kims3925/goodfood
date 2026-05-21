@@ -73,9 +73,11 @@ export async function GET(
 
     if (source === 'SHOPPING_MALL') {
       // 먼저 회원 주문 조회 (orderNumber로 조회)
+      // 외부주문 삭제(soft) 표식은 list와 일관되게 detail에서도 404 처리
       const order = await prisma.order.findFirst({
         where: {
           orderNumber: id,
+          NOT: { cancelReason: '외부 주문 삭제' },
           items: {
             some: {
               shopProduct: {
@@ -248,6 +250,7 @@ export async function GET(
       const guestOrder = await prisma.guestOrder.findFirst({
         where: {
           orderNumber: id,
+          NOT: { cancelReason: '외부 주문 삭제' },
           items: {
             some: {
               shopProduct: {

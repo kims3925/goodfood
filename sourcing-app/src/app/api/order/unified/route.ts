@@ -72,6 +72,10 @@ export async function GET(request: NextRequest) {
 
     const unifiedOrders: UnifiedOrder[] = []
 
+    // 외부주문 삭제(soft) 표식 — 두 delete 엔드포인트만 박는 고유 cancelReason.
+    // 목록/카운트 모두에서 숨겨야 사용자가 "삭제됨"으로 인식.
+    const notExternallyDeleted = { NOT: { cancelReason: '외부 주문 삭제' } } as const
+
     // 상태별 카운트 (필터 무관하게 전체 카운트)
     const statusCounts = {
       total: 0,
@@ -105,6 +109,7 @@ export async function GET(request: NextRequest) {
         if (shopProductIds.length > 0 || userShopIds.length > 0) {
           // 상태별 카운트 조회 (shopId, search 필터 적용, status 필터 제외)
           const countBaseWhere: any = {
+            ...notExternallyDeleted,
             items: {
               some: {
                 shopProductId: { in: shopProductIds },
@@ -145,6 +150,7 @@ export async function GET(request: NextRequest) {
 
           const shopOrders = await prisma.order.findMany({
             where: {
+              ...notExternallyDeleted,
               // 관리자가 발행한 상품이 포함된 주문 조회
               items: {
                 some: {
@@ -259,7 +265,7 @@ export async function GET(request: NextRequest) {
 
           // 비회원 주문 카운트 조회 (상태별)
           // AND 배열로 구성하여 guestItemCondition의 OR와 search OR가 충돌하지 않도록 처리
-          const guestBaseFilters: any[] = [guestItemCondition]
+          const guestBaseFilters: any[] = [guestItemCondition, notExternallyDeleted]
           if (shopId) guestBaseFilters.push({ shopId: parseInt(shopId) })
           if (search) guestBaseFilters.push({
             OR: [
@@ -296,7 +302,7 @@ export async function GET(request: NextRequest) {
           }
 
           // AND 배열로 구성하여 OR 충돌 방지 + status 조건 포함
-          const guestOrderFilters: any[] = [guestItemCondition]
+          const guestOrderFilters: any[] = [guestItemCondition, notExternallyDeleted]
           if (shopId) guestOrderFilters.push({ shopId: parseInt(shopId) })
           if (search) guestOrderFilters.push({
             OR: [
