@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -16,6 +16,9 @@ import {
   Check,
   Plus,
   Minus,
+  Phone,
+  MapPin,
+  History,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -83,6 +86,25 @@ export default function ExternalOrderNewPage() {
   const [guestPhone, setGuestPhone] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
 
+  // 고객명 자동완성 — 옛 주문에서 검색
+  interface CustomerSearchResult {
+    source: 'GUEST' | 'MEMBER'
+    guestName: string
+    guestPhone: string
+    guestEmail: string | null
+    recipientName: string
+    recipientPhone: string
+    postalCode: string
+    address: string
+    addressDetail: string | null
+    lastOrderAt: string
+    lastOrderNumber: string
+    orderCount: number
+  }
+  const [customerSearchResults, setCustomerSearchResults] = useState<CustomerSearchResult[]>([])
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
+  const [searchingCustomer, setSearchingCustomer] = useState(false)
+
   // 배송 정보
   const [sameAsCustomer, setSameAsCustomer] = useState(true)
   const [recipientName, setRecipientName] = useState('')
@@ -120,6 +142,61 @@ export default function ExternalOrderNewPage() {
     show: false,
     orderNumber: '',
   })
+
+  // ── 고객명 자동완성 검색 (debounced 250ms) ──
+  const customerSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleGuestNameChange = (value: string) => {
+    setGuestName(value)
+    // 옛 타이머 취소
+    if (customerSearchDebounceRef.current) clearTimeout(customerSearchDebounceRef.current)
+    // 2자 미만이면 검색 안 함
+    if (value.trim().length < 2) {
+      setCustomerSearchResults([])
+      setShowCustomerDropdown(false)
+      return
+    }
+    // 250ms debounce 후 API 호출
+    customerSearchDebounceRef.current = setTimeout(async () => {
+      setSearchingCustomer(true)
+      try {
+        const res = await fetch(
+          `/api/order/customer-search?q=${encodeURIComponent(value.trim())}&limit=8`,
+          { credentials: 'include' },
+        )
+        const json = await res.json()
+        if (json?.success && Array.isArray(json.data)) {
+          setCustomerSearchResults(json.data)
+          setShowCustomerDropdown(json.data.length > 0)
+        } else {
+          setCustomerSearchResults([])
+          setShowCustomerDropdown(false)
+        }
+      } catch {
+        // 네트워크 오류 — 조용히 무시 (사용자 입력은 계속 가능)
+      } finally {
+        setSearchingCustomer(false)
+      }
+    }, 250)
+  }
+
+  /** 검색 결과 선택 — 고객 + 배송 정보 일괄 채움 */
+  const selectCustomerFromSearch = (r: typeof customerSearchResults[number]) => {
+    setGuestName(r.guestName)
+    setGuestPhone(r.guestPhone)
+    setGuestEmail(r.guestEmail || '')
+    setRecipientName(r.recipientName)
+    setRecipientPhone(r.recipientPhone)
+    setPostalCode(r.postalCode)
+    setAddress(r.address)
+    setAddressDetail(r.addressDetail || '')
+    setShowCustomerDropdown(false)
+    setCustomerSearchResults([])
+    // 고객명 ≠ 수령인 이면 sameAsCustomer 자동 OFF (다른 사람에게 배송)
+    if (r.guestName !== r.recipientName || r.guestPhone !== r.recipientPhone) {
+      setSameAsCustomer(false)
+    }
+  }
 
   // Daum 우편번호 스크립트 로드
   useEffect(() => {
@@ -327,22 +404,30 @@ export default function ExternalOrderNewPage() {
 
   const totalAmount = calculateTotalWithShipping()
 
-  // 폼 유효성 검사
-  const isFormValid = () => {
-    if (!selectedShopId) return false
-    if (!guestName.trim()) return false
-    if (!guestPhone.trim()) return false
-    if (!recipientName.trim()) return false
-    if (!recipientPhone.trim()) return false
-    if (!postalCode || !address) return false
-    if (orderItems.length === 0) return false
-    return true
+  // 폼 유효성 검사 — 누락 항목 목록 반환 (UX: 사용자가 어디가 빠졌는지 즉시 인지)
+  const getMissingFields = (): string[] => {
+    const missing: string[] = []
+    if (!selectedShopId) missing.push('쇼핑몰')
+    if (!guestName.trim()) missing.push('고객명')
+    if (!guestPhone.trim()) missing.push('전화번호')
+    if (!recipientName.trim()) missing.push('수령인')
+    if (!recipientPhone.trim()) missing.push('수령인 연락처')
+    if (!postalCode || !address) missing.push('배송 주소')
+    if (orderItems.length === 0) missing.push('주문 상품')
+    return missing
   }
+
+  const isFormValid = () => getMissingFields().length === 0
 
   // 주문 생성
   const handleSubmit = async () => {
-    if (!isFormValid()) {
-      setError('필수 정보를 모두 입력해주세요.')
+    const missing = getMissingFields()
+    if (missing.length > 0) {
+      setError(`다음 항목을 입력해주세요: ${missing.join(', ')}`)
+      // 사용자가 즉시 인지하도록 위로 스크롤
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
       return
     }
 
@@ -468,14 +553,84 @@ export default function ExternalOrderNewPage() {
               <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
                 <User size={20} className="text-green-600" />
                 고객 정보
+                <span className="ml-auto text-xs font-normal text-gray-500">
+                  고객명 입력 시 옛 주문 자동 검색
+                </span>
               </h2>
               <div className="space-y-4">
-                <Input
-                  label="고객명 *"
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  placeholder="홍길동"
-                />
+                {/* 고객명 — 자동완성 드롭다운 */}
+                <div className="relative">
+                  <Input
+                    label="고객명 *"
+                    value={guestName}
+                    onChange={(e) => handleGuestNameChange(e.target.value)}
+                    onFocus={() => {
+                      if (customerSearchResults.length > 0) setShowCustomerDropdown(true)
+                    }}
+                    onBlur={() => {
+                      // 클릭 시 onMouseDown 이 먼저 동작하도록 약간 지연
+                      setTimeout(() => setShowCustomerDropdown(false), 150)
+                    }}
+                    placeholder="홍길동 (2자 이상 입력 시 옛 주문 검색)"
+                  />
+                  {searchingCustomer && (
+                    <Loader2
+                      size={14}
+                      className="absolute right-3 top-9 animate-spin text-gray-400"
+                    />
+                  )}
+                  {showCustomerDropdown && customerSearchResults.length > 0 && (
+                    <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                      <div className="border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-xs text-gray-500">
+                        <History size={11} className="inline -mt-0.5 mr-1" />
+                        옛 주문 {customerSearchResults.length}건 — 클릭하면 자동 채움
+                      </div>
+                      {customerSearchResults.map((r, idx) => {
+                        const orderDate = new Date(r.lastOrderAt).toLocaleDateString('ko-KR', {
+                          year: '2-digit',
+                          month: '2-digit',
+                          day: '2-digit',
+                        })
+                        return (
+                          <button
+                            key={`${r.lastOrderNumber}-${idx}`}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault() // input blur 방지
+                              selectCustomerFromSearch(r)
+                            }}
+                            className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <span className="font-medium text-sm text-gray-900">
+                                {r.guestName}
+                                {r.source === 'MEMBER' && (
+                                  <span className="ml-1.5 text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">회원</span>
+                                )}
+                                {r.orderCount > 1 && (
+                                  <span className="ml-1.5 text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">{r.orderCount}건</span>
+                                )}
+                              </span>
+                              <span className="text-[11px] text-gray-400">{orderDate}</span>
+                            </div>
+                            <div className="text-xs text-gray-600 flex items-center gap-1">
+                              <Phone size={10} className="text-gray-400" />
+                              {r.guestPhone}
+                            </div>
+                            <div className="text-xs text-gray-500 flex items-start gap-1 mt-0.5">
+                              <MapPin size={10} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                              <span className="line-clamp-1">
+                                [{r.postalCode}] {r.address}
+                                {r.addressDetail ? ` ${r.addressDetail}` : ''}
+                              </span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 <Input
                   label="전화번호 *"
                   value={guestPhone}
@@ -996,7 +1151,7 @@ export default function ExternalOrderNewPage() {
                 <Button
                   variant="primary"
                   onClick={handleSubmit}
-                  disabled={!isFormValid() || isSubmitting}
+                  disabled={isSubmitting}
                   loading={isSubmitting}
                   className="flex-1 sm:flex-none sm:px-12"
                 >
