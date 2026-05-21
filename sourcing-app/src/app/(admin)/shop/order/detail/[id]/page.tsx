@@ -21,6 +21,8 @@ import {
   Building2,
   Banknote,
   Trash2,
+  FileText,
+  Loader2,
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { formatPhoneNumber } from '@/modules/utils/phoneUtils'
@@ -118,6 +120,9 @@ interface UnifiedOrderDetail {
   wholesaleOrderStatus: string | null
   wholesaleChannelId: number | null
   wholesaleOrderedAt: string | null
+  // 관리자 메모
+  adminMemo: string | null
+  adminMemoUpdatedAt: string | null
 }
 
 import { CHANNEL_PLATFORM_CONFIG } from '@/lib/channel-utils'
@@ -186,6 +191,44 @@ export default function UnifiedOrderDetailPage() {
   const [showStatusConfirm, setShowStatusConfirm] = useState(false)
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<string | null>(null)
+
+  // 관리자 메모
+  const [memoText, setMemoText] = useState('')
+  const [memoSaving, setMemoSaving] = useState(false)
+  const [memoSavedAt, setMemoSavedAt] = useState<string | null>(null)
+  // order 가 로드되면 메모 동기화
+  useEffect(() => {
+    if (order) {
+      setMemoText(order.adminMemo || '')
+      setMemoSavedAt(order.adminMemoUpdatedAt || null)
+    }
+  }, [order?.adminMemo, order?.adminMemoUpdatedAt, order])
+
+  const saveAdminMemo = async () => {
+    if (!order) return
+    setMemoSaving(true)
+    try {
+      const res = await fetch(`/api/order/unified/${order.orderNumber}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          source: 'SHOPPING_MALL',
+          adminMemo: memoText,
+        }),
+      })
+      const json = await res.json()
+      if (res.ok && json?.success) {
+        setMemoSavedAt(json.data?.adminMemoUpdatedAt || new Date().toISOString())
+      } else {
+        alert(`메모 저장 실패: ${json?.error || '알 수 없는 오류'}`)
+      }
+    } catch (e: any) {
+      alert(`메모 저장 중 오류: ${e?.message || '네트워크 오류'}`)
+    } finally {
+      setMemoSaving(false)
+    }
+  }
 
   const loadOrder = useCallback(async () => {
     try {
@@ -849,6 +892,56 @@ export default function UnifiedOrderDetailPage() {
             )}
 
             {/* 텍스트 복사 (발주용) */}
+            {/* 관리자 메모 — 운영자 전용 (고객 노출 X) */}
+            {isShoppingMall && (
+              <div className="bg-amber-50 rounded-lg border border-amber-200 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-amber-900 flex items-center gap-2">
+                    <FileText size={18} />
+                    관리자 메모
+                    <span className="text-xs font-normal text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
+                      운영자 전용 · 고객 노출 X
+                    </span>
+                  </h3>
+                  {memoSavedAt && (
+                    <span className="text-xs text-gray-500">
+                      마지막 저장: {new Date(memoSavedAt).toLocaleString('ko-KR')}
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  value={memoText}
+                  onChange={(e) => setMemoText(e.target.value)}
+                  placeholder="이 주문에 대한 관리자 메모 (예: 고객 요청사항, 발주 특이사항, 입금 확인 등)"
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm border border-amber-200 rounded-md bg-white focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none resize-y"
+                  maxLength={2000}
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-[11px] text-gray-500">
+                    {memoText.length}/2000자
+                    {memoText !== (order.adminMemo || '') && (
+                      <span className="ml-2 text-amber-600 font-medium">⚠ 저장되지 않은 변경</span>
+                    )}
+                  </span>
+                  <button
+                    onClick={saveAdminMemo}
+                    disabled={memoSaving || memoText === (order.adminMemo || '')}
+                    className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-md font-medium transition-colors flex items-center gap-1.5"
+                  >
+                    {memoSaving ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        저장 중...
+                      </>
+                    ) : (
+                      '저장'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {isShoppingMall && (
               <OrderTextCopyButton
                 orderNumber={order.orderNumber}

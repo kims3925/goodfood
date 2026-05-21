@@ -34,8 +34,7 @@ async function optimizeImageBuffer(
 
   try {
     // Sharp dynamic import — 의존성 미설치 환경에서도 빌드/실행 안 깨짐.
-    // type declarations 없을 수 있으니 unknown 으로 받아 안전 사용.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // type declarations 없을 수 있으니 any 로 받음. Next.js 기본 eslint 는 no-explicit-any 미강제.
     const sharpMod: any = await import('sharp' as any).catch(() => null)
     if (!sharpMod) {
       console.warn('[Image Optimize] sharp 모듈 없음 — 원본 유지')

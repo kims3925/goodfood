@@ -233,6 +233,9 @@ export async function GET(
           wholesaleOrderStatus: order.wholesaleOrderStatus || null,
           wholesaleChannelId: order.wholesaleChannelId || null,
           wholesaleOrderedAt: order.wholesaleOrderedAt?.toISOString() || null,
+          // 관리자 메모
+          adminMemo: (order as any).adminMemo || null,
+          adminMemoUpdatedAt: (order as any).adminMemoUpdatedAt?.toISOString?.() || null,
         }
 
         return NextResponse.json({
@@ -395,6 +398,9 @@ export async function GET(
         wholesaleOrderStatus: guestOrder.wholesaleOrderStatus || null,
         wholesaleChannelId: guestOrder.wholesaleChannelId || null,
         wholesaleOrderedAt: guestOrder.wholesaleOrderedAt?.toISOString() || null,
+        // 관리자 메모
+        adminMemo: (guestOrder as any).adminMemo || null,
+        adminMemoUpdatedAt: (guestOrder as any).adminMemoUpdatedAt?.toISOString?.() || null,
       }
 
       return NextResponse.json({
@@ -435,11 +441,62 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    const { source, status } = body
+    const { source, status, adminMemo } = body
 
-    if (!source || !status) {
+    if (!source) {
       return NextResponse.json(
-        { success: false, error: 'source와 status가 필요합니다.' },
+        { success: false, error: 'source가 필요합니다.' },
+        { status: 400 }
+      )
+    }
+
+    // adminMemo 만 업데이트하는 경로 (status 없이 메모 저장)
+    if (adminMemo !== undefined && !status) {
+      const memoText = typeof adminMemo === 'string' ? adminMemo : ''
+      const memoUpdatedAt = memoText.trim() ? new Date() : null
+
+      if (source === 'SHOPPING_MALL') {
+        // 회원 주문 우선 시도
+        const updated = await prisma.order.updateMany({
+          where: {
+            orderNumber: id,
+            items: { some: { shopProduct: { userId: user.userId } } },
+          },
+          data: { adminMemo: memoText, adminMemoUpdatedAt: memoUpdatedAt } as any,
+        })
+        if (updated.count === 0) {
+          // 비회원 주문 시도
+          const guestUpdated = await prisma.guestOrder.updateMany({
+            where: {
+              orderNumber: id,
+              items: { some: { shopProduct: { userId: user.userId } } },
+            },
+            data: { adminMemo: memoText, adminMemoUpdatedAt: memoUpdatedAt } as any,
+          })
+          if (guestUpdated.count === 0) {
+            return NextResponse.json(
+              { success: false, error: '주문을 찾을 수 없습니다.' },
+              { status: 404 },
+            )
+          }
+        }
+        return NextResponse.json({
+          success: true,
+          data: {
+            adminMemo: memoText,
+            adminMemoUpdatedAt: memoUpdatedAt?.toISOString() || null,
+          },
+        })
+      }
+      return NextResponse.json(
+        { success: false, error: '메모 저장은 SHOPPING_MALL source 에서만 지원됩니다.' },
+        { status: 400 },
+      )
+    }
+
+    if (!status) {
+      return NextResponse.json(
+        { success: false, error: 'status 또는 adminMemo 가 필요합니다.' },
         { status: 400 }
       )
     }

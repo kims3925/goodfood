@@ -26,6 +26,9 @@ model GuestOrder {
   source                OrderSource           @default(SHOP)
   externalKind          ExternalOrderKind?    @map("external_kind")
   externalMemo          String?               @map("external_memo") @db.Text
+  // 관리자 메모 (2026-05-21) — 주문 상세에서 운영자가 자유 기입. 고객엔 노출 X.
+  adminMemo             String?               @map("admin_memo") @db.Text
+  adminMemoUpdatedAt    DateTime?             @map("admin_memo_updated_at") @db.Timestamp(0)
   // 메시지 발신자 정보 (CHAT/KAKAO 자동변환 시 inbox_message 와 연결용)
   inboxMessageId        Int?                  @map("inbox_message_id")
   shop                  Shop?                 @relation(fields: [shopId], references: [id])

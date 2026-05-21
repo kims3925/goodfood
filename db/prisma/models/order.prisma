@@ -25,6 +25,9 @@ model Order {
   // BandAuto SaaS Phase 4 — 주문 발생 경로 (외부주문/AI 챗 자동변환)
   externalKind          ExternalOrderKind?    @map("external_kind")
   externalMemo          String?               @map("external_memo") @db.Text
+  // 관리자 메모 (2026-05-21) — 주문 상세에서 운영자가 자유 기입. 고객엔 노출 X.
+  adminMemo             String?               @map("admin_memo") @db.Text
+  adminMemoUpdatedAt    DateTime?             @map("admin_memo_updated_at") @db.Timestamp(0)
   shop                  Shop?                 @relation(fields: [shopId], references: [id])
   wholesaleChannel      Channel?              @relation("OrderWholesaleChannel", fields: [wholesaleChannelId], references: [id])
   user                  User                  @relation(fields: [userId], references: [id])
