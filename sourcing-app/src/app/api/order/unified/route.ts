@@ -91,28 +91,31 @@ export async function GET(request: NextRequest) {
     // Order.userId는 고객 ID이므로, ShopProduct를 통해 관리자의 상품이 포함된 주문을 조회
     if (!source || source === 'ALL' || source === 'SHOPPING_MALL') {
       try {
-        // 먼저 현재 사용자의 ShopProduct ID 목록을 조회
-        // 주문 연결 상품은 soft delete 여부와 관계없이 모두 포함 (주문 이력 보존)
-        const userShopProducts = await prisma.shopProduct.findMany({
-          where: { userId: user.userId },
-          select: { id: true },
-        })
-        const shopProductIds = userShopProducts.map(pp => pp.id)
-
         // 사용자의 쇼핑몰 ID 목록 조회 (커스텀 아이템 외부 주문(XORD) 포함용)
+        // 주: ShopProduct ID 목록을 IN 절로 박는 방식은 사용자당 ID 가 수천~수만 건이면
+        //     IN [...] 가 silent truncate 되어 일부 주문이 누락된다 (2026-04-23 이후 데이터
+        //     안 보이는 사고의 원인). 아래 쿼리는 relation traversal(EXISTS subquery)로
+        //     변환되어 ID 개수와 무관하게 정확히 매칭된다.
         const userShops = await prisma.shop.findMany({
           where: { userId: user.userId, deletedAt: null },
           select: { id: true },
         })
         const userShopIds = userShops.map(s => s.id)
 
-        if (shopProductIds.length > 0 || userShopIds.length > 0) {
+        // 사용자 ShopProduct 가 1개라도 있는지(또는 쇼핑몰이 있는지)만 빠르게 확인
+        const hasAnyShopProduct = await prisma.shopProduct.findFirst({
+          where: { userId: user.userId },
+          select: { id: true },
+        })
+
+        if (hasAnyShopProduct || userShopIds.length > 0) {
           // 상태별 카운트 조회 (shopId, search 필터 적용, status 필터 제외)
+          // EXISTS subquery 로 변환되는 relation traversal — IN [...수만 ID...] 회피
           const countBaseWhere: any = {
             ...notExternallyDeleted,
             items: {
               some: {
-                shopProductId: { in: shopProductIds },
+                shopProduct: { userId: user.userId },
               },
             },
           }
@@ -151,10 +154,10 @@ export async function GET(request: NextRequest) {
           const shopOrders = await prisma.order.findMany({
             where: {
               ...notExternallyDeleted,
-              // 관리자가 발행한 상품이 포함된 주문 조회
+              // 관리자가 발행한 상품이 포함된 주문 조회 (EXISTS subquery)
               items: {
                 some: {
-                  shopProductId: { in: shopProductIds },
+                  shopProduct: { userId: user.userId },
                 },
               },
               ...(shopId && { shopId: parseInt(shopId) }),
@@ -249,9 +252,10 @@ export async function GET(request: NextRequest) {
           // 2. 비회원 주문 조회
           // 게스트 주문 아이템 필터 조건:
           // - 사용자 상품이 포함된 주문(GORD) OR 사용자 쇼핑몰의 커스텀 아이템 외부 주문(XORD)
+          // relation traversal 로 작성 — IN [...수만 ShopProduct id...] 회피
           const guestItemConditions: any[] = []
-          if (shopProductIds.length > 0) {
-            guestItemConditions.push({ items: { some: { shopProductId: { in: shopProductIds } } } })
+          if (hasAnyShopProduct) {
+            guestItemConditions.push({ items: { some: { shopProduct: { userId: user.userId } } } })
           }
           if (userShopIds.length > 0) {
             guestItemConditions.push({
