@@ -77,7 +77,8 @@ export async function GET(
       const order = await prisma.order.findFirst({
         where: {
           orderNumber: id,
-          NOT: { cancelReason: '외부 주문 삭제' },
+          // NULL-safe: { not: 'X' } 단독은 cancelReason IS NULL 행을 가려버림
+          OR: [{ cancelReason: null }, { cancelReason: { not: '외부 주문 삭제' } }],
           items: {
             some: {
               shopProduct: {
@@ -250,7 +251,8 @@ export async function GET(
       const guestOrder = await prisma.guestOrder.findFirst({
         where: {
           orderNumber: id,
-          NOT: { cancelReason: '외부 주문 삭제' },
+          // NULL-safe: { not: 'X' } 단독은 cancelReason IS NULL 행을 가려버림
+          OR: [{ cancelReason: null }, { cancelReason: { not: '외부 주문 삭제' } }],
           items: {
             some: {
               shopProduct: {
