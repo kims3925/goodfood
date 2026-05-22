@@ -74,7 +74,14 @@ export async function GET(request: NextRequest) {
 
     // 외부주문 삭제(soft) 표식 — 두 delete 엔드포인트만 박는 고유 cancelReason.
     // 목록/카운트 모두에서 숨겨야 사용자가 "삭제됨"으로 인식.
-    const notExternallyDeleted = { NOT: { cancelReason: '외부 주문 삭제' } } as const
+    // ⚠ NULL-safe 필수: SQL `col != 'x'` 는 NULL 행을 제외하므로 cancel_reason
+    //   IS NULL 인 정상 주문이 통째로 가려지는 사고(2026-05-22) 발생. 명시적 OR.
+    const notExternallyDeleted: any = {
+      OR: [
+        { cancelReason: null },
+        { cancelReason: { not: '외부 주문 삭제' } },
+      ],
+    }
 
     // 상태별 카운트 (필터 무관하게 전체 카운트)
     const statusCounts = {
@@ -111,24 +118,20 @@ export async function GET(request: NextRequest) {
         if (hasAnyShopProduct || userShopIds.length > 0) {
           // 상태별 카운트 조회 (shopId, search 필터 적용, status 필터 제외)
           // EXISTS subquery 로 변환되는 relation traversal — IN [...수만 ID...] 회피
-          const countBaseWhere: any = {
-            ...notExternallyDeleted,
-            items: {
-              some: {
-                shopProduct: { userId: user.userId },
-              },
-            },
-          }
-          if (shopId) {
-            countBaseWhere.shopId = parseInt(shopId)
-          }
-          if (search) {
-            countBaseWhere.OR = [
+          // AND 배열 — notExternallyDeleted 의 OR 가 search 의 OR 와 덮어쓰기 충돌하지 않도록
+          const memberBaseFilters: any[] = [
+            notExternallyDeleted,
+            { items: { some: { shopProduct: { userId: user.userId } } } },
+          ]
+          if (shopId) memberBaseFilters.push({ shopId: parseInt(shopId) })
+          if (search) memberBaseFilters.push({
+            OR: [
               { orderNumber: { contains: search } },
               { shippingAddress: { recipientName: { contains: search } } },
               { shippingAddress: { recipientPhone: { contains: search } } },
-            ]
-          }
+            ],
+          })
+          const countBaseWhere: any = { AND: memberBaseFilters }
 
           try {
             const [pendingCount, paidCount, preparingCount, shippedCount, deliveredCount, cancelledCount, refundedCount] = await Promise.all([
@@ -151,27 +154,26 @@ export async function GET(request: NextRequest) {
             console.error('상태별 카운트 조회 실패:', countError)
           }
 
+          // findMany 도 같은 AND 패턴 — notExternallyDeleted 의 OR 보전
+          const memberFindFilters: any[] = [
+            notExternallyDeleted,
+            { items: { some: { shopProduct: { userId: user.userId } } } },
+          ]
+          if (shopId) memberFindFilters.push({ shopId: parseInt(shopId) })
+          if (search) memberFindFilters.push({
+            OR: [
+              { orderNumber: { contains: search } },
+              { shippingAddress: { recipientName: { contains: search } } },
+              { shippingAddress: { recipientPhone: { contains: search } } },
+            ],
+          })
+          if (status) memberFindFilters.push(
+            status === 'CANCELLED'
+              ? { status: { in: ['CANCELLED', 'REFUNDED'] } }
+              : { status: status as any }
+          )
           const shopOrders = await prisma.order.findMany({
-            where: {
-              ...notExternallyDeleted,
-              // 관리자가 발행한 상품이 포함된 주문 조회 (EXISTS subquery)
-              items: {
-                some: {
-                  shopProduct: { userId: user.userId },
-                },
-              },
-              ...(shopId && { shopId: parseInt(shopId) }),
-              ...(search && {
-                OR: [
-                  { orderNumber: { contains: search } },
-                  { shippingAddress: { recipientName: { contains: search } } },
-                  { shippingAddress: { recipientPhone: { contains: search } } },
-                ],
-              }),
-              ...(status && status === 'CANCELLED'
-                ? { status: { in: ['CANCELLED', 'REFUNDED'] } }
-                : status ? { status: status as any } : {}),
-            },
+            where: { AND: memberFindFilters },
             include: {
               shop: {
                 select: {
