@@ -14,7 +14,7 @@ import {
   OptionPrice,
   GeneratedVariant,
 } from './product.types'
-import { createAiClient, AiResponse } from './ai.client'
+import { createAiClient, generateContentWithFallback, AiResponse } from './ai.client'
 import { generateVariants } from './variant.generator'
 import { classifyProduct } from '../category/category.classifier'
 import {
@@ -996,20 +996,29 @@ export async function transformPostToProduct(
     )
   }
 
-  // Create AI client
-  const aiClient = createAiClient({
-    provider: input.aiProvider,
-    apiKey: input.aiConfig.apiKey,
-    model: input.aiConfig.model,
-    temperature: input.aiConfig.temperature,
-    maxTokens: input.aiConfig.maxTokens,
-  })
+  // provider 후보 구성: 1순위(primary) + 폴백(Gemini↔Claude↔OpenAI 자동 호환)
+  const candidates = [
+    {
+      provider: input.aiProvider,
+      apiKey: input.aiConfig.apiKey,
+      model: input.aiConfig.model,
+      temperature: input.aiConfig.temperature,
+      maxTokens: input.aiConfig.maxTokens,
+    },
+    ...(input.fallbackConfigs ?? []).map((c) => ({
+      provider: c.provider,
+      apiKey: c.apiKey,
+      model: c.model,
+      temperature: c.temperature,
+      maxTokens: c.maxTokens,
+    })),
+  ]
 
   // Generate prompt
   const prompt = buildProductExtractionPrompt(input)
 
-  // Call AI
-  const aiResponse = await aiClient.generateContent(prompt)
+  // Call AI (primary 실패 시 다음 provider 로 자동 폴백)
+  const aiResponse = await generateContentWithFallback(candidates, prompt, (m) => console.log(m))
 
   // Parse response
   const analysis = parseAiResponse(aiResponse)

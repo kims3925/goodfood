@@ -514,3 +514,65 @@ export function createAiClient(config: AiClientConfig): BaseAiClient {
       )
   }
 }
+
+// =============================================
+// PROVIDER 폴백 (Gemini ↔ Claude ↔ OpenAI 자동 호환)
+// =============================================
+
+/**
+ * 다른 provider 로 폴백할 가치가 있는 "provider 사용 불가" 에러인지 판정.
+ * - AI_API_ERROR (크레딧 소진 / API 키 오류 / 할당량 초과 등) → 다른 provider 면 성공할 수 있음 → 폴백.
+ * - 그 외(입력 오류·콘텐츠 차단·파싱 실패 등)는 provider 를 바꿔도 동일하므로 폴백하지 않음.
+ */
+export function isProviderUnavailableError(error: unknown): boolean {
+  return (
+    error instanceof ProductTransformationError &&
+    error.code === TransformationErrorCode.AI_API_ERROR
+  )
+}
+
+/**
+ * 여러 provider 후보를 1순위부터 순서대로 시도한다.
+ * 현재 provider 가 "사용 불가"(크레딧/키/할당량) 에러로 실패하면 자동으로 다음 provider 로 폴백.
+ *
+ * - candidates[0] 가 1순위(primary). 후보가 1개뿐이면 기존 단일 호출과 동작 동일.
+ * - 사용 불가가 아닌 에러(파싱/입력 등)는 즉시 throw (폴백 무의미).
+ * - 모든 후보 소진 시 마지막 에러 throw.
+ */
+export async function generateContentWithFallback(
+  candidates: AiClientConfig[],
+  prompt: string,
+  onEvent?: (message: string) => void,
+  // 테스트용 주입 포인트 — 기본은 실제 createAiClient (호출자 동작 불변)
+  clientFactory: (config: AiClientConfig) => BaseAiClient = createAiClient
+): Promise<AiResponse> {
+  if (!candidates || candidates.length === 0) {
+    throw new ProductTransformationError(
+      'AI provider 후보가 없습니다. AI 설정을 확인해주세요.',
+      TransformationErrorCode.AI_API_ERROR
+    )
+  }
+
+  let lastError: unknown
+  for (let i = 0; i < candidates.length; i++) {
+    const cfg = candidates[i]
+    try {
+      const response = await clientFactory(cfg).generateContent(prompt)
+      if (i > 0) {
+        onEvent?.(`[AI Fallback] ${candidates[0].provider} 실패 → ${cfg.provider}(으)로 가공 성공`)
+      }
+      return response
+    } catch (error) {
+      lastError = error
+      const hasNext = i < candidates.length - 1
+      if (!isProviderUnavailableError(error) || !hasNext) {
+        throw error
+      }
+      const reason = error instanceof Error ? error.message.slice(0, 100) : String(error)
+      onEvent?.(
+        `[AI Fallback] ${cfg.provider} 사용 불가 (${reason}) → 다음 provider(${candidates[i + 1].provider}) 시도`
+      )
+    }
+  }
+  throw lastError
+}

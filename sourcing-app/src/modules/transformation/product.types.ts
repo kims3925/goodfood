@@ -34,6 +34,17 @@ export interface ProductTransformationInput {
     temperature?: number
     maxTokens?: number
   }
+  /**
+   * 다단계 폴백(Gemini↔Claude↔OpenAI 자동 호환): primary(aiProvider) 가 크레딧/키/할당량 등으로
+   * 실패하면 순서대로 시도할 대체 provider 설정들. 비어 있으면 폴백 없이 primary 만 사용(기존 동작).
+   */
+  fallbackConfigs?: Array<{
+    provider: AiProvider
+    apiKey: string
+    model: string
+    temperature?: number
+    maxTokens?: number
+  }>
   policyContent?: string // 가격 정책 내용
   customPrompt?: string  // 사용자 정의 프롬프트 (DB에서 가져온 것)
   sdFoodContext?: SdFoodContext // SD푸드 특수 처리 컨텍스트

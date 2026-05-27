@@ -27,6 +27,7 @@ import {
   TransformedPost,
   PipelineError,
 } from '../types'
+import { filterPriceImages } from '@/modules/utils/priceImageFilter'
 
 // =============================================
 // PROCESSING CONFIGURATION
@@ -173,6 +174,26 @@ export async function runTransformPipeline(
 
   if (!aiConfig) {
     throw new Error(`Active ${config.aiProvider} API config not found`)
+  }
+
+  // 다단계 폴백(Gemini↔Claude↔OpenAI 자동 호환): primary 외 활성 provider 설정들.
+  // primary 가 크레딧 소진/키 오류/할당량 등으로 실패하면 자동으로 다른 provider 로 가공한다.
+  const otherActiveConfigs = await prisma.aiApiConfig.findMany({
+    where: { userId, isActive: true, id: { not: aiConfig.id } },
+    orderBy: { updatedAt: 'desc' },
+  })
+  const fallbackConfigs = otherActiveConfigs.map((c) => {
+    let temperature: number | undefined
+    try {
+      const parsed = typeof c.config === 'string' ? JSON.parse(c.config) : c.config
+      if (parsed && parsed.temperature != null) temperature = parsed.temperature
+    } catch {
+      // config 파싱 실패 시 기본값
+    }
+    return { provider: c.provider, apiKey: c.apiKey, model: c.model, temperature }
+  })
+  if (fallbackConfigs.length > 0) {
+    console.log(`[Transform] 폴백 provider 후보: ${fallbackConfigs.map((f) => f.provider).join(', ')}`)
   }
 
   // 변환할 게시물 조회 (아직 CollectedProduct가 없는 게시물)
@@ -322,6 +343,23 @@ export async function runTransformPipeline(
     const post = batchPosts[0]
     let transformedPost: TransformedPost
 
+    // 가격 이미지 필터링 v2 (2026-05-09)
+    // AI 변환 전에 가격표/배너 이미지를 제거하여 상품 이미지 품질 향상
+    try {
+      const deletedImages = await filterPriceImages(aiConfig.apiKey, post.id)
+      if (deletedImages > 0) {
+        console.log(`[Transform] 가격 이미지 ${deletedImages}개 필터링 완료 (postId: ${post.id})`)
+        // 필터링 후 이미지 목록 갱신 (post.images 캐시 무효화)
+        const freshImages = await prisma.collectedPostImage.findMany({
+          where: { postId: post.id },
+          orderBy: { sortOrder: 'asc' },
+        })
+        ;(post as any).images = freshImages
+      }
+    } catch (filterError) {
+      console.error(`[Transform] 이미지 필터링 실패 (무시, postId: ${post.id}):`, filterError)
+    }
+
     try {
       // 수동 변환과 동일한 함수 사용 (transformPostToProduct)
       const draft = await runSingleTransformWithRetry(
@@ -331,7 +369,9 @@ export async function runTransformPipeline(
           model: aiConfig.model,
           provider: config.aiProvider,
         },
-        batchPolicyContent
+        batchPolicyContent,
+        0,
+        fallbackConfigs
       )
 
       // 가격 정책 적용 검증 (정책이 설정된 경우에만)
@@ -536,7 +576,8 @@ async function runSingleTransformWithRetry(
   post: any,
   aiConfig: { apiKey: string; model: string; provider: any },
   pricingPolicyContent: string | null,
-  retryCount: number = 0
+  retryCount: number = 0,
+  fallbackConfigs?: Array<{ provider: any; apiKey: string; model: string; temperature?: number }>
 ): Promise<ProductDraft> {
   try {
     // 수동 변환과 동일한 함수 사용
@@ -547,6 +588,7 @@ async function runSingleTransformWithRetry(
         apiKey: aiConfig.apiKey,
         model: aiConfig.model,
       },
+      fallbackConfigs,
       policyContent: pricingPolicyContent || undefined,
     })
   } catch (error: any) {
@@ -561,7 +603,7 @@ async function runSingleTransformWithRetry(
       console.log(`[Transform] Error: ${error.message}`)
 
       await new Promise((resolve) => setTimeout(resolve, delay))
-      return runSingleTransformWithRetry(post, aiConfig, pricingPolicyContent, retryCount + 1)
+      return runSingleTransformWithRetry(post, aiConfig, pricingPolicyContent, retryCount + 1, fallbackConfigs)
     }
 
     // 재시도 불가능한 에러거나 최대 재시도 횟수 초과

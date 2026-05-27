@@ -5,90 +5,7 @@ import { getCurrentUser } from '@/modules/auth/auth.service'
 import { transformPostToProduct } from '@/modules/transformation'
 import { settingsService } from '@/modules/config/domain/src/settings'
 import prisma, { AiProvider } from '@bandauto/db'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import fs from 'fs'
-import path from 'path'
-
-function expandHomePath(p: string): string {
-  if (p.startsWith('~/')) return path.join(process.env.HOME || '/home/ubuntu', p.slice(2))
-  return p
-}
-
-/**
- * Gemini Vision으로 이미지에 가격 텍스트가 포함되어 있는지 판별
- */
-async function hasImagePriceText(apiKey: string, imageBuffer: Buffer, mimeType: string): Promise<boolean> {
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
-
-    const result = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: imageBuffer.toString('base64'),
-            },
-          },
-          {
-            text: '이 이미지에 상품 가격 정보(숫자+원, ₩, 공급가, 판매가 등 금액 텍스트)가 포함되어 있나요? "YES" 또는 "NO"로만 답해주세요.',
-          },
-        ],
-      }],
-    })
-
-    const answer = result.response.text().trim().toUpperCase()
-    return answer.includes('YES')
-  } catch (error) {
-    console.error('[Image Price Check] Error:', error)
-    return false // 에러 시 삭제하지 않음 (안전하게)
-  }
-}
-
-/**
- * 게시물 이미지 중 가격 텍스트가 포함된 이미지를 삭제
- */
-async function filterPriceImages(apiKey: string, postId: number): Promise<number> {
-  const images = await prisma.collectedPostImage.findMany({
-    where: { postId },
-    orderBy: { sortOrder: 'asc' },
-  })
-
-  if (images.length === 0) return 0
-
-  const storagePath = process.env.POST_IMAGE_STORAGE_PATH || 'assets/images/post'
-  const imagesDir = expandHomePath(storagePath)
-  let deletedCount = 0
-
-  for (const image of images) {
-    // URL에서 파일명 추출
-    const parts = image.url.split('/')
-    const fileName = parts[parts.length - 1]
-    const filePath = path.join(imagesDir, fileName)
-
-    // 파일이 존재하면 읽기
-    if (!fs.existsSync(filePath)) continue
-
-    const buffer = fs.readFileSync(filePath)
-    const ext = path.extname(fileName).toLowerCase()
-    const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg'
-
-    const hasPrice = await hasImagePriceText(apiKey, buffer, mimeType)
-
-    if (hasPrice) {
-      // DB에서 이미지 레코드 삭제
-      await prisma.collectedPostImage.delete({ where: { id: image.id } })
-      // 파일도 삭제
-      try { fs.unlinkSync(filePath) } catch { /* ignore */ }
-      deletedCount++
-      console.log(`[Image Price Filter] 가격 이미지 삭제: ${fileName} (postId: ${postId})`)
-    }
-  }
-
-  return deletedCount
-}
+import { filterPriceImages } from '@/modules/utils/priceImageFilter'
 
 // =============================================
 // MODEL-SPECIFIC RATE LIMITS
@@ -363,6 +280,26 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // 다단계 폴백(Gemini↔Claude↔OpenAI 자동 호환): primary 외 활성 provider 설정들을 후보로 추가.
+    // primary 가 크레딧 소진/키 오류/할당량 등으로 실패하면 자동으로 다른 provider 로 가공한다.
+    const otherActiveConfigs = await prisma.aiApiConfig.findMany({
+      where: { userId, isActive: true, id: { not: aiConfig.id } },
+      orderBy: { updatedAt: 'desc' },
+    })
+    const fallbackConfigs = otherActiveConfigs.map((c) => {
+      let temperature = 0.7
+      try {
+        const parsed = typeof c.config === 'string' ? JSON.parse(c.config) : c.config
+        if (parsed && parsed.temperature != null) temperature = parsed.temperature
+      } catch {
+        // config 파싱 실패 시 기본 temperature 사용
+      }
+      return { provider: c.provider, apiKey: c.apiKey, model: c.model, temperature }
+    })
+    if (fallbackConfigs.length > 0) {
+      console.log('[AI Product Generation] 폴백 provider 후보:', fallbackConfigs.map((f) => f.provider).join(', '))
+    }
+
     // Transform post to product using AI
     const config = aiConfig.config as any
     const draft = await transformPostToProduct({
@@ -373,6 +310,7 @@ export async function POST(request: NextRequest) {
         model: aiConfig.model,
         temperature: config?.temperature || 0.7,
       },
+      fallbackConfigs,
       policyContent: policyContent || undefined,
       customPrompt,
       sdFoodContext: isSdFoodSpecial
@@ -479,17 +417,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 가격 이미지 필터링: 임시 비활성화 (2026-04-11)
-    // 사유: Gemini Vision 오탐으로 정상 상품 이미지가 대량 삭제되는 사고 발생
-    // 재활성화 시 테스트 환경에서 정확도 검증 후 신중하게 적용할 것
-    // try {
-    //   const deletedImages = await filterPriceImages(aiConfig.apiKey, postId)
-    //   if (deletedImages > 0) {
-    //     console.log(`[AI Product Generation] 가격 이미지 ${deletedImages}개 삭제 (postId: ${postId})`)
-    //   }
-    // } catch (filterError) {
-    //   console.error('[AI Product Generation] 이미지 필터링 실패 (무시):', filterError)
-    // }
+    // 가격 이미지 필터링 v2 (2026-05-09 재활성화) + SD푸드 예외 (2026-05-15)
+    // 개선: 정밀 프롬프트 + confidence 80% 이상만 삭제 + 최소 1장 보존 + 파일 유지.
+    // SD_FOOD_SPECIAL 정책일 때는 통째로 스킵 — SD푸드 상품 사진의 가격 워터마크를 가격배너로 과탐하여
+    // 실 상품 이미지가 사라지는 사고 방지.
+    try {
+      const deletedImages = await filterPriceImages(aiConfig.apiKey, postId, {
+        skipPolicyContent: policyContent || null,
+      })
+      if (deletedImages > 0) {
+        console.log(`[AI Product Generation] 가격 이미지 ${deletedImages}개 필터링 완료 (postId: ${postId})`)
+      }
+    } catch (filterError) {
+      console.error('[AI Product Generation] 이미지 필터링 실패 (무시):', filterError)
+    }
 
     // Update AI config usage (총 사용량 + 일일 사용량)
     await prisma.aiApiConfig.update({
