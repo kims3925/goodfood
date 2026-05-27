@@ -429,8 +429,11 @@ export class ProductRepository {
   }
 
   async delete(id: number) {
-    return prisma.product.delete({
+    // 소프트삭제 — 하드삭제(prisma.product.delete) 금지. 데이터 유실 재발 방지(개발계획서 Phase 0).
+    // deletedAt 설정 + isActive=false 로 비노출 처리. 복원은 deletedAt=null 로 되돌린다.
+    return prisma.product.update({
       where: { id },
+      data: { deletedAt: new Date(), isActive: false },
     })
   }
 

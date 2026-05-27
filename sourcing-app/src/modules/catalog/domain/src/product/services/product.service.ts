@@ -1,6 +1,6 @@
 import prisma, { BundleShippingType, Product } from '@bandauto/db'
 import { productRepository } from '../repository/product.repository'
-import { deleteProductImageFiles, downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
+import { downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput, OptionGroupInput, VariantInput } from '../types/product.types'
 import type { BatchResult, ProgressCallback } from '@/types/batch.types'
 import { createEmptyBatchResult } from '@/types/batch.types'
@@ -209,67 +209,30 @@ export class ProductService {
       throw new Error('상품을 찾을 수 없습니다.')
     }
 
-    // 서버에서 실제 이미지 파일 삭제 (PRODUCT_IMAGE_STORAGE_PATH에서 삭제)
-    // 다른 상품에서 같은 파일을 참조하지 않는 경우에만 삭제
-    if (product.images && product.images.length > 0) {
-      const fileNames = product.images
-        .filter((img) => img.fileName)
-        .map((img) => img.fileName as string)
-      await deleteProductImageFiles(fileNames, id)
-    }
-
-    // 관련 ShopProduct들의 ID 가져오기 (활성 ShopProduct만)
-    const shopProducts = await prisma.shopProduct.findMany({
-      where: { productId: id, deletedAt: null },
-      select: { id: true },
-    })
-    const shopProductIds = shopProducts.map((sp) => sp.id)
-
-    // 관련 CartItem 삭제 (ShopProduct와 연결된 장바구니 항목)
-    if (shopProductIds.length > 0) {
-      await prisma.cartItem.deleteMany({
-        where: { shopProductId: { in: shopProductIds } },
-      })
-    }
-
-    // 관련 ProductVariant들의 ID 가져오기
-    const variants = await prisma.productVariant.findMany({
-      where: { productId: id },
-      select: { id: true },
-    })
-    const variantIds = variants.map((v) => v.id)
-
-    // CartItem, OrderItem, GuestOrderItem에서 variantId 참조 해제
-    if (variantIds.length > 0) {
-      await Promise.all([
-        prisma.cartItem.updateMany({
-          where: { variantId: { in: variantIds } },
-          data: { variantId: { set: null } },
-        }),
-        prisma.orderItem.updateMany({
-          where: { variantId: { in: variantIds } },
-          data: { variantId: { set: null } },
-        }),
-        prisma.guestOrderItem.updateMany({
-          where: { variantId: { in: variantIds } },
-          data: { variantId: { set: null } },
-        }),
-      ])
-    }
-
-    // ShopProduct와 ChannelProduct의 productId를 null로 설정 (연결 해제)
-    await Promise.all([
+    // 소프트삭제 (개발계획서 Phase 0 — 데이터 유실 재발 방지):
+    // 과거의 destructive cascade(이미지 파일 물리삭제 / CartItem 삭제 / variant·productId 참조 해제 /
+    // 하드삭제)는 모두 제거한다. 그래야 복원(restore)이 가능하고 주문 이력이 보존된다.
+    //
+    // 처리: Product 와 그에 연결된 발행물(ShopProduct/ChannelProduct)을 deletedAt 으로 비노출 처리.
+    //  - productId 링크/이미지 파일/주문·장바구니 이력은 보존 → POST /api/product/restore 로 복원 가능.
+    //  - 활성 목록 쿼리는 deletedAt=null 필터를 쓰므로 사용자 화면에서는 즉시 사라진다.
+    const now = new Date()
+    await prisma.$transaction([
       prisma.shopProduct.updateMany({
-        where: { productId: id },
-        data: { productId: null },
+        where: { productId: id, deletedAt: null },
+        data: { deletedAt: now },
       }),
       prisma.channelProduct.updateMany({
-        where: { productId: id },
-        data: { productId: null },
+        where: { productId: id, deletedAt: null },
+        data: { deletedAt: now },
+      }),
+      prisma.product.update({
+        where: { id },
+        data: { deletedAt: now, isActive: false },
       }),
     ])
 
-    return productRepository.delete(id)
+    return { id, deletedAt: now }
   }
 
   /**
