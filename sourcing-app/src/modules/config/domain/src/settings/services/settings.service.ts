@@ -69,6 +69,11 @@ export class SettingsService {
     if (provider === 'band') {
       configData.accessToken = settings.accessToken || null
       configData.refreshToken = settings.refreshToken || null
+      // 토큰 자동 갱신용 절대 만료시각 (expiresIn[초] → now + expiresIn).
+      // refreshBandTokenIfNeeded 가 이 값으로 만료 임박을 판단. expiresIn 없으면 null(자동갱신 비활성).
+      configData.tokenExpiry = settings.expiresIn
+        ? new Date(Date.now() + Number(settings.expiresIn) * 1000)
+        : null
       // OAuth 메타데이터 저장 (만료시간 등)
       if (settings.expiresIn || settings.tokenType) {
         configData.metadata = JSON.stringify({

@@ -15,6 +15,7 @@ import {
   PipelineError,
 } from '../types'
 import { postService } from '@/modules/sourcing/domain/src/post/services/post.service'
+import { refreshBandTokenIfNeeded } from '@/modules/sourcing/domain/src/channel/services/band-token.service'
 import { checkPriceWithinRange } from '../utils/price-extractor'
 
 // =============================================
@@ -69,6 +70,9 @@ export async function runCollectionPipeline(
   const wholesaleChannels = await prisma.channel.findMany({
     where: whereClause,
   })
+
+  // Band 토큰 만료 임박 시 자동 갱신 (tokenExpiry 미설정이면 no-op — 안전).
+  await refreshBandTokenIfNeeded(userId)
 
   // 사용자의 Band API 설정 조회
   const apiConfig = await prisma.sourcingApiConfig.findFirst({
