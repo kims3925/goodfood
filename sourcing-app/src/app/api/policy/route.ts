@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { channelId, name, description, content, isActive = true } = body
+    const { channelId, name, description, content, isActive = true, tierRules, targets } = body
 
     if (!channelId || !name || !content) {
       return NextResponse.json(
@@ -71,6 +71,8 @@ export async function POST(request: NextRequest) {
       description,
       content,
       isActive,
+      tierRules,
+      targets,
     })
 
     return NextResponse.json({ success: true, data: policy })
@@ -95,7 +97,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, channelId, name, description, content, isActive } = body
+    const { id, channelId, name, description, content, isActive, tierRules, targets } = body
 
     if (!id) {
       return NextResponse.json(
@@ -104,7 +106,15 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const policy = await policyService.update(id, { channelId, name, description, content, isActive })
+    const policy = await policyService.update(id, {
+      channelId,
+      name,
+      description,
+      content,
+      isActive,
+      tierRules,
+      targets,
+    }, currentUser.userId)
 
     return NextResponse.json({ success: true, data: policy })
   } catch (error: any) {
@@ -145,7 +155,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    await policyService.delete(parseInt(id))
+    await policyService.delete(parseInt(id), currentUser.userId)
 
     return NextResponse.json({
       success: true,

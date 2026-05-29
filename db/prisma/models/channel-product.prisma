@@ -11,6 +11,13 @@ model ChannelProduct {
   updatedAt                 DateTime  @updatedAt @map("updated_at") @db.Timestamp(0)
   legacyPublishedProductId  Int?      @map("legacy_published_product_id") // 롤백용 원본 published_product ID
 
+  // 다단계 발행 (bandauto-v2 multi-tier): 발행 시점 가격 tier / 가격 스냅샷 (감사·정산 분리용).
+  // 정책이 사후에 바뀌어도 발행 당시 근거가 보존된다 (지시서 §2.2 가격 스냅샷 원칙).
+  // 모두 nullable — 기존 레코드 및 RETAIL 발행에는 영향 없음.
+  priceTier                 PriceTier? @map("price_tier")                       // 발행 시점 tier 스냅샷
+  publishBatchId            String?   @map("publish_batch_id") @db.VarChar(64)  // 동일 소스 fan-out 묶음 ID (saga 추적)
+  priceSnapshot             Json?     @map("price_snapshot")                    // 발행 본문에 노출된 옵션별 단가 스냅샷
+
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   channel Channel  @relation(fields: [channelId], references: [id], onDelete: Restrict)
   user    User     @relation(fields: [userId], references: [id], onDelete: Restrict)
@@ -20,5 +27,6 @@ model ChannelProduct {
   @@index([productId])
   @@index([channelId])
   @@index([deletedAt])
+  @@index([publishBatchId])
   @@map("channel_product")
 }

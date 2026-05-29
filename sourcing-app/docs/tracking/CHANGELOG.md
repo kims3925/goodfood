@@ -21,6 +21,10 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260527-003 | Done(코드)/db push 대기 | 2026-05-27 | - | 경영밴드 SaaS Phase 4.1: 채널별 만료정책 (Channel.expiryDaysNormal/Com/autoExpireEnabled + GET/PUT /api/channel/[id]/expiry-policy + runContentExpiry autoExpire skip & 안전 per-channel 후처리) | Medium | Claude |
+| TR-20260527-002 | Done(배포완료) | 2026-05-27 | - | 경영밴드 SaaS Phase 1: Band OAuth 토큰 자동갱신(defensive — tokenExpiry 절대시각 저장 + 만료10분전 refresh, 성공시에만 덮어쓰기, 미설정시 no-op) | Medium | Claude |
+| TR-20260527-001 | Done(배포완료) | 2026-05-27 | - | 경영밴드 SaaS Phase 0: Product 하드삭제 → 소프트삭제 전환 (데이터 유실 재발 방지). destructive cascade 제거, Product+발행물 soft-delete, 복원 가능 | Critical | Claude |
+| TR-20260526-001 | Done | 2026-05-26 | REQ-PUBLISH-010 | 다단계 발행(fan-out) 1차: 발행대상 가격 tier(PriceTier) + 가족도매방밴드 도매가 발행 (현행 단일경로 비파괴 확장) | Medium | Claude |
 | TR-20260515-013 | Done | 2026-05-15 | - | SD푸드 정책 시 가격이미지 필터 자동 스킵 (실 상품 사진 과탐 방지) | Low | Claude |
 | TR-20260515-012 | Done | 2026-05-15 | - | MarketingAgent 멀티테넌트 fan-out — BandNoticeConfig.isEnabled 사용자별 발화 + scheduleTimes ±5분 매칭 | Medium | Claude |
 | TR-20260515-011 | Done | 2026-05-15 | - | 다른 페이지 server-side 잡 마이그 — /sourcing/publish 재발행, /sourcing/post/list Stage2 (탭 닫아도 진행) | Medium | Claude |
@@ -176,6 +180,79 @@ TR-{YYYYMMDD}-{NUMBER}
 ## 변경 상세
 
 <!-- 최신 항목이 위로 -->
+
+## TR-20260526-001: 다단계 발행(fan-out) 1차 — 발행대상 가격 tier + 가족도매방밴드 도매가 발행
+
+| 항목 | 값 |
+|-----|---|
+| Status | Done (코드) / DB push 운영 적용 대기 |
+| Author | Claude |
+| Date | 2026-05-26 |
+| REQ-ID | REQ-PUBLISH-010 |
+| Risk | Medium |
+
+### 배경
+`bandauto-v2-multitier-publish-pricing-directive.md` 지시서를 현행 아키텍처에 맞게 매핑.
+지시서는 신규 `PricingPolicy`/`PublicationTarget`/`Publication` 모델 + 발행 시점 PricingEngine
+재계산을 제안했으나, 현행 시스템과 충돌하여 **비파괴적 최소 설계**로 재해석:
+- 현행 `PricingPolicy`(Int, content/tierRules)와 이름 충돌 → 신규 모델 도입하지 않음
+- 가격은 AI 가공 시점에 이미 `price`(소매)+`wholesalePrice`(도매) **둘 다 저장** → 발행 시
+  재계산 대신 tier 별 **선택**만 (머니 수학 중복/괴리 방지)
+- 발행 대상은 `kind=RETAIL` Channel + `AutomationConfig.channelIds` 로 이미 일반화돼 있음
+  → 신규 `PublicationTarget` 대신 Channel 에 `publishPriceTier` 플래그 1개만 추가
+
+### 변경 사항
+- enum `PriceTier { WHOLESALE RETAIL }` 추가
+- `Channel.publishPriceTier PriceTier @default(RETAIL)` — 발행 대상의 가격 기준. 기본 RETAIL → 기존 채널 동작 변화 0
+- `ChannelProduct`: `priceTier` / `publishBatchId` / `priceSnapshot(Json)` 감사 컬럼 추가 (모두 nullable, 가격 스냅샷 보존)
+- 순수 엔진 `modules/pricing/publish-tier-pricing.ts` + 골든 테스트 35건 (G1~G5 + tier 선택기)
+- `publish.service.ts`: tier 별 본문(도매가/판매가 라벨) + WHOLESALE 은 쇼핑몰 연결 요구 완화·CTA 숨김 + 스냅샷 저장
+- `pipelines/publish.ts`: 1차 도매(WHOLESALE) → 2차 소매(RETAIL) 정렬 + 단일 `publishBatchId` fan-out 묶음
+- 채널 상세 페이지: "발행 가격 기준" 토글 (소매가/도매가) — RETAIL 채널 전용
+
+### 변경 파일
+| 파일 | 유형 | 설명 |
+|-----|-----|-----|
+| db/prisma/schema.prisma | Modified | enum PriceTier 추가 |
+| db/prisma/models/channel.prisma | Modified | publishPriceTier 컬럼 |
+| db/prisma/models/channel-product.prisma | Modified | priceTier/publishBatchId/priceSnapshot + index |
+| db/src/client.ts | Modified | PriceTier re-export |
+| sourcing-app/src/modules/pricing/publish-tier-pricing.ts | Added | 순수 tier 가격 엔진 |
+| sourcing-app/src/modules/pricing/__tests__/publish-tier-pricing.test.ts | Added | 골든 테스트 35건 |
+| sourcing-app/src/modules/publish/publish.service.ts | Modified | tier 본문/스냅샷/쇼핑몰요구 완화 |
+| sourcing-app/src/modules/publish/types.ts | Modified | publishBatchId/priceTier 필드 |
+| sourcing-app/src/modules/automation/pipelines/publish.ts | Modified | 정렬 + batchId 전파 |
+| sourcing-app/src/app/api/channel/[id]/route.ts | Modified | publishPriceTier 입력 |
+| sourcing-app/src/modules/sourcing/domain/src/channel/{types,repository} | Modified | publishPriceTier 전달 |
+| sourcing-app/src/app/(admin)/sourcing/channel/detail/[id]/page.tsx | Modified | 발행 가격 기준 토글 UI |
+
+### 영향 분석
+- [x] API Contract 변경 (PUT /api/channel/[id] 에 publishPriceTier 선택 필드)
+- [x] DB Schema 변경 (db push 필요 — 운영 적용 전까지 코드만 동작)
+- [x] Domain Logic 변경 (발행 본문 가격 선택)
+- [ ] Security 변경
+
+### 테스트
+| 유형 | 상태 |
+|-----|-----|
+| Unit (골든 G1~G5 + tier 선택기) | Pass (35/35) |
+| Typecheck (sourcing-app tsc) | Pass (0 errors) |
+| Integration | 미실행 (운영 DB push + 실밴드 발행 검증 필요) |
+
+### 롤백 계획
+1. 코드: 본 TR 의 변경 파일 revert (기존 RETAIL 경로는 default tier=RETAIL 이라 영향 없음)
+2. DB: 추가 컬럼은 nullable/defaulted 라 그대로 둬도 무해. 필요 시 컬럼 drop.
+
+### 시니어 리뷰 게이트 (미배선 / 후속)
+- PricingEngine 의 MARKUP/FIXED_MARGIN **라이브 소매 배선** — 현행 정책 엔진과 괴리 위험, 정산 영향 (지시서 §3.2·§7)
+- 정산 분리 집계 / Hublink tier 별 분리 (지시서 §4.2·§7) — 데이터 토대(priceTier 태깅)만 확보
+- saga 2차 실패 재시도 큐(BullMQ) — 현재는 기존 순차 실패 처리 유지
+
+### 관련 항목
+- REQ-ID: REQ-PUBLISH-010
+- 지시서: bandauto-v2-multitier-publish-pricing-directive.md
+
+---
 
 ## TR-20260121-003: 쇼핑몰 섹션 페이지 모바일 UI 개선
 

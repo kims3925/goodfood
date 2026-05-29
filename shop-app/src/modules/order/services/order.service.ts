@@ -22,6 +22,7 @@ import {
   createOrderNotification,
   createCancelNotification,
 } from '@/services/notification.service'
+import { generateOrderNumber } from '@/lib/order-utils'
 
 // ============================================
 // Types
@@ -118,16 +119,6 @@ export class OrderService {
   ) {}
 
   /**
-   * 주문번호 생성
-   */
-  generateOrderNumber(): string {
-    const date = new Date()
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase()
-    return `ORD-${dateStr}-${random}`
-  }
-
-  /**
    * 장바구니에서 주문 생성
    */
   async createOrderFromCart(data: CreateOrderFromCartDTO): Promise<{
@@ -204,7 +195,7 @@ export class OrderService {
     const orderInput: CreateOrderInput = {
       userId,
       shopId,
-      orderNumber: this.generateOrderNumber(),
+      orderNumber: generateOrderNumber(),
       // 배송지 정보 (수령인)
       shippingAddress: {
         recipientName: shippingAddress.recipientName,
@@ -350,7 +341,7 @@ export class OrderService {
     const orderInput: CreateOrderInput = {
       userId,
       shopId,
-      orderNumber: this.generateOrderNumber(),
+      orderNumber: generateOrderNumber(),
       // 배송지 정보 (수령인)
       shippingAddress: {
         recipientName: shippingAddress.recipientName,

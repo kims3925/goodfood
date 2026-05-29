@@ -52,6 +52,7 @@ REQ-{CATEGORY}-{NUMBER}
 | REQ-AUTH-001 | Draft | P2 | 사용자/관리자 권한 분류 체계화 | - | - |
 | REQ-AUTH-002 | Draft | P3 | 슈퍼 어드민/매니저 권한 관리 | - | - |
 | REQ-PAYMENT-001 | Draft | P2 | 토스페이먼트 관리자 페이지 링크 추가 | - | - |
+| REQ-PUBLISH-010 | Done | P1 | 다단계 발행(fan-out) — 발행대상 가격 tier + 가족도매방밴드 도매가 발행 | Claude | TR-20260526-001 |
 
 ### Status
 

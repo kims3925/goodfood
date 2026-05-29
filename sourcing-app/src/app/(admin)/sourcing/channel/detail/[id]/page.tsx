@@ -58,6 +58,8 @@ interface Channel {
   orderDeadline: string | null
   // 소매 채널 전용: 발행글 푸터 이미지 (모든 게시글 이미지 맨 마지막 자동 첨부)
   footerImageUrl: string | null
+  // 다단계 발행: 발행 대상 가격 tier (RETAIL=소매가 / WHOLESALE=도매가, 가족도매방밴드)
+  publishPriceTier: 'WHOLESALE' | 'RETAIL' | null
 }
 
 const PLATFORM_LABELS: { [key: string]: string } = {
@@ -114,6 +116,9 @@ export default function ChannelDetailPage({
   const [minSourcingPrice, setMinSourcingPrice] = useState<string>('')
   const [maxSourcingPrice, setMaxSourcingPrice] = useState<string>('')
   const [orderDeadline, setOrderDeadline] = useState<string>('')
+
+  // 다단계 발행: 발행 대상 가격 tier (RETAIL 채널 전용 토글)
+  const [publishPriceTier, setPublishPriceTier] = useState<'WHOLESALE' | 'RETAIL'>('RETAIL')
 
   // 도메인 쇼핑몰 필드
   const [subdomain, setSubdomain] = useState('')
@@ -189,6 +194,8 @@ export default function ChannelDetailPage({
         setMinSourcingPrice(ch.minSourcingPrice != null ? String(ch.minSourcingPrice) : '')
         setMaxSourcingPrice(ch.maxSourcingPrice != null ? String(ch.maxSourcingPrice) : '')
         setOrderDeadline(ch.orderDeadline || '')
+        // 다단계 발행: 가격 tier (기본 RETAIL)
+        setPublishPriceTier(ch.publishPriceTier === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL')
         // Shop 연결
         setSelectedShopId(ch.shopId || null)
         // 도메인 쇼핑몰 필드
@@ -260,9 +267,10 @@ export default function ChannelDetailPage({
         updateData.maxSourcingPrice = maxSourcingPrice === '' ? null : parseInt(maxSourcingPrice.replace(/[^0-9]/g, ''), 10) || null
       }
 
-      // 소매 채널인 경우 Shop 연결
+      // 소매 채널인 경우 Shop 연결 + 발행 가격 tier (다단계 발행)
       if (channel?.kind === 'RETAIL') {
         updateData.shopId = selectedShopId || null
+        updateData.publishPriceTier = publishPriceTier
       }
 
       // 소매 밴드인 경우 쇼핑몰/테마 필드 포함
@@ -827,6 +835,58 @@ export default function ChannelDetailPage({
                               ) : (
                                 <p className="text-slate-400">연결된 Shop이 없습니다</p>
                               )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 발행 가격 tier (다단계 발행) — RETAIL 채널 전용 */}
+                    {channel.kind === 'RETAIL' && (
+                      <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-base">🏷️</span>
+                          <span className="text-sm font-semibold text-slate-700">발행 가격 기준</span>
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                            다단계 발행
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mb-3">
+                          이 밴드에 상품을 발행할 때 본문에 표기할 가격 기준입니다.
+                          <br />
+                          <b>소매가</b>: 마진을 적용한 판매가 + 쇼핑몰 주문 링크 (일반 소매밴드).
+                          <br />
+                          <b>도매가</b>: 소스 도매가 그대로(마진 0) + 쇼핑몰 링크 숨김 (가족도매방밴드).
+                        </p>
+                        {isEditMode ? (
+                          <div className="flex gap-2">
+                            {(['RETAIL', 'WHOLESALE'] as const).map((t) => (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => setPublishPriceTier(t)}
+                                className={`flex-1 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
+                                  publishPriceTier === t
+                                    ? 'bg-amber-500 text-white border-amber-500'
+                                    : 'bg-white text-slate-600 border-amber-200 hover:bg-amber-100'
+                                }`}
+                              >
+                                {t === 'RETAIL' ? '💰 소매가 (기본)' : '🏷️ 도매가 (가족도매방)'}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 bg-white rounded-lg p-3 border border-amber-100">
+                            <span className="text-lg">{channel.publishPriceTier === 'WHOLESALE' ? '🏷️' : '💰'}</span>
+                            <div>
+                              <p className="font-medium text-slate-900">
+                                {channel.publishPriceTier === 'WHOLESALE' ? '도매가 발행 (가족도매방)' : '소매가 발행 (기본)'}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {channel.publishPriceTier === 'WHOLESALE'
+                                  ? '소스 도매가 그대로 발행 · 쇼핑몰 링크 없음'
+                                  : '마진 적용 판매가 + 쇼핑몰 주문 링크'}
+                              </p>
                             </div>
                           </div>
                         )}

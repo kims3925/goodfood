@@ -389,28 +389,55 @@ export class ProductManagerAgent extends AgentBase {
     const limit = options.limit ?? 100
     const skipPlaywright = options.skipPlaywright ?? false
     const now = new Date()
-    const cutoff7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const cutoff30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const DAY_MS = 24 * 60 * 60 * 1000
+    // 기본 게이트(쇼핑몰용 — per-shop 만료설정 없음): 일반 7일 / COM 30일.
+    const cutoff7 = new Date(now.getTime() - 7 * DAY_MS)
+    const cutoff30 = new Date(now.getTime() - 30 * DAY_MS)
+
+    // 채널 동적 게이트 (운영플로우 Phase 4.1 — 짧은 만료 미반영 한계 해소):
+    // 활성 RETAIL·autoExpire 채널 중 "기본(7/30)보다 짧게" 설정한 값이 있으면 1차 DB 게이트를 그만큼
+    // 넓혀, 후처리(per-channel 필터)가 7일 미만 글도 평가할 수 있게 한다. 기본값(7/30)을 baseline 으로
+    // 항상 포함하므로 게이트가 7/30 위로는 절대 올라가지 않아 기존 채널의 만료는 빠짐없이 유지된다.
+    // (게이트는 "후보를 더 가져오는" 역할일 뿐, 실제 삭제 여부는 아래 per-channel 후처리가 권위를 가짐.)
+    const expiryChannels = await prisma.channel.findMany({
+      where: { isActive: true, kind: 'RETAIL', autoExpireEnabled: true },
+      select: { expiryDaysNormal: true, expiryDaysCom: true },
+    })
+    const minNormalDays = Math.max(
+      1,
+      Math.min(7, ...expiryChannels.map((c) => c.expiryDaysNormal ?? 7))
+    )
+    const minComDays = Math.max(
+      1,
+      Math.min(30, ...expiryChannels.map((c) => c.expiryDaysCom ?? 30))
+    )
+    const channelOuterDays = Math.min(minNormalDays, minComDays) // 가장 느슨한 1차 게이트
+    const cutoffChannelOuter = new Date(now.getTime() - channelOuterDays * DAY_MS)
+    const cutoffChannelCom = new Date(now.getTime() - minComDays * DAY_MS)
 
     await this.log(
       'INFO',
-      `이전글 정리 시작 (dryRun=${dryRun}, skipPlaywright=${skipPlaywright}, limit=${limit}, 일반=${cutoff7.toISOString()} 이전, 상시상품=${cutoff30.toISOString()} 이전)`
+      `이전글 정리 시작 (dryRun=${dryRun}, skipPlaywright=${skipPlaywright}, limit=${limit}, ` +
+        `쇼핑몰게이트: 일반=${cutoff7.toISOString()}/상시=${cutoff30.toISOString()} 이전, ` +
+        `채널동적게이트: 일반최소=${minNormalDays}일/상시최소=${minComDays}일(1차=${channelOuterDays}일) — 실제 삭제는 채널별 만료일로 정밀 판정)`
     )
 
     // 만료된 ChannelProduct: 일반 7일, COM 30일.
     // ⚠️ 활성 RETAIL 채널만 대상 — 비활성 채널 글은 자동 삭제하지 않음 (사용자 의도
     // 로 비활성된 채널에 임의로 손대면 안 되고, 세션도 없을 가능성).
-    const expiredChannelProducts = await prisma.channelProduct.findMany({
+    const expiredChannelProductsRaw = await prisma.channelProduct.findMany({
       where: {
         deletedAt: null,
-        publishedAt: { not: null, lt: cutoff7 }, // 1차 게이트: 최소 7일은 지나야 함
-        channel: { is: { isActive: true, kind: 'RETAIL' } },
+        publishedAt: { not: null, lt: cutoffChannelOuter }, // 1차 게이트: 동적 최소 만료일 경과
+        // autoExpireEnabled=false 채널은 자동만료 대상에서 제외 (운영플로우 Phase 4.1).
+        // 기본값 true 이므로 미설정 채널은 기존대로 만료된다.
+        channel: { is: { isActive: true, kind: 'RETAIL', autoExpireEnabled: true } },
         OR: [
-          // 비-COM: publishedAt이 7일 초과 (cutoff7 게이트로 이미 만족)
+          // 비-COM: 1차 게이트(cutoffChannelOuter) 통과분을 후처리에서 per-channel 일반 만료일로 정밀 판정
           { product: { is: { categoryId: { not: 'COM' } } } },
           { product: { is: { categoryId: null } } },
-          // COM: publishedAt이 30일 초과
-          { AND: [{ product: { is: { categoryId: 'COM' } } }, { publishedAt: { lt: cutoff30 } }] },
+          // COM: 최소 COM 만료일 경과분만 추림 (후처리에서 per-channel COM 만료일로 정밀 판정)
+          { AND: [{ product: { is: { categoryId: 'COM' } } }, { publishedAt: { lt: cutoffChannelCom } }] },
         ],
       },
       select: {
@@ -420,10 +447,24 @@ export class ProductManagerAgent extends AgentBase {
         postKey: true,
         publishedAt: true,
         product: { select: { id: true, categoryId: true, name: true } },
-        channel: { select: { id: true, channelKey: true, name: true, isActive: true } },
+        channel: { select: { id: true, channelKey: true, name: true, isActive: true, expiryDaysNormal: true, expiryDaysCom: true } },
       },
       take: limit,
       orderBy: { publishedAt: 'asc' },
+    })
+
+    // per-channel 만료 정책 적용 (운영플로우 Phase 4.1):
+    // 채널이 기본값(일반 7일 / COM 30일)보다 "더 긴" 보존을 설정했으면, 그 기간이 지나기 전 글은
+    // 삭제 대상에서 제외한다. 전역 게이트(cutoff7/cutoff30)는 그대로라, 이 후처리는 "덜 삭제하는"
+    // 방향으로만 작동 → 민감한 대량삭제 로직에 안전(추가 삭제 유발 불가).
+    // (기본보다 "짧게" 설정한 경우의 7일 미만 조기삭제는 전역 게이트가 우선 — 후속 과제로 명시.)
+    const expiredChannelProducts = expiredChannelProductsRaw.filter((cp) => {
+      const ch = cp.channel as { expiryDaysNormal: number | null; expiryDaysCom: number | null } | null
+      const isCom = cp.product?.categoryId === 'COM'
+      const days = isCom ? (ch?.expiryDaysCom ?? 30) : (ch?.expiryDaysNormal ?? 7)
+      if (!cp.publishedAt) return false
+      const threshold = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+      return new Date(cp.publishedAt) < threshold
     })
 
     // 만료된 ShopProduct: 활성 쇼핑몰만 대상.

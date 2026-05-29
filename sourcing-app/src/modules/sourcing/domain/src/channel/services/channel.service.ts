@@ -45,8 +45,13 @@ export class ChannelService {
     return channelRepository.findMany(params)
   }
 
-  async getById(id: number) {
-    return channelRepository.findById(id)
+  async getById(id: number, ownerId?: number) {
+    const channel = await channelRepository.findById(id)
+    // 멀티테넌트 격리: ownerId 전달 시 소유자 불일치면 노출하지 않음 (IDOR 방지)
+    if (!channel || (ownerId !== undefined && channel.userId !== ownerId)) {
+      return null
+    }
+    return channel
   }
 
   async create(userId: number, data: Omit<ChannelCreateInput, 'userId'>) {
@@ -88,9 +93,10 @@ export class ChannelService {
     })
   }
 
-  async update(id: number, data: ChannelUpdateInput) {
+  async update(id: number, data: ChannelUpdateInput, ownerId?: number) {
     const existing = await channelRepository.findById(id)
-    if (!existing) {
+    // 멀티테넌트 격리: ownerId 전달 시 소유자 불일치면 존재하지 않는 것으로 처리 (IDOR 방지)
+    if (!existing || (ownerId !== undefined && existing.userId !== ownerId)) {
       throw new Error('채널을 찾을 수 없습니다.')
     }
 
@@ -102,9 +108,10 @@ export class ChannelService {
     return channelRepository.update(id, data)
   }
 
-  async delete(id: number) {
+  async delete(id: number, ownerId?: number) {
     const existing = await channelRepository.findById(id)
-    if (!existing) {
+    // 멀티테넌트 격리: ownerId 전달 시 소유자 불일치면 존재하지 않는 것으로 처리 (IDOR 방지)
+    if (!existing || (ownerId !== undefined && existing.userId !== ownerId)) {
       throw new Error('채널을 찾을 수 없습니다.')
     }
 

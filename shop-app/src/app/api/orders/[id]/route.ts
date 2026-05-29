@@ -191,6 +191,8 @@ export async function DELETE(
     }
 
     // 주문 및 관련 데이터 삭제 (트랜잭션)
+    // Soft Delete 원칙의 의도된 예외: 위 가드로 "미결제(PENDING) + 결제 DONE 아님" 주문만 도달한다.
+    // 즉 결제 시도가 실패/이탈한 임시 주문이라 보존 가치가 없어 하드삭제한다. 실주문은 취소(status) 경로 사용.
     await prisma.$transaction(async (tx) => {
       // OrderItem 삭제
       await tx.orderItem.deleteMany({

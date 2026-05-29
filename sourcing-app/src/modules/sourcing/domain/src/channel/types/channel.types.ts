@@ -1,4 +1,4 @@
-import { ChannelKind, ChannelPlatform } from '@bandauto/db'
+import { ChannelKind, ChannelPlatform, PriceTier } from '@bandauto/db'
 
 export interface ChannelListParams {
   userId?: number
@@ -29,6 +29,8 @@ export interface ChannelUpdateInput {
   maxSourcingPrice?: number | null
   // 도매방 주문 마감시간 (예: "오후 3시", "14:00")
   orderDeadline?: string | null
+  // 다단계 발행: 발행 대상의 가격 tier (RETAIL 기본 / WHOLESALE=가족도매방, 도매가 발행)
+  publishPriceTier?: PriceTier
 }
 
 export interface PaginatedResult<T> {

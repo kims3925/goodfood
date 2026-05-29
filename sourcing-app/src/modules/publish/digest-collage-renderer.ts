@@ -56,6 +56,10 @@ export interface RenderedCollage {
 
 /**
  * 이미지 URL을 base64 data URI로 변환. HTTP 404나 네트워크 실패 시 null.
+ *
+ * TODO: renderer-utils.toDataUri 로 통합 예정 (Phase 4 잔여).
+ *       단, 본 함수는 배경 제거(@imgly/background-removal-node) 입력으로 raw Buffer 가
+ *       필요하여 단순 data URI 형태로는 즉시 대체 불가. 콜라주 모드 동작 검증 후 진행.
  */
 async function fetchImageBuffer(urlOrPath: string): Promise<{ buf: Buffer; mime: string } | null> {
   try {

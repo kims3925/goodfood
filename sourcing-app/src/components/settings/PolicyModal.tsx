@@ -34,6 +34,22 @@ interface PricingPolicy {
   // GBand SaaS Phase 3 (2026-05-13): postType별 차등 마진 규칙 (JSON 또는 stringified)
   // 비어있으면 옛 content (마진 구간표) 기반 로직 그대로 사용.
   tierRules?: string | Record<string, unknown> | null
+  // 경영밴드 이원화 정책 (2026-05-28): 소매채널별 적용 모드
+  targets?: PolicyTarget[]
+}
+
+// 경영밴드 이원화 정책 (2026-05-28)
+type PolicyApplyMode = 'INHERIT' | 'ZERO_MARGIN' | 'CUSTOM'
+
+interface PolicyTarget {
+  retailChannelId: number
+  applyMode: PolicyApplyMode
+  customContent?: string | null
+  retailChannel?: Channel // GET 응답에 포함되는 디스플레이용
+}
+
+interface RetailChannelRow extends Channel {
+  // 모달 로컬 상태: 선택 여부 + applyMode + customContent
 }
 
 interface PolicyModalProps {
@@ -207,10 +223,17 @@ export default function PolicyModal({
   const [tierRulesText, setTierRulesText] = useState('')
   const [tierRulesError, setTierRulesError] = useState<string | null>(null)
 
-  // 도매채널 목록 로드
+  // 경영밴드 이원화 정책 (2026-05-28) — 소매채널 타겟 상태
+  const [retailChannels, setRetailChannels] = useState<RetailChannelRow[]>([])
+  const [isLoadingRetail, setIsLoadingRetail] = useState(false)
+  // retailChannelId → { applyMode, customContent } — 미선택은 키 없음 (INHERIT 기본 적용은 저장 시 제외)
+  const [targetMap, setTargetMap] = useState<Record<number, { applyMode: PolicyApplyMode; customContent: string }>>({})
+
+  // 도매채널 + 소매채널 목록 로드
   useEffect(() => {
     if (isOpen) {
       loadWholesaleChannels()
+      loadRetailChannels()
     }
   }, [isOpen])
 
@@ -226,6 +249,21 @@ export default function PolicyModal({
       console.error('채널 목록 로드 실패:', error)
     } finally {
       setIsLoadingChannels(false)
+    }
+  }
+
+  const loadRetailChannels = async () => {
+    setIsLoadingRetail(true)
+    try {
+      const response = await fetch('/api/channel?kind=RETAIL&limit=200')
+      const data = await response.json()
+      if (data.success) {
+        setRetailChannels(data.data || [])
+      }
+    } catch (error) {
+      console.error('소매채널 목록 로드 실패:', error)
+    } finally {
+      setIsLoadingRetail(false)
     }
   }
 
@@ -254,6 +292,15 @@ export default function PolicyModal({
           setTierRulesText('')
         }
       }
+      // 기존 targets → targetMap 복원
+      const map: Record<number, { applyMode: PolicyApplyMode; customContent: string }> = {}
+      for (const t of policy.targets ?? []) {
+        map[t.retailChannelId] = {
+          applyMode: (t.applyMode as PolicyApplyMode) ?? 'INHERIT',
+          customContent: t.customContent ?? '',
+        }
+      }
+      setTargetMap(map)
     } else {
       setChannelId('')
       setName('')
@@ -264,6 +311,7 @@ export default function PolicyModal({
       setExcludeAbove('')
       setShippingType('separate')
       setTierRulesText('')
+      setTargetMap({})
     }
     setError(null)
     setTierRulesError(null)
@@ -351,6 +399,15 @@ export default function PolicyModal({
       setTierRulesError(null)
     }
 
+    // 경영밴드 이원화 정책 — targets 직렬화
+    // targetMap 의 모든 항목을 보내되, CUSTOM 만 customContent 동봉.
+    // 빈 배열을 명시적으로 보내면 PUT 시 기존 타겟 전부 삭제(=모두 INHERIT 기본 동작).
+    const targetsPayload: PolicyTarget[] = Object.entries(targetMap).map(([id, v]) => ({
+      retailChannelId: Number(id),
+      applyMode: v.applyMode,
+      customContent: v.applyMode === 'CUSTOM' ? (v.customContent || null) : null,
+    }))
+
     setIsSaving(true)
     try {
       await onSave({
@@ -361,6 +418,7 @@ export default function PolicyModal({
         content,
         isActive,
         tierRules: tierRulesPayload, // null = 옛 로직 fallthrough
+        targets: targetsPayload,
       })
       onClose()
     } catch (err) {
@@ -368,6 +426,33 @@ export default function PolicyModal({
     } finally {
       setIsSaving(false)
     }
+  }
+
+  // 소매채널 타겟 토글/변경 핸들러
+  const toggleTarget = (channelId: number) => {
+    setTargetMap((prev) => {
+      const next = { ...prev }
+      if (next[channelId]) {
+        delete next[channelId]
+      } else {
+        next[channelId] = { applyMode: 'INHERIT', customContent: '' }
+      }
+      return next
+    })
+  }
+
+  const updateTargetMode = (channelId: number, mode: PolicyApplyMode) => {
+    setTargetMap((prev) => ({
+      ...prev,
+      [channelId]: { ...(prev[channelId] ?? { customContent: '' }), applyMode: mode },
+    }))
+  }
+
+  const updateTargetCustomContent = (channelId: number, content: string) => {
+    setTargetMap((prev) => ({
+      ...prev,
+      [channelId]: { ...(prev[channelId] ?? { applyMode: 'CUSTOM' }), customContent: content },
+    }))
   }
 
   if (!isOpen) return null
@@ -433,6 +518,98 @@ export default function PolicyModal({
               placeholder="예: 기본 마진 정책"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+          </div>
+
+          {/* 경영밴드 이원화 정책 (2026-05-28) — 소매채널별 적용 모드 */}
+          <div className="border border-amber-200 bg-amber-50/50 rounded-lg p-4">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-800">
+                  적용 대상 소매채널 <span className="text-gray-400 text-xs ml-1">(선택)</span>
+                </label>
+                <p className="text-[11px] text-gray-600 mt-0.5 leading-relaxed">
+                  💡 체크박스로 선택한 소매채널만 별도 모드로 동작합니다. 미선택 채널은
+                  <strong> INHERIT (기존 정책 그대로 적용)</strong> 입니다 — 기존 동작 보존.
+                  <br />
+                  경영비공개밴드/외주밴드 등에 <code className="bg-amber-100 px-1">ZERO_MARGIN</code> 을 적용하면
+                  마진 없이 도매가 그대로 발행됩니다 (지침서 §1.3).
+                </p>
+              </div>
+              {Object.keys(targetMap).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTargetMap({})}
+                  className="text-xs text-gray-500 hover:text-red-600 underline"
+                >
+                  전체 해제
+                </button>
+              )}
+            </div>
+            {isLoadingRetail ? (
+              <div className="text-xs text-gray-500 py-2">소매채널 로딩 중...</div>
+            ) : retailChannels.length === 0 ? (
+              <div className="text-xs text-gray-500 py-2">
+                등록된 소매채널이 없습니다. 채널 관리에서 RETAIL 채널을 먼저 등록하세요.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-1">
+                {retailChannels.map((ch) => {
+                  const t = targetMap[ch.id]
+                  const checked = !!t
+                  return (
+                    <div
+                      key={ch.id}
+                      className={`flex items-center gap-2 p-2 rounded border ${
+                        checked ? 'bg-white border-amber-300' : 'bg-white/50 border-gray-200'
+                      }`}
+                    >
+                      <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleTarget(ch.id)}
+                          className="w-4 h-4 text-blue-500 rounded"
+                        />
+                        <span className="text-xs text-gray-800 truncate max-w-[120px]" title={ch.name}>
+                          {ch.name}
+                        </span>
+                      </label>
+                      {checked && (
+                        <select
+                          value={t.applyMode}
+                          onChange={(e) => updateTargetMode(ch.id, e.target.value as PolicyApplyMode)}
+                          className="ml-auto text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                        >
+                          <option value="INHERIT">INHERIT (기본)</option>
+                          <option value="ZERO_MARGIN">ZERO_MARGIN (마진 0)</option>
+                          <option value="CUSTOM">CUSTOM (별도 규칙)</option>
+                        </select>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {/* CUSTOM 모드 선택된 채널만 별도 입력 박스 노출 */}
+            {Object.entries(targetMap)
+              .filter(([, v]) => v.applyMode === 'CUSTOM')
+              .map(([id, v]) => {
+                const ch = retailChannels.find((c) => c.id === Number(id))
+                return (
+                  <div key={id} className="mt-2 p-2 bg-white border border-purple-200 rounded">
+                    <label className="text-xs text-gray-600 block mb-1">
+                      📝 {ch?.name ?? `채널 ${id}`} 의 CUSTOM 마진 규칙
+                    </label>
+                    <textarea
+                      value={v.customContent}
+                      onChange={(e) => updateTargetCustomContent(Number(id), e.target.value)}
+                      rows={3}
+                      placeholder="예) ## 마진 구간표  / | 1원 ~ 19900원 | +2000원 |  / 배송비: 별도"
+                      className="w-full text-xs font-mono px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-400"
+                    />
+                  </div>
+                )
+              })}
           </div>
 
           {/* 설명 */}

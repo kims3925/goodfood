@@ -124,6 +124,8 @@ export class ChannelRepository {
     if (data.minSourcingPrice !== undefined) channelData.minSourcingPrice = data.minSourcingPrice
     if (data.maxSourcingPrice !== undefined) channelData.maxSourcingPrice = data.maxSourcingPrice
     if (data.orderDeadline !== undefined) channelData.orderDeadline = data.orderDeadline
+    // 다단계 발행: 발행 대상 가격 tier (RETAIL/WHOLESALE)
+    if (data.publishPriceTier !== undefined) channelData.publishPriceTier = data.publishPriceTier
 
     return prisma.channel.update({
       where: { id },

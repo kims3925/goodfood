@@ -331,12 +331,9 @@ export class OrderRepository {
     return prisma.order.count({ where })
   }
 
-  /**
-   * 주문 삭제
-   */
-  async delete(orderId: number): Promise<void> {
-    await prisma.order.delete({ where: { id: orderId } })
-  }
+  // 주의: 무조건 하드삭제하던 delete(orderId) 메서드는 제거했다 (호출처 없음 + Soft Delete 원칙 위반).
+  // 실주문은 status=CANCELLED 로 취소(보존)하고, 미결제 PENDING 정리만 api/orders/[id] DELETE 에서
+  // status·결제상태 가드와 함께 트랜잭션 하드삭제한다. 새 삭제 경로가 필요하면 그 가드를 반드시 따른다.
 
   /**
    * 기간별 주문 통계

@@ -33,6 +33,14 @@ export async function GET(
         id: policyId,
         userId: currentUser.userId,
       },
+      include: {
+        channel: { select: { id: true, name: true, kind: true } },
+        targets: {
+          include: {
+            retailChannel: { select: { id: true, name: true, kind: true } },
+          },
+        },
+      },
     })
 
     if (!policy) {

@@ -110,6 +110,14 @@ export async function POST(request: NextRequest) {
 // PUT: 채널 수정
 export async function PUT(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { id, name, isActive, coverUrl } = body
 
@@ -124,7 +132,7 @@ export async function PUT(request: NextRequest) {
       name,
       isActive,
       coverUrl,
-    })
+    }, currentUser.userId)
 
     return NextResponse.json({ success: true, data: channel })
   } catch (error: any) {
@@ -147,6 +155,14 @@ export async function PUT(request: NextRequest) {
 // DELETE: 채널 삭제
 export async function DELETE(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      )
+    }
+
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
 
@@ -157,7 +173,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    await channelService.delete(parseInt(id))
+    await channelService.delete(parseInt(id), currentUser.userId)
 
     return NextResponse.json({
       success: true,

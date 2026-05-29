@@ -13,50 +13,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import QRCode from 'qrcode'
-
-/**
- * 이미지 URL을 base64 data URI로 변환. HTTP 404나 네트워크 실패 시 null 반환.
- * - 상대 경로(/...) → NEXT_PUBLIC_APP_URL prefix
- * - file:// 또는 OS 절대 경로 → fs로 읽기
- * - http(s) → fetch
- */
-async function toDataUri(urlOrPath: string): Promise<string | null> {
-  try {
-    // 로컬 절대 경로
-    if (urlOrPath.startsWith('file://')) {
-      const p = urlOrPath.replace(/^file:\/\//, '')
-      if (!fs.existsSync(p)) return null
-      const buf = fs.readFileSync(p)
-      const mime = p.endsWith('.png') ? 'image/png' : p.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
-      return `data:${mime};base64,${buf.toString('base64')}`
-    }
-    // 일반 파일시스템 절대 경로 (리눅스 /xxx 또는 윈도우 C:\xxx)
-    if ((urlOrPath.startsWith('/') && !urlOrPath.startsWith('//')) || /^[a-zA-Z]:[\\/]/.test(urlOrPath)) {
-      // URL path vs filesystem path — 실제 파일이면 파일로 처리
-      if (fs.existsSync(urlOrPath)) {
-        const buf = fs.readFileSync(urlOrPath)
-        const mime = urlOrPath.endsWith('.png') ? 'image/png' : urlOrPath.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
-        return `data:${mime};base64,${buf.toString('base64')}`
-      }
-      // 파일이 아니면 NEXT_PUBLIC_APP_URL prefix 붙여 fetch
-      const base = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
-      urlOrPath = `${base}${urlOrPath.startsWith('/') ? urlOrPath : '/' + urlOrPath}`
-    }
-
-    const res = await fetch(urlOrPath, {
-      headers: { 'User-Agent': 'Mozilla/5.0 BandAuto/1.0' },
-    })
-    if (!res.ok) return null
-    const buf = Buffer.from(await res.arrayBuffer())
-    const mime =
-      res.headers.get('content-type')?.split(';')[0] ||
-      (urlOrPath.endsWith('.png') ? 'image/png' : urlOrPath.endsWith('.webp') ? 'image/webp' : 'image/jpeg')
-    return `data:${mime};base64,${buf.toString('base64')}`
-  } catch (err) {
-    console.warn(`[digest-card] toDataUri 실패: ${urlOrPath}`, err)
-    return null
-  }
-}
+import { toDataUri, escapeHtml, FONT_CSS } from './renderer-utils'
 
 export interface DigestCardProduct {
   id: number
@@ -108,19 +65,6 @@ async function generateQrDataUri(url: string | null | undefined): Promise<string
     console.warn(`[digest-card] QR 생성 실패: ${url}`, err)
     return null
   }
-}
-
-const FONT_CSS = `
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
-`
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
 }
 
 function buildImageGridHtml(imageUrls: string[]): string {

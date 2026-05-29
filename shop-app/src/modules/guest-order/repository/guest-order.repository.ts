@@ -19,6 +19,10 @@ export interface GuestOrderItemInput {
   thumbnailUrl: string | null
   quantity: number
   unitPrice: number
+  // 할인 전 단가 / 할인 반영 아이템 총액 — subtotal·discount 산출용 임시 필드 (DB 미저장).
+  // 회원 OrderItemInput 과 동일 패턴. repository.create 는 명시 매핑이라 persist 시 무시됨.
+  originalUnitPrice?: number
+  itemTotal?: number
 }
 
 export interface GuestShippingAddressInput {

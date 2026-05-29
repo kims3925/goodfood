@@ -15,7 +15,11 @@ import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
 import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
 import { resetSessionFailureCount } from '@/modules/band-playwright/band-session-manager'
-import { calculateSellingPrice } from '@/lib/price-calculator'
+import {
+  resolveTierUnitPrice,
+  normalizePriceTier,
+  type PublishPriceTier,
+} from '@/modules/pricing/publish-tier-pricing'
 import { markPriceImagesOnProduct } from '@/modules/utils/priceImageFilter'
 import type {
   PublishToChannelParams,
@@ -72,33 +76,39 @@ function formatPrice(price: number): string {
 
 /**
  * 게시글 내용 생성
- * 소매밴드 발행용 - 옵션별 판매가 포함
- * 본문 구조: 쇼핑몰URL → 상품명 → 옵션별 판매가 → 상품설명 → 쇼핑몰URL
+ * - RETAIL tier(소매밴드/기존): 옵션별 판매가(소매가+배송비) + 쇼핑몰 주문 링크
+ * - WHOLESALE tier(가족도매방밴드): 옵션별 도매가(INHERIT_SOURCE) + 쇼핑몰 CTA 숨김
+ *   (지시서 §4.1: showMargin=도매가 노출 / hideRetailCTA=소매 링크 숨김)
+ *
+ * tier 별 가격은 resolveTierUnitPrice 로 선택만 한다(머니 수학 재계산 X — 이미 저장된 값 사용).
  */
 function buildPostContent(
   product: ProductForPublish,
-  options?: { orderLink?: string }
+  options?: { orderLink?: string; tier?: PublishPriceTier }
 ): string {
+  const tier = options?.tier ?? 'RETAIL'
   const lines: string[] = []
 
   // 상품명 (맨 위에 노출)
   lines.push(product.name)
   lines.push('')
 
-  // 옵션별 판매가 표시
+  // 옵션별 단가 표시 (tier 에 따라 도매가/판매가)
   if (product.variants && product.variants.length > 0) {
     const shippingFee = product.shippingFee || 0
     const bundleShippingType = product.bundleShippingType || null
 
-    lines.push('💰 판매가')
+    lines.push(tier === 'WHOLESALE' ? '🏷️ 도매가' : '💰 판매가')
     for (const variant of product.variants) {
-      const sellingPrice = calculateSellingPrice(
-        variant.price,
+      const { unitPrice } = resolveTierUnitPrice({
+        tier,
+        wholesalePrice: variant.wholesalePrice,
+        retailPrice: variant.price,
         shippingFee,
-        bundleShippingType
-      )
+        bundleShippingType,
+      })
       const optionName = variant.optionSummary || '기본'
-      lines.push(`• ${optionName}: ${formatPrice(sellingPrice)}원`)
+      lines.push(`• ${optionName}: ${formatPrice(unitPrice)}원`)
     }
     lines.push('')
   }
@@ -108,13 +118,55 @@ function buildPostContent(
     lines.push(product.description)
   }
 
-  // 하단 쇼핑몰 링크
-  if (options?.orderLink) {
+  // 하단 쇼핑몰 링크 — 소매(RETAIL) 발행에만. 도매(WHOLESALE)는 소매 CTA 숨김.
+  if (tier !== 'WHOLESALE' && options?.orderLink) {
     lines.push('')
     lines.push(`🛒 주문하기 👉 ${options.orderLink}`)
   }
 
   return lines.join('\n')
+}
+
+/**
+ * 발행 시점 가격 스냅샷 생성 — ChannelProduct.priceSnapshot 에 저장.
+ * 정책이 사후에 바뀌어도 발행 당시 옵션별 단가 근거가 보존된다(지시서 §2.2 / 골든 G8).
+ */
+function buildPriceSnapshot(
+  product: ProductForPublish,
+  tier: PublishPriceTier
+): { snapshot: Record<string, unknown>; wholesaleFallback: boolean } {
+  const shippingFee = product.shippingFee || 0
+  const bundleShippingType = product.bundleShippingType || null
+  let wholesaleFallback = false
+
+  const items = (product.variants || []).map((variant) => {
+    const r = resolveTierUnitPrice({
+      tier,
+      wholesalePrice: variant.wholesalePrice,
+      retailPrice: variant.price,
+      shippingFee,
+      bundleShippingType,
+    })
+    if (r.wholesaleFallback) wholesaleFallback = true
+    return {
+      variantId: variant.id,
+      optionSummary: variant.optionSummary,
+      wholesalePrice: variant.wholesalePrice,
+      retailPrice: variant.price,
+      unitPrice: r.unitPrice,
+    }
+  })
+
+  return {
+    snapshot: {
+      tier,
+      shippingFee,
+      bundleShippingType,
+      items,
+      snapshotAt: new Date().toISOString(),
+    },
+    wholesaleFallback,
+  }
 }
 
 function toProductForPublish(product: {
@@ -182,7 +234,7 @@ export class PublishService {
    * 단일 상품을 단일 채널에 발행 (쿼터 에러 시 재시도)
    */
   async publishToChannel(params: PublishToChannelParams, retryCount: number = 0): Promise<PublishToChannelResult> {
-    const { userId, productId, channelId } = params
+    const { userId, productId, channelId, publishBatchId } = params
 
     // 가격이미지 검출/마킹 (Gemini Vision, isPriceBanner=NULL 인 것만 첫 발행 시 분석)
     await maybeMarkPriceImagesForRetailPublish(userId, productId)
@@ -226,23 +278,27 @@ export class PublishService {
         }
       }
 
-      // 소매채널에 쇼핑몰이 연결되어 있는지 확인
-      if (!channel.shop || !channel.shop.isActive) {
-        return {
-          success: false,
-          productId,
-          channelId,
-          error: '소매채널에 쇼핑몰이 연결되어 있지 않습니다. 채널 설정에서 쇼핑몰을 연결해주세요.',
-        }
-      }
+      // 다단계 발행: 이 발행 대상의 가격 tier (RETAIL 기본 / WHOLESALE=가족도매방)
+      const tier = normalizePriceTier(channel.publishPriceTier)
 
-      // 쇼핑몰에 subdomain이 설정되어 있는지 확인 (주문 링크 생성에 필요)
-      if (!channel.shop.subdomain) {
-        return {
-          success: false,
-          productId,
-          channelId,
-          error: '쇼핑몰에 도메인이 설정되어 있지 않습니다. 쇼핑몰 설정에서 도메인을 설정해주세요.',
+      // 쇼핑몰 연결은 소매(RETAIL) tier 에만 필수 — 주문 링크 생성용.
+      // 도매(WHOLESALE) tier(가족도매방밴드)는 쇼핑몰 없이 도매가만 발행한다.
+      if (tier === 'RETAIL') {
+        if (!channel.shop || !channel.shop.isActive) {
+          return {
+            success: false,
+            productId,
+            channelId,
+            error: '소매채널에 쇼핑몰이 연결되어 있지 않습니다. 채널 설정에서 쇼핑몰을 연결해주세요.',
+          }
+        }
+        if (!channel.shop.subdomain) {
+          return {
+            success: false,
+            productId,
+            channelId,
+            error: '쇼핑몰에 도메인이 설정되어 있지 않습니다. 쇼핑몰 설정에서 도메인을 설정해주세요.',
+          }
         }
       }
 
@@ -312,15 +368,22 @@ export class PublishService {
         }
       }
 
-      // 4. 주문 링크 생성 (연결된 Shop이 있는 경우) - 경로 기반 URL
+      // 4. 주문 링크 생성 (소매 tier + 연결된 Shop이 있는 경우) - 경로 기반 URL
+      // 도매(WHOLESALE) tier 는 쇼핑몰 링크를 붙이지 않는다.
       let orderLink: string | undefined
-      if (channel.shop?.subdomain && channel.shop.isActive) {
+      if (tier === 'RETAIL' && channel.shop?.subdomain && channel.shop.isActive) {
         const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'
         orderLink = `${shopBaseUrl}/${channel.shop.subdomain}/product/${productId}`
       }
 
-      // 5. 게시물 내용 생성 (쇼핑몰URL → 상품내용 → 쇼핑몰URL)
-      const postContent = buildPostContent(toProductForPublish(product), { orderLink })
+      // 5. 게시물 내용 생성 (tier 별 가격/CTA)
+      const productForPublish = toProductForPublish(product)
+      const postContent = buildPostContent(productForPublish, { orderLink, tier })
+      // 발행 시점 가격 스냅샷 (감사·정산 분리용)
+      const { snapshot: priceSnapshot, wholesaleFallback } = buildPriceSnapshot(productForPublish, tier)
+      if (wholesaleFallback) {
+        console.warn(`[PublishService] product ${productId}: WHOLESALE tier 인데 도매가 누락 — 소매가로 폴백 발행 (channel ${channelId})`)
+      }
 
       // 이미지 URL 추출 — 가격이미지 (isPriceBanner=true) 제외, 결과 0장이면 원본 사용
       // 채널 푸터 이미지가 있으면 1자리 예약하여 상품 이미지를 19개로 자르고 푸터를 마지막에 추가.
@@ -430,6 +493,7 @@ export class PublishService {
       }
 
       // 7. ChannelProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원, postKey 저장)
+      // 다단계 발행: priceTier / publishBatchId / priceSnapshot 스냅샷 동시 저장.
       const channelProduct = await prisma.channelProduct.upsert({
         where: {
           productId_channelId: { productId, channelId },
@@ -439,6 +503,9 @@ export class PublishService {
           deletedAt: null,
           publishedAt: new Date(),
           postKey: postKey || undefined,
+          priceTier: tier,
+          publishBatchId: publishBatchId || undefined,
+          priceSnapshot: priceSnapshot as any,
         },
         create: {
           userId,
@@ -446,11 +513,14 @@ export class PublishService {
           channelId,
           publishedAt: new Date(),
           postKey: postKey || undefined,
+          priceTier: tier,
+          publishBatchId: publishBatchId || undefined,
+          priceSnapshot: priceSnapshot as any,
         },
       })
 
       console.log(
-        `[PublishService] Published product ${productId} to channel ${channel.name} (${publishMethod}${orderLink ? ', with order link' : ''})`
+        `[PublishService] Published product ${productId} to channel ${channel.name} (${publishMethod}, tier=${tier}${orderLink ? ', with order link' : ''})`
       )
 
       return {
@@ -460,6 +530,8 @@ export class PublishService {
         publishedProductId: channelProduct.id,
         imageCount,
         publishMethod,
+        priceTier: tier,
+        wholesaleFallback,
       }
     } catch (error: any) {
       console.error(`[PublishService] Error publishing product ${productId} to channel ${channelId}:`, error)
@@ -486,7 +558,7 @@ export class PublishService {
    * Playwright 세션이 있으면 이미지 포함, 없으면 Band API로 텍스트만 발행
    */
   async publishBatch(params: PublishBatchParams): Promise<PublishBatchResult> {
-    const { userId, productIds, channelId, onProgress } = params
+    const { userId, productIds, channelId, onProgress, publishBatchId } = params
 
     // 채널 정보 조회 (Shop 정보 포함)
     const channel = await prisma.channel.findFirst({
@@ -555,7 +627,7 @@ export class PublishService {
         await delay(cooldownMs)
       }
 
-      const result = await this.publishToChannel({ userId, productId, channelId })
+      const result = await this.publishToChannel({ userId, productId, channelId, publishBatchId })
       results.push(result)
 
       // 다음 쿨다운을 위해 발행 방식 저장
@@ -817,7 +889,7 @@ export class PublishService {
     },
     retryCount: number = 0
   ): Promise<PublishToChannelResult> {
-    const { userId, productId, channelId, onStageProgress, signal } = params
+    const { userId, productId, channelId, onStageProgress, signal, publishBatchId } = params
 
     // 취소 신호 확인
     if (signal?.aborted) {
@@ -871,41 +943,47 @@ export class PublishService {
         }
       }
 
-      // 소매채널에 쇼핑몰이 연결되어 있는지 확인
-      if (!channel.shop || !channel.shop.isActive) {
-        if (onStageProgress) {
-          await onStageProgress({
-            productId,
-            productName: `상품 ${productId}`,
-            stage: 'failed',
-            stageLabel: '실패',
-            error: '소매채널에 쇼핑몰이 연결되어 있지 않습니다.',
-          })
-        }
-        return {
-          success: false,
-          productId,
-          channelId,
-          error: '소매채널에 쇼핑몰이 연결되어 있지 않습니다. 채널 설정에서 쇼핑몰을 연결해주세요.',
-        }
-      }
+      // 다단계 발행: 이 발행 대상의 가격 tier (RETAIL 기본 / WHOLESALE=가족도매방)
+      const tier = normalizePriceTier(channel.publishPriceTier)
 
-      // 쇼핑몰에 subdomain이 설정되어 있는지 확인 (주문 링크 생성에 필요)
-      if (!channel.shop.subdomain) {
-        if (onStageProgress) {
-          await onStageProgress({
+      // 쇼핑몰 연결은 소매(RETAIL) tier 에만 필수. 도매(WHOLESALE)는 쇼핑몰 없이 발행.
+      if (tier === 'RETAIL') {
+        // 소매채널에 쇼핑몰이 연결되어 있는지 확인
+        if (!channel.shop || !channel.shop.isActive) {
+          if (onStageProgress) {
+            await onStageProgress({
+              productId,
+              productName: `상품 ${productId}`,
+              stage: 'failed',
+              stageLabel: '실패',
+              error: '소매채널에 쇼핑몰이 연결되어 있지 않습니다.',
+            })
+          }
+          return {
+            success: false,
             productId,
-            productName: `상품 ${productId}`,
-            stage: 'failed',
-            stageLabel: '실패',
-            error: '쇼핑몰에 도메인이 설정되어 있지 않습니다.',
-          })
+            channelId,
+            error: '소매채널에 쇼핑몰이 연결되어 있지 않습니다. 채널 설정에서 쇼핑몰을 연결해주세요.',
+          }
         }
-        return {
-          success: false,
-          productId,
-          channelId,
-          error: '쇼핑몰에 도메인이 설정되어 있지 않습니다. 쇼핑몰 설정에서 도메인을 설정해주세요.',
+
+        // 쇼핑몰에 subdomain이 설정되어 있는지 확인 (주문 링크 생성에 필요)
+        if (!channel.shop.subdomain) {
+          if (onStageProgress) {
+            await onStageProgress({
+              productId,
+              productName: `상품 ${productId}`,
+              stage: 'failed',
+              stageLabel: '실패',
+              error: '쇼핑몰에 도메인이 설정되어 있지 않습니다.',
+            })
+          }
+          return {
+            success: false,
+            productId,
+            channelId,
+            error: '쇼핑몰에 도메인이 설정되어 있지 않습니다. 쇼핑몰 설정에서 도메인을 설정해주세요.',
+          }
         }
       }
 
@@ -983,15 +1061,20 @@ export class PublishService {
         }
       }
 
-      // 4. 주문 링크 생성
+      // 4. 주문 링크 생성 (소매 tier + 연결된 Shop 있을 때). 도매(WHOLESALE)는 링크 미생성.
       let orderLink: string | undefined
-      if (channel.shop?.subdomain && channel.shop.isActive) {
+      if (tier === 'RETAIL' && channel.shop?.subdomain && channel.shop.isActive) {
         const shopBaseUrl = process.env.NEXT_PUBLIC_SHOP_BASE_URL || 'http://localhost:3000'
         orderLink = `${shopBaseUrl}/${channel.shop.subdomain}/product/${productId}`
       }
 
-      // 5. 게시물 내용 생성
-      const postContent = buildPostContent(toProductForPublish(product), { orderLink })
+      // 5. 게시물 내용 생성 (tier 별 가격/CTA) + 가격 스냅샷
+      const productForPublish = toProductForPublish(product)
+      const postContent = buildPostContent(productForPublish, { orderLink, tier })
+      const { snapshot: priceSnapshot, wholesaleFallback } = buildPriceSnapshot(productForPublish, tier)
+      if (wholesaleFallback) {
+        console.warn(`[PublishService] product ${productId}: WHOLESALE tier 인데 도매가 누락 — 소매가로 폴백 발행 (channel ${channelId})`)
+      }
       // 가격이미지 (isPriceBanner=true) 제외, 결과 0장이면 원본 사용 (최소 1장 보존)
       // 채널 푸터 이미지가 있으면 1자리 예약 — 상품 이미지 최대 19개 + 푸터 1장 = Band 20개 한도 유지.
       // 상품 이미지가 0건이면 푸터를 붙이지 않음 (텍스트만 발행 차단 보존).
@@ -1158,6 +1241,7 @@ export class PublishService {
       }
 
       // 7. ChannelProduct 레코드 생성 또는 복원 (soft-deleted 레코드가 있으면 복원, postKey 저장)
+      // 다단계 발행: priceTier / publishBatchId / priceSnapshot 스냅샷 동시 저장.
       const channelProduct = await prisma.channelProduct.upsert({
         where: {
           productId_channelId: { productId, channelId },
@@ -1167,6 +1251,9 @@ export class PublishService {
           deletedAt: null,
           publishedAt: new Date(),
           postKey: postKey || undefined,
+          priceTier: tier,
+          publishBatchId: publishBatchId || undefined,
+          priceSnapshot: priceSnapshot as any,
         },
         create: {
           userId,
@@ -1174,6 +1261,9 @@ export class PublishService {
           channelId,
           publishedAt: new Date(),
           postKey: postKey || undefined,
+          priceTier: tier,
+          publishBatchId: publishBatchId || undefined,
+          priceSnapshot: priceSnapshot as any,
         },
       })
 
@@ -1196,6 +1286,8 @@ export class PublishService {
         publishedProductId: channelProduct.id,
         imageCount,
         publishMethod,
+        priceTier: tier,
+        wholesaleFallback,
       }
     } catch (error: any) {
       console.error(`[PublishService] Error publishing product ${productId} to channel ${channelId}:`, error)

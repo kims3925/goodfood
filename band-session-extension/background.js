@@ -67,10 +67,14 @@ async function getBandCookies() {
 
 /**
  * Sourcing App 인증 토큰 가져오기
+ * 쿠키명 우선순위: auth-token-manager > auth-token-admin > auth-token (레거시)
  */
 async function getAuthToken() {
   const cookies = await chrome.cookies.getAll({ url: SERVER_URL });
-  const authCookie = cookies.find(c => c.name === 'auth-token');
+  console.log('[Band Session] 서버 쿠키 목록:', cookies.map(c => c.name));
+  const authCookie = cookies.find(c => c.name === 'auth-token-manager')
+    || cookies.find(c => c.name === 'auth-token-admin')
+    || cookies.find(c => c.name === 'auth-token');
   return authCookie ? authCookie.value : null;
 }
 
@@ -302,6 +306,27 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
       }
     })();
     return true; // 비동기 응답을 위해 true 반환
+  }
+
+  // debugCookies: 서버 쿠키 디버그 (개발용)
+  if (request.action === 'debugCookies') {
+    (async () => {
+      try {
+        const cookies = await chrome.cookies.getAll({ url: SERVER_URL });
+        sendResponse({
+          success: true,
+          data: {
+            serverUrl: SERVER_URL,
+            cookieCount: cookies.length,
+            cookieNames: cookies.map(c => c.name),
+            cookies: cookies.map(c => ({ name: c.name, domain: c.domain, path: c.path, httpOnly: c.httpOnly, secure: c.secure }))
+          }
+        });
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
   }
 
   // 알 수 없는 액션

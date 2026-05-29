@@ -14,18 +14,20 @@ export class PolicyService {
     return policyRepository.create(data)
   }
 
-  async update(id: number, data: PolicyUpdateInput) {
+  async update(id: number, data: PolicyUpdateInput, ownerId?: number) {
     const existing = await policyRepository.findById(id)
-    if (!existing) {
+    // 멀티테넌트 격리: ownerId 전달 시 소유자 불일치면 존재하지 않는 것으로 처리 (IDOR 방지)
+    if (!existing || (ownerId !== undefined && existing.userId !== ownerId)) {
       throw new Error('정책을 찾을 수 없습니다.')
     }
 
     return policyRepository.update(id, data)
   }
 
-  async delete(id: number) {
+  async delete(id: number, ownerId?: number) {
     const existing = await policyRepository.findById(id)
-    if (!existing) {
+    // 멀티테넌트 격리: ownerId 전달 시 소유자 불일치면 존재하지 않는 것으로 처리 (IDOR 방지)
+    if (!existing || (ownerId !== undefined && existing.userId !== ownerId)) {
       throw new Error('정책을 찾을 수 없습니다.')
     }
 

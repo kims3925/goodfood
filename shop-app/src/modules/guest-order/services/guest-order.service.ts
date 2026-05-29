@@ -21,6 +21,7 @@ import {
   BusinessLogicError,
 } from '@/modules/common/utils/src/errors/handlers'
 import { calculateItemPrice } from '@/lib/price-calculator'
+import { generateGuestOrderNumber } from '@/lib/order-utils'
 
 // ============================================
 // Types
@@ -117,16 +118,6 @@ export class GuestOrderService {
   ) {}
 
   /**
-   * 주문번호 생성
-   */
-  generateOrderNumber(): string {
-    const date = new Date()
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '')
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase()
-    return `GORD-${dateStr}-${random}`
-  }
-
-  /**
    * 세션 장바구니에서 비회원 주문 생성
    */
   async createFromSessionCart(data: CreateGuestOrderFromCartDTO): Promise<GuestOrderResponse> {
@@ -217,16 +208,18 @@ export class GuestOrderService {
         thumbnailUrl: product?.thumbnailUrl || null,
         quantity: item.quantity,
         unitPrice: unitPriceWithDiscount, // 할인 반영된 단가
+        originalUnitPrice, // 할인 전 단가 (subtotal·discount 산출용)
+        itemTotal: itemTotalWithDiscount, // 할인 반영된 아이템 총액
       }
     })
 
     // 금액 계산
     const subtotalBeforeDiscount = orderItems.reduce(
-      (sum, item: any) => sum + (item.originalUnitPrice || item.unitPrice) * item.quantity,
+      (sum, item) => sum + (item.originalUnitPrice || item.unitPrice) * item.quantity,
       0
     )
     const subtotal = orderItems.reduce(
-      (sum, item: any) => sum + (item.itemTotal || item.unitPrice * item.quantity),
+      (sum, item) => sum + (item.itemTotal || item.unitPrice * item.quantity),
       0
     )
     const discountAmount = subtotalBeforeDiscount - subtotal // 할인 금액
@@ -235,7 +228,7 @@ export class GuestOrderService {
     // 비회원 주문 생성
     const orderInput: CreateGuestOrderInput = {
       shopId,
-      orderNumber: this.generateOrderNumber(),
+      orderNumber: generateGuestOrderNumber(),
       guestName: customerInfo.name,
       guestPhone: customerInfo.phone,
       guestEmail: customerInfo.email,
@@ -343,7 +336,7 @@ export class GuestOrderService {
     // 비회원 주문 생성
     const orderInput: CreateGuestOrderInput = {
       shopId,
-      orderNumber: this.generateOrderNumber(),
+      orderNumber: generateGuestOrderNumber(),
       guestName: customerInfo.name,
       guestPhone: customerInfo.phone,
       guestEmail: customerInfo.email,

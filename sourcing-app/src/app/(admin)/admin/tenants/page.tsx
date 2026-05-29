@@ -8,6 +8,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 import { Building2, Search, RefreshCw, Power, KeyRound, AlertCircle } from 'lucide-react'
 
 interface TenantRow {
@@ -223,9 +224,18 @@ export default function AdminTenantsPage() {
               tenants.map((t) => (
                 <tr key={t.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{t.name || t.email}</div>
-                    <div className="text-xs text-gray-500">{t.email}</div>
-                    {t.companyName && <div className="text-xs text-gray-400 mt-0.5">{t.companyName}</div>}
+                    <Link
+                      href={`/admin/tenants/${t.id}`}
+                      className="block hover:bg-indigo-50/40 -mx-2 px-2 py-1 rounded transition-colors"
+                    >
+                      <div className="font-medium text-indigo-700 hover:text-indigo-800 hover:underline">
+                        {t.name || t.email}
+                      </div>
+                      <div className="text-xs text-gray-500">{t.email}</div>
+                      {t.companyName && (
+                        <div className="text-xs text-gray-400 mt-0.5">{t.companyName}</div>
+                      )}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-xs">
                     {t.subscription?.planName ?? '(없음)'}

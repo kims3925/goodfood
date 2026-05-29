@@ -46,9 +46,10 @@ npx prisma studio --schema prisma
 
 | Enum | 값 | 설명 |
 |------|---|-----|
-| ChannelKind | `WHOLESALE`, `RETAIL` | 채널 유형 (도매/소매) |
+| ChannelKind | `WHOLESALE`, `RETAIL` | 채널 유형 (도매 소스 / 소매 발행대상) |
 | ChannelPlatform | `BAND`, `NAVER_CAFE`, `ALIEXPRESS`, `SMARTSTORE`, `COUPANG`, `CUSTOM` | 플랫폼 |
 | SourcingPlatform | `BAND`, `ALIEXPRESS` | 소싱 플랫폼 |
+| PriceTier | `WHOLESALE`, `RETAIL` | 다단계 발행 가격 tier (발행대상의 가격 기준) |
 
 ### 주문 & 결제
 
@@ -190,6 +191,11 @@ npx prisma studio --schema prisma
 | bandSessionCookie | String? | Band 세션 쿠키 |
 | sessionExpiresAt | DateTime? | 세션 만료일 |
 | shopId | Int? | 연결된 쇼핑몰 |
+| publishPriceTier | PriceTier | 다단계 발행: 발행 가격 기준 (기본 `RETAIL`=소매가, `WHOLESALE`=도매가/가족도매방). RETAIL 채널에만 의미 |
+
+> **가족도매방밴드 매핑**: 가족도매방밴드는 우리가 글을 **올리는 발행 대상**이므로 `kind=RETAIL`
+> (발행 대상 역할) 이면서 `publishPriceTier=WHOLESALE` (도매가로 발행) 인 채널이다.
+> `kind=WHOLESALE` 채널은 여전히 소싱 소스(수집 대상)를 의미한다 — 혼동 주의.
 
 ### Product (상품)
 
@@ -291,6 +297,9 @@ npx prisma studio --schema prisma
 | deletedAt | DateTime? | Soft Delete 시각 |
 | createdAt | DateTime | 생성일시 |
 | updatedAt | DateTime | 수정일시 |
+| priceTier | PriceTier? | 다단계 발행: 발행 시점 가격 tier 스냅샷 |
+| publishBatchId | String? | 다단계 발행: 동일 소스 fan-out 묶음 ID (saga 추적) |
+| priceSnapshot | Json? | 다단계 발행: 발행 본문에 노출된 옵션별 단가 스냅샷 (정책 사후 변경에도 근거 보존) |
 
 **Relations:**
 - `product` - 원본 상품 (onDelete: SetNull)
@@ -298,6 +307,7 @@ npx prisma studio --schema prisma
 - `user` - 소유자 (onDelete: Cascade)
 
 **Unique Index:** `(productId, channelId)` - 같은 상품은 같은 채널에 한 번만 발행
+**Index:** `(publishBatchId)` - fan-out 묶음 조회
 
 ### WorkflowStepLog (워크플로우 단계 로그)
 

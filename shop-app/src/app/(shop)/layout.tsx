@@ -115,9 +115,9 @@ async function getShopFromHeaders(): Promise<ShopInfo | null> {
 export async function generateMetadata() {
   const shop = await getShopFromHeaders()
 
-  const title = shop
-    ? `${shop.name} - 신선한 농수산물 직거래 쇼핑몰`
-    : 'ABC마켓 - 신선한 농수산물 직거래 쇼핑몰'
+  const shopName = shop?.name || '가족함께'
+  const title = `${shopName} - 신선한 수산물 농수산물 횟감 과일 한우 밀키트 산지직송`
+  const description = `${shopName}에서 신선한 수산물, 횟감, 과일, 한우, 밀키트, 농수산물, 축산물을 산지직송으로 만나보세요. 매일 경매로 엄선한 최상급 식품을 합리적인 가격에!`
 
   // favicon 설정
   const faviconUrl = shop?.theme?.faviconUrl
@@ -129,11 +129,126 @@ export async function generateMetadata() {
       }
     : undefined
 
+  const logoUrl = shop?.theme?.logoUrl
+  const bannerUrl = shop?.theme?.bannerUrl
+
   return {
     title,
-    description: '신선한 농수산물을 합리적인 가격에 만나보세요!',
+    description,
     icons,
+    openGraph: {
+      title,
+      description,
+      siteName: shopName,
+      locale: 'ko_KR',
+      type: 'website',
+      images: bannerUrl || logoUrl
+        ? [{ url: bannerUrl || logoUrl!, alt: shopName }]
+        : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: bannerUrl || logoUrl ? [bannerUrl || logoUrl!] : undefined,
+    },
   }
+}
+
+/**
+ * 구조화 데이터 JSON-LD — Organization + WebSite + BreadcrumbList
+ * 구글 검색결과에 사이트링크, 검색박스, 로고 등 리치 스니펫 노출
+ */
+function ShopJsonLd({ shop }: { shop: ShopInfo | null }) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://familyshop.kr'
+  const shopName = shop?.name || '가족함께'
+  const logoUrl = shop?.theme?.logoUrl || `${siteUrl}/logo.png`
+
+  const organizationLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: shopName,
+    url: siteUrl,
+    logo: logoUrl,
+    description:
+      '신선한 수산물, 횟감, 과일, 한우, 밀키트, 농수산물, 축산물을 산지직송으로 판매하는 온라인 쇼핑몰',
+    contactPoint: shop?.contactPhone
+      ? {
+          '@type': 'ContactPoint',
+          telephone: shop.contactPhone,
+          contactType: 'customer service',
+          availableLanguage: 'Korean',
+        }
+      : undefined,
+  }
+
+  const websiteLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: shopName,
+    url: siteUrl,
+    description:
+      '신선한 수산물, 횟감, 과일, 한우, 밀키트를 산지직송으로 만나보세요.',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${siteUrl}/main?search={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  }
+
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: '홈',
+        item: siteUrl,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: '수산물',
+        item: `${siteUrl}/category/SEA`,
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: '농산물',
+        item: `${siteUrl}/category/AGR`,
+      },
+      {
+        '@type': 'ListItem',
+        position: 4,
+        name: '축산물',
+        item: `${siteUrl}/category/MEA`,
+      },
+      {
+        '@type': 'ListItem',
+        position: 5,
+        name: '밀키트/반찬',
+        item: `${siteUrl}/category/MKT`,
+      },
+    ],
+  }
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+      />
+    </>
+  )
 }
 
 export default async function ShopLayout({
@@ -146,6 +261,7 @@ export default async function ShopLayout({
   return (
     <ShopProvider initialShop={shop}>
       <ThemeProvider>
+        <ShopJsonLd shop={shop} />
         <StoreLayout>{children}</StoreLayout>
       </ThemeProvider>
     </ShopProvider>

@@ -11,6 +11,13 @@ interface Channel {
   kind: string
 }
 
+interface PolicyTarget {
+  retailChannelId: number
+  applyMode: 'INHERIT' | 'ZERO_MARGIN' | 'CUSTOM'
+  customContent?: string | null
+  retailChannel?: Channel
+}
+
 interface PricingPolicy {
   id: number
   channelId: number
@@ -21,6 +28,8 @@ interface PricingPolicy {
   createdAt: string
   updatedAt: string
   channel?: Channel
+  // 경영밴드 이원화 정책 (2026-05-28): 적용 대상 소매채널
+  targets?: PolicyTarget[]
 }
 
 interface PolicyManagerProps {
@@ -81,6 +90,8 @@ export default function PolicyManager({ onToast }: PolicyManagerProps) {
     description: string | null
     content: string
     isActive: boolean
+    tierRules?: unknown
+    targets?: PolicyTarget[]
   }) => {
     try {
       const isEdit = modalMode === 'edit' && policyData.id
@@ -223,10 +234,46 @@ export default function PolicyManager({ onToast }: PolicyManagerProps) {
               </div>
 
               {/* Content Preview */}
-              <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <div className="bg-gray-50 rounded-lg p-3 mb-3">
                 <p className="text-sm text-gray-600 font-mono whitespace-pre-wrap">
                   {truncateText(policy.content)}
                 </p>
+              </div>
+
+              {/* 경영밴드 이원화 정책 — 적용 대상 소매채널 표시 */}
+              <div className="mb-4">
+                <p className="text-[11px] text-gray-500 mb-1.5">적용 대상</p>
+                {(!policy.targets || policy.targets.length === 0) ? (
+                  <span className="inline-block px-2 py-0.5 text-[11px] bg-gray-100 text-gray-600 rounded">
+                    모든 소매밴드 (INHERIT 기본)
+                  </span>
+                ) : (
+                  <div className="flex flex-wrap gap-1">
+                    {policy.targets.map((t) => {
+                      const label = t.retailChannel?.name ?? `채널 ${t.retailChannelId}`
+                      const cls =
+                        t.applyMode === 'ZERO_MARGIN'
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                          : t.applyMode === 'CUSTOM'
+                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                      const modeShort =
+                        t.applyMode === 'ZERO_MARGIN' ? '마진0'
+                        : t.applyMode === 'CUSTOM' ? 'CUSTOM'
+                        : 'INHERIT'
+                      return (
+                        <span
+                          key={t.retailChannelId}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded ${cls}`}
+                          title={`${label} — ${t.applyMode}`}
+                        >
+                          <span className="truncate max-w-[120px]">{label}</span>
+                          <span className="opacity-75">· {modeShort}</span>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Actions */}

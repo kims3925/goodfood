@@ -7,6 +7,8 @@ export interface PublishToChannelParams {
   userId: number
   productId: number
   channelId: number
+  // 다단계 발행 fan-out 묶음 ID (saga 추적). 지정 시 ChannelProduct.publishBatchId 에 스냅샷.
+  publishBatchId?: string
 }
 
 export interface PublishToChannelResult {
@@ -21,6 +23,9 @@ export interface PublishToChannelResult {
   // 발행 방법 및 이미지 정보
   imageCount?: number
   publishMethod?: 'playwright' | 'api'
+  // 다단계 발행: 적용된 가격 tier 및 도매가 폴백 여부 (진단용)
+  priceTier?: 'WHOLESALE' | 'RETAIL'
+  wholesaleFallback?: boolean
 }
 
 export interface PublishBatchParams {
@@ -28,6 +33,8 @@ export interface PublishBatchParams {
   productIds: number[]
   channelId: number
   onProgress?: (current: number, total: number, result: PublishToChannelResult) => void | Promise<void>
+  // 다단계 발행 fan-out 묶음 ID (saga 추적)
+  publishBatchId?: string
 }
 
 export interface PublishBatchResult {

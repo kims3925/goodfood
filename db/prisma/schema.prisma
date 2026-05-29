@@ -25,6 +25,15 @@ enum ChannelKind {
   RETAIL
 }
 
+// 다단계 발행 가격 tier (bandauto-v2 multi-tier publish)
+// 발행 "대상"의 가격 그룹. RETAIL=소매 마진가(기존), WHOLESALE=소스 도매가 그대로(가족도매방).
+// 새 PricingPolicy/PublicationTarget 모델을 도입하지 않고, 발행 대상(Channel)에 tier 플래그만
+// 부여하여 현행 단일경로를 fan-out 으로 일반화한다. (지시서 §1·§2 의 현실 매핑)
+enum PriceTier {
+  WHOLESALE
+  RETAIL
+}
+
 enum ChannelPlatform {
   BAND
   NAVER_CAFE

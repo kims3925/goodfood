@@ -13,6 +13,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { buildAdCardHtml, type AdCardHtmlInput } from './templates/kakao-ad-card.html'
+import { toDataUri } from '../publish/renderer-utils'
 
 export interface RenderAdCardInput {
   cardId: number
@@ -27,53 +28,11 @@ export interface RenderedAdCard {
 }
 
 /**
- * 이미지 URL or 로컬 경로 → base64 data URI.
- * 실패 시 null. 호출측은 placeholder로 폴백.
- */
-async function toDataUri(urlOrPath: string | null): Promise<string | null> {
-  if (!urlOrPath) return null
-  try {
-    if (urlOrPath.startsWith('file://')) {
-      const p = urlOrPath.replace(/^file:\/\//, '')
-      if (!fs.existsSync(p)) return null
-      const buf = fs.readFileSync(p)
-      const mime = detectMime(p)
-      return `data:${mime};base64,${buf.toString('base64')}`
-    }
-    if ((urlOrPath.startsWith('/') && !urlOrPath.startsWith('//')) || /^[a-zA-Z]:[\\/]/.test(urlOrPath)) {
-      if (fs.existsSync(urlOrPath)) {
-        const buf = fs.readFileSync(urlOrPath)
-        return `data:${detectMime(urlOrPath)};base64,${buf.toString('base64')}`
-      }
-      const base = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
-      urlOrPath = `${base}${urlOrPath.startsWith('/') ? urlOrPath : '/' + urlOrPath}`
-    }
-    const res = await fetch(urlOrPath, {
-      headers: { 'User-Agent': 'Mozilla/5.0 BandAuto/1.0' },
-    })
-    if (!res.ok) return null
-    const buf = Buffer.from(await res.arrayBuffer())
-    const mime = res.headers.get('content-type')?.split(';')[0] || detectMime(urlOrPath)
-    return `data:${mime};base64,${buf.toString('base64')}`
-  } catch (err) {
-    console.warn(`[ad-card] toDataUri 실패: ${urlOrPath}`, err)
-    return null
-  }
-}
-
-function detectMime(urlOrPath: string): string {
-  if (urlOrPath.endsWith('.png')) return 'image/png'
-  if (urlOrPath.endsWith('.webp')) return 'image/webp'
-  if (urlOrPath.endsWith('.gif')) return 'image/gif'
-  return 'image/jpeg'
-}
-
-/**
  * 카드 1장 렌더 — 자체 브라우저 1개 띄우는 비용 있음.
  * 다수 카드를 한꺼번에 만들 땐 renderAdCardsBatch() 사용 권장.
  */
 export async function renderAdCard(input: RenderAdCardInput): Promise<RenderedAdCard> {
-  const dataUri = await toDataUri(input.imageUrlOrPath)
+  const dataUri = input.imageUrlOrPath ? await toDataUri(input.imageUrlOrPath) : null
   const html = buildAdCardHtml({ ...input.card, productImageDataUri: dataUri })
 
   const browser = await chromium.launch({ headless: true })
@@ -137,7 +96,7 @@ export async function renderAdCardsBatch(
     for (let i = 0; i < inputs.length; i++) {
       const input = inputs[i]
       try {
-        const dataUri = await toDataUri(input.imageUrlOrPath)
+        const dataUri = input.imageUrlOrPath ? await toDataUri(input.imageUrlOrPath) : null
         const html = buildAdCardHtml({ ...input.card, productImageDataUri: dataUri })
         await page.setContent(html, { waitUntil: 'load', timeout: 30_000 })
         await page.evaluate(async () => {

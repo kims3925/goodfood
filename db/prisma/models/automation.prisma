@@ -6,14 +6,42 @@ model PricingPolicy {
   description String?  @db.Text
   content     String   @db.Text
   isActive    Boolean  @default(true) @map("is_active")
+  // GBand SaaS (2026-05-13): 게시글 차등 마진 (postType별 마진 규칙 JSON)
+  tierRules   Json?    @map("tier_rules")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
   channel     Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 경영밴드 이원화 정책 (2026-05-28): 소매채널별 차등 적용 모드
+  // target이 없는 소매채널로 발행 시는 INHERIT 기본 동작 (기존 정책 그대로) — 하위 호환 보장
+  targets     PricingPolicyTarget[]
 
   @@index([userId], map: "pricing_policy_user_id_fkey")
   @@index([channelId])
   @@map("pricing_policy")
+}
+
+// 경영밴드 이원화 정책 (2026-05-28): PricingPolicy ↔ 소매 Channel 매핑.
+// applyMode 별 동작:
+//   - INHERIT: 도매채널 PricingPolicy.content/tierRules 그대로 상속 (기본값)
+//   - ZERO_MARGIN: 마진 없이 도매가 그대로 (판매가=공급가) — 경영비공개밴드/외주밴드 케이스
+//   - CUSTOM: customContent 의 별도 마진 규칙 적용 (향후 확장)
+// 매칭되는 Target 행이 없으면 INHERIT 기본 동작이라 기존 정책의 하위 호환 보장.
+model PricingPolicyTarget {
+  id              Int           @id @default(autoincrement())
+  pricingPolicyId Int           @map("pricing_policy_id")
+  retailChannelId Int           @map("retail_channel_id")
+  applyMode       String        @default("INHERIT") @map("apply_mode") @db.VarChar(20)
+  customContent   String?       @map("custom_content") @db.Text
+  isActive        Boolean       @default(true) @map("is_active")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+  pricingPolicy   PricingPolicy @relation(fields: [pricingPolicyId], references: [id], onDelete: Cascade)
+  retailChannel   Channel       @relation("RetailPolicyTargets", fields: [retailChannelId], references: [id], onDelete: Cascade)
+
+  @@unique([pricingPolicyId, retailChannelId])
+  @@index([retailChannelId])
+  @@map("pricing_policy_target")
 }
 
 model AutomationConfig {

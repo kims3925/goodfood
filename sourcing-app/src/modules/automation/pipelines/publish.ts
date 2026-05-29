@@ -6,6 +6,7 @@
  * 워크플로우 진행 상황 추적 기능을 추가합니다.
  */
 
+import { randomUUID } from 'crypto'
 import prisma, { ChannelKind } from '@bandauto/db'
 import { getBatchContext, checkCancellation, CancellationError } from '../context'
 import { updateWorkflowProgress } from '../workflow-service'
@@ -37,6 +38,8 @@ export async function runPublishPipeline(
   }
 
   const { userId, workflowLogId, shopIds } = context
+  // 다단계 발행 fan-out 묶음 ID — 이번 실행의 모든 발행을 하나로 묶어 saga 추적/감사한다.
+  const publishBatchId = randomUUID()
   const errors: PipelineError[] = []
   const publishedProducts: PublishedProductResult[] = []
   const channelResults: ChannelPublishResult[] = []
@@ -214,23 +217,34 @@ export async function runPublishPipeline(
   const productIds = validProducts.map((p) => p.id)
   console.log(`[Publish Pipeline] Found ${productIds.length} valid products to publish (${skippedProducts.length} skipped)`)
 
-  // 발행할 소매채널 조회
-  const retailChannels = await prisma.channel.findMany({
+  // 발행할 소매채널 조회 (kind=RETAIL = 발행 대상). publishPriceTier 로 가격 tier 구분.
+  const retailChannelsRaw = await prisma.channel.findMany({
     where: {
       userId,
       id: { in: channelIds },
       kind: ChannelKind.RETAIL,
       isActive: true,
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, publishPriceTier: true },
   })
 
-  if (retailChannels.length === 0) {
+  if (retailChannelsRaw.length === 0) {
     cleanup()
     throw new Error('No active retail channels found')
   }
 
-  console.log(`[Publish Pipeline] Publishing to ${retailChannels.length} retail channels`)
+  // 발행 순서: 1차 도매(WHOLESALE) → 2차 소매(RETAIL) (지시서 §3.1 / 골든 G6).
+  // 가족도매방밴드(WHOLESALE tier)에 먼저 도매가로 발행한 뒤, 쇼핑몰·소매밴드에 소매가로 발행한다.
+  const retailChannels = [...retailChannelsRaw].sort((a, b) => {
+    const aw = a.publishPriceTier === 'WHOLESALE' ? 0 : 1
+    const bw = b.publishPriceTier === 'WHOLESALE' ? 0 : 1
+    return aw - bw
+  })
+
+  const wholesaleCount = retailChannels.filter((c) => c.publishPriceTier === 'WHOLESALE').length
+  console.log(
+    `[Publish Pipeline] Publishing to ${retailChannels.length} retail channels (batch=${publishBatchId}, wholesale-tier=${wholesaleCount})`
+  )
 
   // 이미 발행된 상품 정보 매핑 (productId -> 발행된 channelIds)
   const publishedChannelsMap = new Map<number, Set<number>>()
@@ -461,6 +475,7 @@ export async function runPublishPipeline(
       userId,
       productIds: unpublishedProductIds,
       channelId: channel.id,
+      publishBatchId,
       // 각 상품 발행 후 실시간 진행 상황 업데이트 및 취소 체크
       onProgress: workflowLogId ? async (current, total, productResult) => {
         // 취소 체크

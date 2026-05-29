@@ -29,6 +29,8 @@ export {
   // Channel & Shop
   ChannelKind,
   ChannelPlatform,
+  // 다단계 발행 가격 tier (bandauto-v2 multi-tier publish)
+  PriceTier,
   // Orders & Payments
   CustomerOrderStatus,
   TossPaymentMethod,

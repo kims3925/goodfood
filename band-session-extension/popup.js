@@ -69,7 +69,10 @@ async function getAuthToken() {
   // URL 기반으로 쿠키 조회 (도메인 매칭 문제 해결)
   const cookies = await chrome.cookies.getAll({ url: SERVER_URL });
   console.log('Cookies for SERVER_URL:', cookies.map(c => c.name));
-  const authCookie = cookies.find(c => c.name === 'auth-token');
+  // 쿠키 이름 우선순위: auth-token-manager > auth-token-admin > auth-token (레거시)
+  const authCookie = cookies.find(c => c.name === 'auth-token-manager')
+    || cookies.find(c => c.name === 'auth-token-admin')
+    || cookies.find(c => c.name === 'auth-token');
   return authCookie ? authCookie.value : null;
 }
 

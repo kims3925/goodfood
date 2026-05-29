@@ -81,11 +81,17 @@ model User {
   // 밴드공지 1일 N회 (2026-05-15): 인기상품 자동공지 설정
   bandNoticeConfig      BandNoticeConfig?
 
+  // GBand SaaS (2026-05-13): 매니저-스태프 계층 (멀티테넌트 격리)
+  managerId Int?   @map("manager_id")
+  manager   User?  @relation("ManagerStaff", fields: [managerId], references: [id])
+  staff     User[] @relation("ManagerStaff")
+
   @@index([shopId])
   @@index([email])
   @@index([phone])
   @@index([role])
   @@index([mode])
+  @@index([managerId]) // 매니저-스태프 조회 (manager_id = ?) 풀스캔 방지
   @@map("user")
 }
 

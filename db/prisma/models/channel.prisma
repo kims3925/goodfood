@@ -24,6 +24,15 @@ model Channel {
   // RETAIL 채널 전용: 발행글 이미지 맨 마지막에 자동 첨부되는 푸터 이미지 URL
   // (예: 밴드 이용 안내사항, 사업자 정보, 교환환불 안내). null이면 첨부 안 함.
   footerImageUrl    String?          @map("footer_image_url") @db.VarChar(1000)
+  // 다단계 발행 (bandauto-v2 multi-tier): 이 발행 대상에 적용할 가격 tier.
+  // RETAIL(기본)=소매 마진가(기존 동작 그대로). WHOLESALE=소스 도매가 그대로 발행(가족도매방밴드).
+  // RETAIL 채널(발행 대상)에만 의미가 있으며, 기본값 RETAIL 이므로 기존 채널은 동작 변화 0.
+  publishPriceTier  PriceTier        @default(RETAIL) @map("publish_price_tier")
+  // 경영밴드 SaaS 운영플로우 Phase 4.1: 채널별 게시글 만료(자동삭제) 정책.
+  // null 이면 전역 기본값(일반 7일 / COM 30일) 사용 — 기존 동작 보존.
+  expiryDaysNormal  Int?             @map("expiry_days_normal")  // 일반 카테고리 만료 일수
+  expiryDaysCom     Int?             @map("expiry_days_com")     // COM(상시상품) 만료 일수
+  autoExpireEnabled Boolean          @default(true) @map("auto_expire_enabled") // 이 채널 자동만료 ON/OFF
   shop              Shop?            @relation(fields: [shopId], references: [id])
   user              User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   collectedPosts    CollectedPost[]
@@ -32,6 +41,8 @@ model Channel {
   channelProducts   ChannelProduct[]
   wholesaleOrders      Order[]        @relation("OrderWholesaleChannel")
   wholesaleGuestOrders GuestOrder[]   @relation("GuestOrderWholesaleChannel")
+  // 경영밴드 이원화 정책 (2026-05-28): 이 소매채널을 적용 대상으로 가진 정책들
+  retailPolicyTargets  PricingPolicyTarget[] @relation("RetailPolicyTargets")
 
   @@unique([userId, channelKey])
   @@index([userId])
