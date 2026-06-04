@@ -58,9 +58,27 @@ class BandBrowserPool {
     if (existing) {
       const age = Date.now() - existing.lastUsed.getTime()
       if (age < CONTEXT_TTL_MS) {
-        existing.lastUsed = new Date()
-        console.log(`[BandBrowserPool] Reusing context for channel ${channelId}`)
-        return existing.context
+        // 재사용 시에도 최신 쿠키를 다시 주입한다.
+        // (옛 동작: 재사용 컨텍스트는 "생성 시점" 쿠키를 그대로 유지 → 사용자가 세션을
+        //  재저장해도 컨텍스트 TTL(30분) 동안 옛 쿠키가 적용되어 재저장이 즉시 반영되지
+        //  않던 문제. clearCookies 후 새 쿠키로 교체해 재저장이 곧바로 반영되도록 한다.)
+        if (cookies) {
+          try {
+            await existing.context.clearCookies()
+            await existing.context.addCookies(this.parseCookies(cookies))
+            existing.lastUsed = new Date()
+            console.log(`[BandBrowserPool] Reusing context for channel ${channelId} (쿠키 최신화 적용)`)
+            return existing.context
+          } catch (e) {
+            console.warn(`[BandBrowserPool] 컨텍스트 쿠키 최신화 실패 — 컨텍스트 재생성 (channel ${channelId})`, e)
+            await this.closeContext(channelId)
+            // 아래로 진행하여 새 컨텍스트 생성
+          }
+        } else {
+          existing.lastUsed = new Date()
+          console.log(`[BandBrowserPool] Reusing context for channel ${channelId}`)
+          return existing.context
+        }
       } else {
         // 만료된 컨텍스트 삭제
         await this.closeContext(channelId)
