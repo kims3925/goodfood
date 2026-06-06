@@ -67,7 +67,31 @@ export class BandPlaywrightService {
       const page = await context.newPage()
 
       try {
-        // 3. 글 작성 + 이미지 업로드
+        // 3-0. 크로스포스트 우선 시도 (옵션). 어떤 이유로든 실패하면 아래 기존
+        //      본문작성(createPostWithImages)으로 자동 폴백 → 발행이 멈추지 않는다.
+        //      params.crossPost 가 없으면(기본) 이 블록은 통째로 건너뛰어 기존 동작 100% 동일.
+        if (params.crossPost) {
+          try {
+            const cp = await postAutomation.crossPostToBand(page, {
+              channelId,
+              sourceBandKey: params.crossPost.sourceBandKey,
+              sourceBandName: params.crossPost.sourceBandName,
+              sourceMatchTitle: params.crossPost.sourceMatchTitle,
+              targetBandKey: params.bandKey,
+              targetBandName: params.bandName,
+              priceMap: params.crossPost.priceMap,
+              commentContent: params.commentContent,
+              signal: params.signal,
+            })
+            if (cp.success) return cp
+            console.warn(`[BandPlaywrightService] 크로스포스트 비성공 — 기존 방식으로 폴백: ${cp.error || ''}`)
+          } catch (cpErr: any) {
+            console.warn(`[BandPlaywrightService] 크로스포스트 실패 — 기존 방식으로 폴백: ${cpErr?.message || cpErr}`)
+          }
+          // (createPostWithImages 가 band.us/home 으로 새로 이동하므로 남은 모달/상태는 자동 정리됨)
+        }
+
+        // 3. 글 작성 + 이미지 업로드 (기존 경로 — 폴백 포함)
         const result = await postAutomation.createPostWithImages(page, params)
 
         return result

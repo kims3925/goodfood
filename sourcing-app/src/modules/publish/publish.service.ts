@@ -15,6 +15,7 @@ import prisma, { ChannelKind, ChannelPlatform } from '@bandauto/db'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/channel'
 import { bandPlaywrightService } from '@/modules/band-playwright/band-playwright.service'
 import { resetSessionFailureCount } from '@/modules/band-playwright/band-session-manager'
+import type { CrossPostInfo } from '@/modules/band-playwright/types'
 import {
   resolveTierUnitPrice,
   normalizePriceTier,
@@ -40,6 +41,38 @@ import type {
 
 // Band API 쿨다운 지연 시간 (10초)
 const BAND_API_COOLDOWN_MS = 10000
+
+/**
+ * 크로스포스트 파라미터 구성 (2026-06-06).
+ * - 채널(RETAIL)이 bandPublishMethod='CROSSPOST' opt-in 이고
+ * - 상품에 원본 도매글(collectedPost) + 도매채널(name/key) + 변형 도매가가 있을 때만 반환.
+ * 조건 미충족 시 undefined → 호출부는 기존 compose 방식 그대로 사용 (동작 변화 0).
+ *
+ * 반환된 crossPost 가 publishWithImages 로 전달되면, 거기서 "다른 밴드에 올리기" 방식을
+ * 먼저 시도하고 실패 시 createPostWithImages(본문 새작성)로 자동 폴백한다.
+ */
+function buildCrossPostInfo(
+  channel: { bandPublishMethod?: string | null },
+  product: {
+    variants?: { price: number; wholesalePrice: unknown }[]
+    collectedPost?: { title: string | null; channel?: { name: string; channelKey: string } | null } | null
+  },
+  tier: string
+): CrossPostInfo | undefined {
+  if ((channel.bandPublishMethod || 'COMPOSE') !== 'CROSSPOST') return undefined
+  if (tier !== 'RETAIL') return undefined // 도매(WHOLESALE) tier 는 기존 방식 유지
+  const src = product.collectedPost
+  if (!src || !src.title || !src.channel?.channelKey || !src.channel?.name) return undefined
+  const priceMap = (product.variants || [])
+    .map((v) => ({ from: Math.round(Number(v.wholesalePrice ?? 0)), to: Math.round(Number(v.price ?? 0)) }))
+    .filter((p) => p.from > 0 && p.to > 0)
+  return {
+    sourceBandKey: src.channel.channelKey,
+    sourceBandName: src.channel.name,
+    sourceMatchTitle: src.title,
+    priceMap,
+  }
+}
 // Playwright 발행 쿨다운 지연 시간 (2초)
 const PLAYWRIGHT_COOLDOWN_MS = 2000
 
@@ -332,6 +365,13 @@ export class PublishService {
               wholesalePrice: true,
             },
           },
+          // 크로스포스트용: 원본 도매글 제목(매칭키) + 도매밴드(name/key)
+          collectedPost: {
+            select: {
+              title: true,
+              channel: { select: { name: true, channelKey: true } },
+            },
+          },
           images: {
             orderBy: { sortOrder: 'asc' },
             select: { url: true, isPriceBanner: true },
@@ -432,6 +472,9 @@ export class PublishService {
             content: postContent,
             imageUrls,
             commentContent: orderLink ? `주문하기 👉 ${orderLink}` : undefined,
+            // 크로스포스트 opt-in (CROSSPOST 채널만). 실패 시 위 본문작성으로 자동 폴백.
+            // 미설정 채널은 undefined → 기존 동작 100% 동일.
+            crossPost: buildCrossPostInfo(channel, product, tier),
           })
 
           if (playwrightResult.success && playwrightResult.postKey) {
@@ -1016,6 +1059,13 @@ export class PublishService {
               wholesalePrice: true,
             },
           },
+          // 크로스포스트용: 원본 도매글 제목(매칭키) + 도매밴드(name/key)
+          collectedPost: {
+            select: {
+              title: true,
+              channel: { select: { name: true, channelKey: true } },
+            },
+          },
           images: {
             orderBy: { sortOrder: 'asc' },
             select: { url: true, isPriceBanner: true },
@@ -1141,6 +1191,8 @@ export class PublishService {
             content: postContent,
             imageUrls,
             commentContent: orderLink ? `주문하기 👉 ${orderLink}` : undefined,
+            // 크로스포스트 opt-in (CROSSPOST 채널만). 실패 시 본문작성으로 자동 폴백.
+            crossPost: buildCrossPostInfo(channel, product, tier),
             signal, // 취소 신호 전달
             // 진행률 콜백 전달
             onStageProgress: onStageProgress

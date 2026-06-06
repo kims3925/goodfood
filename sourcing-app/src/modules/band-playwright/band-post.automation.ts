@@ -9,6 +9,7 @@ import * as os from 'os'
 import {
   BandPublishParams,
   BandPublishResult,
+  BandCrossPostParams,
   BandBatchPublishParams,
   BandBatchItemResult,
   BandBatchPublishResult,
@@ -808,6 +809,144 @@ export class BandPostAutomation {
       // 업로드 진행 이벤트 리스너 정리
       cleanupProgressListener()
     }
+  }
+
+  /**
+   * 크로스포스트: 원본 도매글을 Band "다른 밴드에 올리기"로 대상 소매밴드에 공유한 뒤,
+   * 편집기에서 가격(공급가→판매가)만 정밀 치환하고 게시 + 댓글에 쇼핑몰 링크.
+   * 원본의 영상/디자인/이미지를 그대로 보존한다 (createPostWithImages 가 못 하는 것).
+   *
+   * 셀렉터 흐름(2026-06-06 실증):
+   *   글옵션 button.postSet._btnPostMore → ul._postMoreMenuUl "다른 밴드에 올리기"
+   *   → li.tLine(대상밴드) → button "선택" → .contentEditor[contenteditable] 가격치환
+   *   → button._btnSubmitPost(게시) → 대상밴드 최신글 댓글
+   *
+   * ⚠️ 실패(원본글 못찾음/셀렉터 변경/타임아웃 등) 시 BandPlaywrightError 를 throw.
+   *    호출자(band-playwright.service)가 잡아 기존 createPostWithImages 로 자동 폴백한다.
+   */
+  async crossPostToBand(page: Page, params: BandCrossPostParams): Promise<BandPublishResult> {
+    const {
+      sourceBandKey, sourceBandName, sourceMatchTitle,
+      targetBandKey, targetBandName, priceMap, commentContent, signal,
+    } = params
+    const fail = (msg: string): never => {
+      throw new BandPlaywrightError(msg, BandPlaywrightErrorCode.POST_FAILED)
+    }
+    const checkCancel = () => {
+      if (signal?.aborted) throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
+    }
+
+    console.log(`[크로스포스트] 시작: 원본="${sourceBandName}" → 대상="${targetBandName}" (매칭="${(sourceMatchTitle || '').slice(0, 20)}")`)
+
+    // 1) 원본 도매밴드 진입 (세션만료 시 navigateToBand 가 SESSION_EXPIRED throw)
+    checkCancel()
+    await this.navigateToBand(page, sourceBandKey, sourceBandName)
+    await page.waitForTimeout(2500)
+
+    // 2) 원본글 매칭 — CollectedPost.title(본문 첫줄)로 피드에서 탐색
+    const needle = (sourceMatchTitle || '').replace(/\s+/g, '').slice(0, 14)
+    if (needle.length < 4) fail('크로스포스트 매칭 키가 너무 짧습니다.')
+    const matchIdx: number = await page.evaluate((nd) => {
+      const posts = Array.from(document.querySelectorAll('article._postMainWrap'))
+      for (let i = 0; i < posts.length; i++) {
+        const t = (posts[i].textContent || '').replace(/\s+/g, '')
+        if (t.includes(nd)) return i
+      }
+      return -1
+    }, needle)
+    if (matchIdx < 0) fail(`원본글을 도매밴드 피드에서 찾지 못함 (title="${(sourceMatchTitle || '').slice(0, 20)}")`)
+    console.log(`[크로스포스트] 원본글 매칭 인덱스=${matchIdx}`)
+
+    // 3) 글 옵션 → "다른 밴드에 올리기"
+    checkCancel()
+    const moreBtns = page.locator('article._postMainWrap button.postSet._btnPostMore')
+    await moreBtns.nth(matchIdx).click({ timeout: 8000 })
+    await page.waitForTimeout(1000)
+    const shareItem = page.locator('._postMoreMenuUl a:has-text("다른 밴드에 올리기"), ._postMoreMenuUl li:has-text("다른 밴드에 올리기")').first()
+    if ((await shareItem.count()) === 0) fail('"다른 밴드에 올리기" 메뉴 항목 없음')
+    await shareItem.click({ timeout: 8000 })
+    await page.waitForTimeout(3000)
+
+    // 4) 대상 밴드 선택 + "선택" 확인
+    const bandLi = page.locator('li.tLine').filter({ hasText: targetBandName }).first()
+    if ((await bandLi.count()) === 0) fail(`대상밴드 "${targetBandName}" 가 선택목록에 없음`)
+    await bandLi.click({ timeout: 8000 })
+    await page.waitForTimeout(1000)
+    await page.locator('button', { hasText: /^선택$/ }).first().click({ timeout: 8000 })
+    await page.waitForTimeout(4500)
+
+    // 5) 편집기 + 가격정책 적용 (ProductVariant 도매가→판매가 정밀 치환)
+    checkCancel()
+    const editorEl = await page.$('[contenteditable="true"]')
+    if (!editorEl) fail('공유 편집기 로드 실패')
+    const editStat: { ok: boolean; replaced: number } = await page.evaluate((pmap) => {
+      const editor = document.querySelector('[contenteditable="true"]')
+      if (!editor) return { ok: false, replaced: 0 }
+      const fmt = (n: number) => n.toLocaleString('en-US')
+      const sorted = [...pmap].filter((p) => p.from > 0 && p.to > 0).sort((a, b) => b.from - a.from)
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
+      const nodes: Node[] = []
+      while (walker.nextNode()) nodes.push(walker.currentNode)
+      let replaced = 0
+      for (const nodeEl of nodes) {
+        let t = nodeEl.nodeValue || ''
+        const orig = t
+        t = t.replace(/공급가/g, '판매가')
+        for (const p of sorted) {
+          const wc = fmt(p.from), rc = fmt(p.to), wn = String(p.from), rn = String(p.to)
+          if (wc !== rc && t.includes(wc)) { t = t.split(wc).join(rc); replaced++ }
+          else if (wn !== rn && t.includes(wn)) { t = t.split(wn).join(rn); replaced++ }
+        }
+        if (t !== orig) nodeEl.nodeValue = t
+      }
+      return { ok: true, replaced }
+    }, priceMap)
+    console.log(`[크로스포스트] 가격치환 ${editStat.replaced}건 적용`)
+
+    // 6) 게시 (보이고 활성화된 버튼만)
+    checkCancel()
+    let submitted = false
+    const subs = page.locator('button._btnSubmitPost:visible')
+    const sc = await subs.count()
+    for (let i = 0; i < sc; i++) {
+      const b = subs.nth(i)
+      if (await b.isEnabled().catch(() => false)) { await b.click({ timeout: 8000 }).catch(() => {}); submitted = true; break }
+    }
+    if (!submitted) await page.getByRole('button', { name: '게시', exact: true }).last().click({ timeout: 8000 })
+    console.log('[크로스포스트] 게시 클릭 완료')
+    await page.waitForTimeout(8000)
+
+    // 7) 대상밴드 이동 → 최신글 postKey + 댓글(쇼핑몰 링크)
+    await this.navigateToBand(page, targetBandKey, targetBandName)
+    await page.waitForTimeout(3000)
+    const bandNoMatch = page.url().match(/\/band\/(\d+)/)
+    const targetBandNo = bandNoMatch ? bandNoMatch[1] : ''
+    const postKey = await this.getLatestPostKey(page, targetBandNo)
+
+    if (commentContent) {
+      try {
+        const cbtn = page.locator('article._postMainWrap button._commentMainBtn, .cCard button._commentMainBtn').first()
+        await cbtn.click({ timeout: 8000 })
+        await page.waitForTimeout(1200)
+        const ta = page.locator('textarea._messageTextArea, textarea[placeholder*="댓글"]').first()
+        await ta.click({ timeout: 6000 })
+        await page.waitForTimeout(300)
+        const lines = commentContent.split('\n')
+        for (let li = 0; li < lines.length; li++) {
+          if (lines[li].length > 0) await page.keyboard.type(lines[li], { delay: 5 })
+          if (li < lines.length - 1) await page.keyboard.press('Shift+Enter')
+        }
+        await page.waitForSelector('button._sendMessageButton.-active', { timeout: 5000 })
+        await page.click('button._sendMessageButton.-active')
+        await page.waitForTimeout(1000)
+        console.log('[크로스포스트] 댓글(쇼핑몰 링크) 등록 완료')
+      } catch (e: any) {
+        console.warn('[크로스포스트] 댓글 실패 (글은 정상 발행됨):', e?.message)
+      }
+    }
+
+    console.log(`[크로스포스트] 완료 postKey=${postKey}`)
+    return { success: true, postKey: postKey || undefined }
   }
 
   /**

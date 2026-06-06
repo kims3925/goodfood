@@ -28,6 +28,12 @@ model Channel {
   // RETAIL(기본)=소매 마진가(기존 동작 그대로). WHOLESALE=소스 도매가 그대로 발행(가족도매방밴드).
   // RETAIL 채널(발행 대상)에만 의미가 있으며, 기본값 RETAIL 이므로 기존 채널은 동작 변화 0.
   publishPriceTier  PriceTier        @default(RETAIL) @map("publish_price_tier")
+  // 크로스포스트 발행 방식 (2026-06-06): 이 RETAIL 채널에 밴드 발행할 때 사용할 방식.
+  //  COMPOSE(기본)  = 기존 AI 본문 새 작성 (createPostWithImages) — 동작 변화 0.
+  //  CROSSPOST      = 원본 도매글을 Band "다른 밴드에 올리기"로 공유 → 가격정책/쇼핑몰링크만 편집.
+  //                   (원본 영상/디자인 그대로 보존). 원본글 못찾음/실패 시 COMPOSE 로 자동 폴백.
+  // 채널별 opt-in. 기본 COMPOSE 이므로 기존 채널 동작 변화 없음.
+  bandPublishMethod String           @default("COMPOSE") @map("band_publish_method") @db.VarChar(20)
   // 경영밴드 SaaS 운영플로우 Phase 4.1: 채널별 게시글 만료(자동삭제) 정책.
   // null 이면 전역 기본값(일반 7일 / COM 30일) 사용 — 기존 동작 보존.
   expiryDaysNormal  Int?             @map("expiry_days_normal")  // 일반 카테고리 만료 일수

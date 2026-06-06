@@ -25,6 +25,34 @@ export interface BandPublishParams {
   onStageProgress?: BandStageProgressCallback
   /** 취소 신호 (발행 중단용) */
   signal?: AbortSignal
+  /**
+   * 크로스포스트 정보 (선택). 존재하면 "다른 밴드에 올리기" 방식으로 먼저 시도하고,
+   * 실패하면 기존 createPostWithImages(본문 새작성)로 자동 폴백한다.
+   * 없으면(기본) 기존 동작과 100% 동일.
+   */
+  crossPost?: CrossPostInfo
+}
+
+/** 크로스포스트(원본 도매글 공유) 정보 */
+export interface CrossPostInfo {
+  sourceBandKey: string   // 원본 도매밴드 band_key (AAC...)
+  sourceBandName: string  // 원본 도매밴드 이름 (navigateToBand 용)
+  sourceMatchTitle: string // 원본글 매칭 키 (CollectedPost.title = 본문 첫줄)
+  /** 도매가→판매가 매핑 (ProductVariant 기반). 편집기에서 정확 치환용. */
+  priceMap: Array<{ from: number; to: number }>
+}
+
+/** 크로스포스트 실행 파라미터 (BandPostAutomation.crossPostToBand) */
+export interface BandCrossPostParams {
+  channelId: number
+  sourceBandKey: string
+  sourceBandName: string
+  sourceMatchTitle: string
+  targetBandKey: string
+  targetBandName: string
+  priceMap: Array<{ from: number; to: number }>
+  commentContent?: string
+  signal?: AbortSignal
 }
 
 export interface BandPublishResult {
