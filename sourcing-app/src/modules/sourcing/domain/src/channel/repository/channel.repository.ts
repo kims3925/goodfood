@@ -126,6 +126,8 @@ export class ChannelRepository {
     if (data.orderDeadline !== undefined) channelData.orderDeadline = data.orderDeadline
     // 다단계 발행: 발행 대상 가격 tier (RETAIL/WHOLESALE)
     if (data.publishPriceTier !== undefined) channelData.publishPriceTier = data.publishPriceTier
+    // 밴드 발행 방식 (COMPOSE/CROSSPOST)
+    if (data.bandPublishMethod !== undefined) channelData.bandPublishMethod = data.bandPublishMethod
 
     return prisma.channel.update({
       where: { id },

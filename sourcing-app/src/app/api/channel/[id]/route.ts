@@ -70,7 +70,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, isActive, coverUrl, shopId, minSourcingPrice, maxSourcingPrice, orderDeadline, publishPriceTier } = body
+    const { name, isActive, coverUrl, shopId, minSourcingPrice, maxSourcingPrice, orderDeadline, publishPriceTier, bandPublishMethod } = body
 
     // 가격 범위는 정수만 허용. 빈 문자열/null은 제거(필드 자체 unset).
     const parsePrice = (v: any): number | null | undefined => {
@@ -86,6 +86,12 @@ export async function PUT(
       return v === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL'
     }
 
+    // 밴드 발행 방식 — 'CROSSPOST' | 'COMPOSE' 만 허용. 미전달 시 변경 없음.
+    const parsePublishMethod = (v: any): 'COMPOSE' | 'CROSSPOST' | undefined => {
+      if (v === undefined || v === null) return undefined
+      return v === 'CROSSPOST' ? 'CROSSPOST' : 'COMPOSE'
+    }
+
     const channel = await channelService.update(id, {
       name,
       isActive,
@@ -95,6 +101,7 @@ export async function PUT(
       maxSourcingPrice: parsePrice(maxSourcingPrice),
       orderDeadline,
       publishPriceTier: parseTier(publishPriceTier) as any,
+      bandPublishMethod: parsePublishMethod(bandPublishMethod),
     }, currentUser.userId)
 
     return NextResponse.json({ success: true, data: channel })

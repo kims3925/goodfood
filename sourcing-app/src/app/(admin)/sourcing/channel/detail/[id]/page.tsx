@@ -60,6 +60,8 @@ interface Channel {
   footerImageUrl: string | null
   // 다단계 발행: 발행 대상 가격 tier (RETAIL=소매가 / WHOLESALE=도매가, 가족도매방밴드)
   publishPriceTier: 'WHOLESALE' | 'RETAIL' | null
+  // 밴드 발행 방식 (RETAIL): COMPOSE(기본, AI 본문작성) / CROSSPOST(원본 도매글 공유)
+  bandPublishMethod?: 'COMPOSE' | 'CROSSPOST' | string | null
 }
 
 const PLATFORM_LABELS: { [key: string]: string } = {
@@ -119,6 +121,9 @@ export default function ChannelDetailPage({
 
   // 다단계 발행: 발행 대상 가격 tier (RETAIL 채널 전용 토글)
   const [publishPriceTier, setPublishPriceTier] = useState<'WHOLESALE' | 'RETAIL'>('RETAIL')
+
+  // 밴드 발행 방식 (RETAIL 채널 전용 토글): COMPOSE(기본) / CROSSPOST(원본 공유)
+  const [bandPublishMethod, setBandPublishMethod] = useState<'COMPOSE' | 'CROSSPOST'>('COMPOSE')
 
   // 도메인 쇼핑몰 필드
   const [subdomain, setSubdomain] = useState('')
@@ -196,6 +201,8 @@ export default function ChannelDetailPage({
         setOrderDeadline(ch.orderDeadline || '')
         // 다단계 발행: 가격 tier (기본 RETAIL)
         setPublishPriceTier(ch.publishPriceTier === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL')
+        // 밴드 발행 방식 (기본 COMPOSE)
+        setBandPublishMethod(ch.bandPublishMethod === 'CROSSPOST' ? 'CROSSPOST' : 'COMPOSE')
         // Shop 연결
         setSelectedShopId(ch.shopId || null)
         // 도메인 쇼핑몰 필드
@@ -271,6 +278,7 @@ export default function ChannelDetailPage({
       if (channel?.kind === 'RETAIL') {
         updateData.shopId = selectedShopId || null
         updateData.publishPriceTier = publishPriceTier
+        updateData.bandPublishMethod = bandPublishMethod
       }
 
       // 소매 밴드인 경우 쇼핑몰/테마 필드 포함
@@ -886,6 +894,59 @@ export default function ChannelDetailPage({
                                 {channel.publishPriceTier === 'WHOLESALE'
                                   ? '소스 도매가 그대로 발행 · 쇼핑몰 링크 없음'
                                   : '마진 적용 판매가 + 쇼핑몰 주문 링크'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 밴드 발행 방식 (크로스포스트) — RETAIL 채널 전용 */}
+                    {channel.kind === 'RETAIL' && (
+                      <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-base">🔄</span>
+                          <span className="text-sm font-semibold text-slate-700">밴드 발행 방식</span>
+                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                            소매 채널
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mb-3">
+                          이 밴드에 상품을 발행할 때 사용할 방식입니다.
+                          <br />
+                          <b>작성 방식</b>: 기존과 동일. AI가 본문을 새로 작성해 발행.
+                          <br />
+                          <b>공유 방식</b>: 원본 도매글을 그대로 공유(영상·디자인 보존) + 판매가·쇼핑몰 링크만 편집.
+                          원본글을 못 찾으면 자동으로 작성 방식으로 발행됩니다.
+                        </p>
+                        {isEditMode ? (
+                          <div className="flex gap-2">
+                            {(['COMPOSE', 'CROSSPOST'] as const).map((m) => (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setBandPublishMethod(m)}
+                                className={`flex-1 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
+                                  bandPublishMethod === m
+                                    ? 'bg-purple-500 text-white border-purple-500'
+                                    : 'bg-white text-slate-600 border-purple-200 hover:bg-purple-100'
+                                }`}
+                              >
+                                {m === 'COMPOSE' ? '✍️ 작성 방식 (기본)' : '🔄 공유 방식'}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 bg-white rounded-lg p-3 border border-purple-100">
+                            <span className="text-lg">{channel.bandPublishMethod === 'CROSSPOST' ? '🔄' : '✍️'}</span>
+                            <div>
+                              <p className="font-medium text-slate-900">
+                                {channel.bandPublishMethod === 'CROSSPOST' ? '공유 방식 (원본 보존)' : '작성 방식 (기본)'}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {channel.bandPublishMethod === 'CROSSPOST'
+                                  ? '원본 도매글을 "다른 밴드에 올리기"로 공유 · 영상/디자인 보존'
+                                  : 'AI가 새 글을 작성하여 발행'}
                               </p>
                             </div>
                           </div>

@@ -31,6 +31,8 @@ export interface ChannelUpdateInput {
   orderDeadline?: string | null
   // 다단계 발행: 발행 대상의 가격 tier (RETAIL 기본 / WHOLESALE=가족도매방, 도매가 발행)
   publishPriceTier?: PriceTier
+  // 밴드 발행 방식 (RETAIL): 'COMPOSE'(기본, AI 본문작성) | 'CROSSPOST'(원본 도매글 공유)
+  bandPublishMethod?: string
 }
 
 export interface PaginatedResult<T> {
