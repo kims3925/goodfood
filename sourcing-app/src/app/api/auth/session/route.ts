@@ -1,13 +1,17 @@
 export const dynamic = 'force-dynamic'
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import prisma from '@bandauto/db'
 
 // GET: 현재 세션 정보 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const tokenPayload = await getCurrentUser()
+    // 어드민 패널에서 ?preferAdmin=1 로 호출하면 admin 쿠키를 우선 조회한다.
+    // (같은 브라우저에 매니저 쿠키가 함께 있어도 어드민 세션이 매니저로 가려져
+    //  어드민 패널에서 튕기던 버그 방지. 매니저 페이지는 파라미터 없이 호출 → 기존 동작.)
+    const preferAdmin = request.nextUrl.searchParams.get('preferAdmin') === '1'
+    const tokenPayload = await getCurrentUser(preferAdmin)
 
     if (!tokenPayload) {
       return NextResponse.json({

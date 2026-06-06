@@ -23,7 +23,8 @@ export default function AdminPanelLayout({
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch('/api/auth/session')
+        // 어드민 패널 → admin 쿠키 우선 조회 (매니저 쿠키 공존 시 매니저로 가려져 튕기던 버그 방지)
+        const res = await fetch('/api/auth/session?preferAdmin=1')
         const data = await res.json()
 
         if (!data.success || !data.user) {

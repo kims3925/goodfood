@@ -28,7 +28,10 @@ export default function AdminLayout({
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/session')
+        // 어드민 경로(/admin/*)에선 admin 쿠키 우선 조회 — 매니저 쿠키가 함께 있어도
+        // 어드민 세션이 매니저로 가려지지 않도록. 그 외 경로는 기존(매니저 우선) 동작.
+        const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
+        const response = await fetch(`/api/auth/session${isAdminPath ? '?preferAdmin=1' : ''}`)
         const data = await response.json()
 
         if (!data.success || !data.user) {
