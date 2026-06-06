@@ -14,6 +14,11 @@ export async function GET() {
         role: true,
         createdAt: true,
         signupCompletedAt: true,
+        // 어드민/매니저 vs 일반회원(쇼핑몰 유입) 구분용
+        shopId: true,
+        mode: true,
+        // 일반회원이 가입한 쇼핑몰(어느 몰에서 유입됐는지)
+        registeredShop: { select: { name: true, subdomain: true } },
       },
       orderBy: { createdAt: 'desc' },
     })

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, UserCog, Shield, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Users, Search } from 'lucide-react'
 
 interface UserInfo {
   id: number
@@ -10,13 +10,21 @@ interface UserInfo {
   role: string
   createdAt: string
   signupCompletedAt?: string
+  shopId?: number | null
+  mode?: string
+  registeredShop?: { name: string; subdomain: string } | null
 }
+
+// 운영자(어드민·매니저) vs 일반회원(쇼핑몰 유입) 구분
+const isOperator = (u: UserInfo) => u.role === 'ADMIN' || u.role === 'MANAGER'
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserInfo[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
+  // 구분 필터: 전체 / 운영자(어드민·매니저) / 일반회원(쇼핑몰)
+  const [groupFilter, setGroupFilter] = useState<'all' | 'operator' | 'member'>('all')
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -51,12 +59,18 @@ export default function AdminUsersPage() {
     }
   }
 
+  const operatorCount = users.filter(isOperator).length
+  const memberCount = users.length - operatorCount
+
   const filteredUsers = users.filter(u => {
     const matchesSearch = !searchQuery ||
       u.name.includes(searchQuery) ||
       u.email.includes(searchQuery)
     const matchesRole = roleFilter === 'all' || u.role === roleFilter
-    return matchesSearch && matchesRole
+    const matchesGroup = groupFilter === 'all' ||
+      (groupFilter === 'operator' && isOperator(u)) ||
+      (groupFilter === 'member' && !isOperator(u))
+    return matchesSearch && matchesRole && matchesGroup
   })
 
   const roleConfig: Record<string, { label: string; bg: string }> = {
@@ -80,7 +94,25 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="bg-white rounded-lg shadow-sm p-4 space-y-3">
+        {/* 구분: 운영자(어드민·매니저) vs 일반회원(쇼핑몰 유입) */}
+        <div className="flex flex-wrap gap-2">
+          {([
+            { key: 'all', label: `전체 (${users.length})` },
+            { key: 'operator', label: `🛡️ 운영자 · 어드민/매니저 (${operatorCount})` },
+            { key: 'member', label: `🛒 일반회원 · 쇼핑몰 유입 (${memberCount})` },
+          ] as const).map(g => (
+            <button
+              key={g.key}
+              onClick={() => setGroupFilter(g.key)}
+              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                groupFilter === g.key ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -125,6 +157,7 @@ export default function AdminUsersPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">이름</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">이메일</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">구분</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">역할</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">가입일</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">역할 변경</th>
@@ -138,6 +171,17 @@ export default function AdminUsersPage() {
                       <td className="px-4 py-3 text-sm text-gray-500">{user.id}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{user.name}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{user.email}</td>
+                      <td className="px-4 py-3">
+                        {isOperator(user) ? (
+                          <span className="inline-flex items-center px-2 py-0.5 text-xs rounded-full font-medium bg-indigo-100 text-indigo-700">
+                            🛡️ 운영자
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 text-xs rounded-full font-medium bg-emerald-100 text-emerald-700">
+                            🛒 일반회원{user.registeredShop?.name ? ` · ${user.registeredShop.name}` : ''}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${rc.bg}`}>
                           {rc.label}
@@ -162,7 +206,7 @@ export default function AdminUsersPage() {
                 })}
                 {filteredUsers.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                       검색 결과가 없습니다.
                     </td>
                   </tr>
