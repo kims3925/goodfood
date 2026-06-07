@@ -3,7 +3,8 @@
  * Claude API 로 고객 메시지 → 12개 의도 + confidence 분류.
  */
 
-import { callClaudeJson } from '@/modules/ai/claude.client'
+// 오디세이우스 우선 → 실패 시 callClaudeJson 자동 폴백 (ODYSSEUS_ENABLED=false 면 기존과 동일)
+import { aiJson } from '@/modules/ai/odysseus.client'
 import { INTENTS, INTENT_DESCRIPTIONS, isValidIntent, type Intent } from '@/lib/inbox-intents'
 
 export interface IntentClassification {
@@ -87,7 +88,7 @@ ${customerMessage}
   "amount": 금액 숫자 또는 null
 }`
 
-  const result = await callClaudeJson<IntentClassification>(userId, prompt, {
+  const result = await aiJson<IntentClassification>(userId, prompt, {
     system: SYSTEM_PROMPT,
     maxTokens: 512,
   })

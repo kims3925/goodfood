@@ -8,7 +8,8 @@
  * - order: 매칭된 주문 (상태/금액)
  */
 
-import { callClaude } from '@/modules/ai/claude.client'
+// 오디세이우스 우선 → 실패 시 callClaude 자동 폴백 (ODYSSEUS_ENABLED=false 면 기존과 동일)
+import { aiText } from '@/modules/ai/odysseus.client'
 import type { Intent } from '@/lib/inbox-intents'
 
 export interface ReplyContext {
@@ -166,7 +167,7 @@ ${[shopCtx, productCtx, orderCtx].filter(Boolean).join('\n\n') || '(컨텍스트
 
 위 컨텍스트만 사용하여 한국어로 친근한 응답을 작성하세요. 없는 정보는 추측 금지.`
 
-  return callClaude(userId, prompt, {
+  return aiText(userId, prompt, {
     system: SYSTEM_PROMPT,
     temperature: 0.5,
     maxTokens: 600,
