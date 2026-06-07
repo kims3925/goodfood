@@ -338,6 +338,9 @@ export class ProductService {
               userId,
               channelId: collectedProduct.post.channelId,
               name: collectedProduct.name || '상품명 없음',
+              // 도매방 원본 품명 보존 — 정산·발주(주문) 확인 + 크로스포스트 원본글 매칭용.
+              // (가공 후 CollectedPost 가 삭제되어도 이 값은 Product 에 남는다)
+              sourceProductName: collectedProduct.post.title || null,
               description: collectedProduct.description || null,
               categoryId: metadata.category || null,
               currency: collectedProduct.currency || 'KRW',
