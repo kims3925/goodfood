@@ -826,7 +826,7 @@ export class BandPostAutomation {
    */
   async crossPostToBand(page: Page, params: BandCrossPostParams): Promise<BandPublishResult> {
     const {
-      sourceBandKey, sourceBandName, sourceMatchTitle,
+      sourceBandKey, sourceBandName, sourceMatchTitle, sourceBandNo,
       targetBandKey, targetBandName, priceMap, commentContent, signal,
     } = params
     const fail = (msg: string): never => {
@@ -836,11 +836,25 @@ export class BandPostAutomation {
       if (signal?.aborted) throw new BandPlaywrightError('발행이 취소되었습니다.', BandPlaywrightErrorCode.POST_FAILED)
     }
 
-    console.log(`[크로스포스트] 시작: 원본="${sourceBandName}" → 대상="${targetBandName}" (매칭="${(sourceMatchTitle || '').slice(0, 20)}")`)
+    console.log(`[크로스포스트] 시작: 원본="${sourceBandName}"(no=${sourceBandNo ?? '-'}) → 대상="${targetBandName}" (매칭="${(sourceMatchTitle || '').slice(0, 20)}")`)
 
-    // 1) 원본 도매밴드 진입 (세션만료 시 navigateToBand 가 SESSION_EXPIRED throw)
+    // 1) 원본 도매밴드 진입.
+    //  도매 공급밴드는 홈 "내 밴드" 목록에 안 떠서 navigateToBand(이름해석)가 못 찾는다.
+    //  → sourceBandNo 가 있으면 band.us/band/{no} 로 직접 진입. 없으면 기존 이름해석(폴백).
     checkCancel()
-    await this.navigateToBand(page, sourceBandKey, sourceBandName)
+    if (sourceBandNo) {
+      await page.goto(`https://band.us/band/${sourceBandNo}`, { waitUntil: 'load', timeout: POST_TIMEOUT_MS })
+      await page.waitForTimeout(3500)
+      const u = page.url()
+      if (u.includes('signin') || u.includes('login') || u.includes('auth.band.us')) {
+        throw new BandPlaywrightError(
+          '세션이 만료되었습니다(원본밴드 진입). Chrome Extension 에서 Band 세션을 다시 저장해주세요.',
+          BandPlaywrightErrorCode.SESSION_EXPIRED
+        )
+      }
+    } else {
+      await this.navigateToBand(page, sourceBandKey, sourceBandName)
+    }
     await page.waitForTimeout(2500)
 
     // 2) 원본글 매칭 — CollectedPost.title(본문 첫줄)로 피드에서 탐색

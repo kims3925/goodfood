@@ -34,6 +34,10 @@ model Channel {
   //                   (원본 영상/디자인 그대로 보존). 원본글 못찾음/실패 시 COMPOSE 로 자동 폴백.
   // 채널별 opt-in. 기본 COMPOSE 이므로 기존 채널 동작 변화 없음.
   bandPublishMethod String           @default("COMPOSE") @map("band_publish_method") @db.VarChar(20)
+  // Band 웹 숫자 밴드ID (예: band.us/band/85675937). 크로스포스트가 도매 원본밴드로 직접 진입할 때 사용.
+  // 도매 공급밴드는 홈 "내 밴드" 목록에 안 떠서 이름 해석(navigateToBand)으로 못 찾음 → 숫자ID 직접진입 필요.
+  // null 이면 이름 해석으로 폴백(못 찾으면 compose 폴백). 채널키(AAC..)와 별개.
+  bandNo            Int?             @map("band_no")
   // 경영밴드 SaaS 운영플로우 Phase 4.1: 채널별 게시글 만료(자동삭제) 정책.
   // null 이면 전역 기본값(일반 7일 / COM 30일) 사용 — 기존 동작 보존.
   expiryDaysNormal  Int?             @map("expiry_days_normal")  // 일반 카테고리 만료 일수

@@ -77,6 +77,7 @@ export class BandPlaywrightService {
               sourceBandKey: params.crossPost.sourceBandKey,
               sourceBandName: params.crossPost.sourceBandName,
               sourceMatchTitle: params.crossPost.sourceMatchTitle,
+              sourceBandNo: params.crossPost.sourceBandNo,
               targetBandKey: params.bandKey,
               targetBandName: params.bandName,
               priceMap: params.crossPost.priceMap,

@@ -59,8 +59,8 @@ function buildCrossPostInfo(
     name?: string
     sourceProductName?: string | null
     variants?: { price: number; wholesalePrice: unknown }[]
-    channel?: { name: string; channelKey: string; kind?: string } | null
-    collectedPost?: { title: string | null; channel?: { name: string; channelKey: string } | null } | null
+    channel?: { name: string; channelKey: string; kind?: string; bandNo?: number | null } | null
+    collectedPost?: { title: string | null; channel?: { name: string; channelKey: string; bandNo?: number | null } | null } | null
   },
   tier: string
 ): CrossPostInfo | undefined {
@@ -82,6 +82,7 @@ function buildCrossPostInfo(
     sourceBandKey: srcChannel.channelKey,
     sourceBandName: srcChannel.name,
     sourceMatchTitle: matchTitle,
+    sourceBandNo: (srcChannel as { bandNo?: number | null }).bandNo ?? null,
     priceMap,
   }
 }
@@ -380,11 +381,11 @@ export class PublishService {
           // 크로스포스트용: 원본 도매글 제목(매칭키) + 도매밴드(name/key).
           // 가공 후 collectedPost 가 삭제되어도 Product.channel(도매 소스)·sourceProductName 으로 폴백.
           sourceProductName: true,
-          channel: { select: { name: true, channelKey: true, kind: true } },
+          channel: { select: { name: true, channelKey: true, kind: true, bandNo: true } },
           collectedPost: {
             select: {
               title: true,
-              channel: { select: { name: true, channelKey: true } },
+              channel: { select: { name: true, channelKey: true, bandNo: true } },
             },
           },
           images: {
@@ -1077,11 +1078,11 @@ export class PublishService {
           // 크로스포스트용: 원본 도매글 제목(매칭키) + 도매밴드(name/key).
           // 가공 후 collectedPost 가 삭제되어도 Product.channel(도매 소스)·sourceProductName 으로 폴백.
           sourceProductName: true,
-          channel: { select: { name: true, channelKey: true, kind: true } },
+          channel: { select: { name: true, channelKey: true, kind: true, bandNo: true } },
           collectedPost: {
             select: {
               title: true,
-              channel: { select: { name: true, channelKey: true } },
+              channel: { select: { name: true, channelKey: true, bandNo: true } },
             },
           },
           images: {

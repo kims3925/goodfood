@@ -38,6 +38,8 @@ export interface CrossPostInfo {
   sourceBandKey: string   // 원본 도매밴드 band_key (AAC...)
   sourceBandName: string  // 원본 도매밴드 이름 (navigateToBand 용)
   sourceMatchTitle: string // 원본글 매칭 키 (CollectedPost.title = 본문 첫줄)
+  /** 원본 도매밴드 숫자ID. 있으면 band.us/band/{no} 로 직접 진입(도매 공급밴드는 홈 목록에 없어 이름해석 실패). */
+  sourceBandNo?: number | null
   /** 도매가→판매가 매핑 (ProductVariant 기반). 편집기에서 정확 치환용. */
   priceMap: Array<{ from: number; to: number }>
 }
@@ -48,6 +50,7 @@ export interface BandCrossPostParams {
   sourceBandKey: string
   sourceBandName: string
   sourceMatchTitle: string
+  sourceBandNo?: number | null
   targetBandKey: string
   targetBandName: string
   priceMap: Array<{ from: number; to: number }>
