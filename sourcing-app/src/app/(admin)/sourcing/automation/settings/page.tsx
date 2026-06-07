@@ -98,6 +98,8 @@ interface AutomationConfig {
   digestMode: 'individual' | 'digest' | 'both'
   digestProductsPerPost: number
   digestImagesPerProduct: 1 | 2 | 4
+  // 밴드 발행 방식 전체 스위치: COMPOSE(AI 본문작성) | CROSSPOST(다른 밴드에 올리기)
+  bandPublishMethod: 'COMPOSE' | 'CROSSPOST'
 }
 
 // 12시간제 → 24시간제 변환
@@ -212,6 +214,7 @@ const defaultConfig: AutomationConfig = {
   digestMode: 'individual',
   digestProductsPerPost: 20,
   digestImagesPerProduct: 1,
+  bandPublishMethod: 'COMPOSE',
 }
 
 // 수집 개수 옵션
@@ -595,6 +598,7 @@ export default function AutomationSettingsPage() {
             autoPublishLimitByShop: configData.data?.autoPublishLimitByShop ?? {},
             autoPublishLimitByChannel: configData.data?.autoPublishLimitByChannel ?? {},
             digestMode: (configData.data?.digestMode as any) ?? 'individual',
+            bandPublishMethod: (configData.data?.bandPublishMethod === 'CROSSPOST' ? 'CROSSPOST' : 'COMPOSE'),
             digestProductsPerPost: configData.data?.digestProductsPerPost ?? 20,
             digestImagesPerProduct: (configData.data?.digestImagesPerProduct as 1 | 2 | 4) ?? 1,
           }
@@ -689,6 +693,7 @@ export default function AutomationSettingsPage() {
     ai: 'AI 변환 설정',
     publish: '발행 설정',
     pipeline: '파이프라인 범위',
+    publishMethod: '밴드 발행 방식',
   }
 
   const handleSaveSection = async (section: string) => {
@@ -729,6 +734,9 @@ export default function AutomationSettingsPage() {
           break
         case 'pipeline':
           sectionData = { pipelineSteps: config.pipelineSteps }
+          break
+        case 'publishMethod':
+          sectionData = { bandPublishMethod: config.bandPublishMethod }
           break
         default:
           sectionData = config
@@ -933,6 +941,51 @@ export default function AutomationSettingsPage() {
 
       {/* 자동화 흐름 제어 — 다건 실행상태 + 전체 중지/재등록/stuck 정리/영구 비활성화 */}
       <AutomationFlowControl />
+
+      {/* 밴드 발행 방식 (전체 스위치) */}
+      <Card className="overflow-hidden transition-all">
+        <div className="p-4 pb-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🔄</span>
+              <h3 className="text-sm font-bold text-gray-800">밴드 발행 방식</h3>
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-[10px] font-medium">전체 소매밴드 적용</span>
+            </div>
+            <button
+              onClick={() => handleSaveSection('publishMethod')}
+              disabled={savingSection === 'publishMethod' || config.bandPublishMethod === initialConfig.bandPublishMethod}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {savingSection === 'publishMethod' ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+              저장
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            소매밴드에 상품을 올릴 때 사용할 방식입니다. 저장하면 <b>모든 소매밴드에 일괄 적용</b>됩니다.
+            공유 방식은 원본 도매글을 못 찾으면 자동으로 작성 방식으로 발행됩니다.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { v: 'COMPOSE' as const, icon: '✍️', label: 'AI 가공 (기존)', desc: 'AI가 본문을 새로 작성해 발행' },
+              { v: 'CROSSPOST' as const, icon: '🔄', label: '다른 밴드에 올리기 (신규)', desc: '원본 도매글 공유 · 영상/디자인 보존' },
+            ]).map(opt => (
+              <button
+                key={opt.v}
+                type="button"
+                onClick={() => setConfig(prev => ({ ...prev, bandPublishMethod: opt.v }))}
+                className={`text-left p-3 rounded-xl border transition-colors ${
+                  config.bandPublishMethod === opt.v
+                    ? 'bg-purple-500 text-white border-purple-500'
+                    : 'bg-white text-gray-700 border-gray-200 hover:bg-purple-50'
+                }`}
+              >
+                <div className="text-sm font-semibold">{opt.icon} {opt.label}</div>
+                <div className={`text-[11px] mt-0.5 ${config.bandPublishMethod === opt.v ? 'text-purple-100' : 'text-gray-500'}`}>{opt.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       {/* Schedule Settings - 독립 섹션 */}
       <Card className={`overflow-hidden transition-all ${warningSections.includes('schedule') && warningPhase === 'shake' ? 'ring-2 ring-red-400 animate-shake' : hasScheduleProblem ? 'ring-2 ring-red-300' : ''}`}>

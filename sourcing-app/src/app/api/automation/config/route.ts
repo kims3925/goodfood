@@ -176,7 +176,14 @@ export async function POST(request: NextRequest) {
       digestMode,
       digestProductsPerPost,
       digestImagesPerProduct,
+      bandPublishMethod,
     } = body
+
+    // 밴드 발행 방식 전체 스위치 — 'CROSSPOST' | 'COMPOSE' 만 허용. 미전달 시 변경 없음(undefined).
+    const finalBandPublishMethod: 'COMPOSE' | 'CROSSPOST' | undefined =
+      bandPublishMethod === 'CROSSPOST' ? 'CROSSPOST'
+        : bandPublishMethod === 'COMPOSE' ? 'COMPOSE'
+          : undefined
 
     // 종합발행 설정 검증/기본값
     const validDigestModes = ['individual', 'digest', 'both']
@@ -273,6 +280,25 @@ export async function POST(request: NextRequest) {
       })
     } catch (e: any) {
       console.warn('[AutomationConfig] digest 컬럼 업데이트 실패 (DB 마이그레이션 필요):', e?.message)
+    }
+
+    // 밴드 발행 방식 전체 스위치 — 명시 전달된 경우에만 적용.
+    // 전역 값을 저장하고, 동시에 사용자의 활성 RETAIL 채널 bandPublishMethod 에 일괄 반영한다.
+    // (발행 로직은 channel.bandPublishMethod 를 읽으므로 이 일괄 적용으로 즉시 유효.)
+    if (finalBandPublishMethod) {
+      try {
+        await prisma.automationConfig.update({
+          where: { userId: currentUser.userId },
+          data: { bandPublishMethod: finalBandPublishMethod } as any,
+        })
+        const applied = await prisma.channel.updateMany({
+          where: { userId: currentUser.userId, kind: 'RETAIL', deletedAt: null },
+          data: { bandPublishMethod: finalBandPublishMethod } as any,
+        })
+        console.log(`[AutomationConfig] 발행방식 '${finalBandPublishMethod}' → RETAIL 채널 ${applied.count}개 일괄 적용 (user ${currentUser.userId})`)
+      } catch (e: any) {
+        console.warn('[AutomationConfig] bandPublishMethod 적용 실패 (DB 마이그레이션 필요):', e?.message)
+      }
     }
 
     // 스케줄러 업데이트

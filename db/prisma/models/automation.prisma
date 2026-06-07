@@ -67,6 +67,9 @@ model AutomationConfig {
   digestMode                    String     @default("individual") @map("digest_mode") @db.VarChar(20) // individual | digest | both
   digestProductsPerPost         Int        @default(20) @map("digest_products_per_post")
   digestImagesPerProduct        Int        @default(1) @map("digest_images_per_product") // 1 | 2 | 4
+  // 밴드 발행 방식 전체 스위치 (2026-06-07): COMPOSE(AI 본문작성) | CROSSPOST(다른 밴드에 올리기).
+  // 저장 시 사용자의 활성 RETAIL 채널 bandPublishMethod 에 일괄 적용. 기본 COMPOSE.
+  bandPublishMethod             String     @default("COMPOSE") @map("band_publish_method") @db.VarChar(20)
   user                          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([isEnabled])
