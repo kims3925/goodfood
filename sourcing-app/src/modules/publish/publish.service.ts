@@ -43,33 +43,45 @@ import type {
 const BAND_API_COOLDOWN_MS = 10000
 
 /**
- * 크로스포스트 파라미터 구성 (2026-06-06).
- * - 채널(RETAIL)이 bandPublishMethod='CROSSPOST' opt-in 이고
- * - 상품에 원본 도매글(collectedPost) + 도매채널(name/key) + 변형 도매가가 있을 때만 반환.
- * 조건 미충족 시 undefined → 호출부는 기존 compose 방식 그대로 사용 (동작 변화 0).
+ * 크로스포스트 파라미터 구성 (2026-06-06, 2026-06-07 보강).
+ * - 채널(RETAIL)이 bandPublishMethod='CROSSPOST' opt-in 이고 tier=RETAIL 이며
+ * - 원본 도매밴드 + 매칭 제목 + 변형 도매가가 있을 때만 반환.
  *
- * 반환된 crossPost 가 publishWithImages 로 전달되면, 거기서 "다른 밴드에 올리기" 방식을
- * 먼저 시도하고 실패 시 createPostWithImages(본문 새작성)로 자동 폴백한다.
+ * ⚠️ AI 가공 시 CollectedPost 가 삭제되어 product.collectedPost 가 null 이 되는 경우가 많다
+ *    (collectedPostId onDelete:SetNull). 그래서 도매 출처는 **살아남는 Product.channel**
+ *    (가공상품의 channelId = 도매 소스 채널)을 폴백으로 쓰고, 매칭 제목도
+ *    collectedPost.title → sourceProductName → 상품명 순으로 폴백한다.
+ *    (못 찾으면 crossPostToBand 가 throw → createPostWithImages 로 자동 폴백되므로 안전)
  */
 function buildCrossPostInfo(
   channel: { bandPublishMethod?: string | null },
   product: {
+    name?: string
+    sourceProductName?: string | null
     variants?: { price: number; wholesalePrice: unknown }[]
+    channel?: { name: string; channelKey: string; kind?: string } | null
     collectedPost?: { title: string | null; channel?: { name: string; channelKey: string } | null } | null
   },
   tier: string
 ): CrossPostInfo | undefined {
   if ((channel.bandPublishMethod || 'COMPOSE') !== 'CROSSPOST') return undefined
   if (tier !== 'RETAIL') return undefined // 도매(WHOLESALE) tier 는 기존 방식 유지
-  const src = product.collectedPost
-  if (!src || !src.title || !src.channel?.channelKey || !src.channel?.name) return undefined
+  // 원본 도매밴드: collectedPost.channel 우선, 없으면 Product.channel(도매)로 폴백
+  const srcChannel =
+    product.collectedPost?.channel ??
+    (product.channel && (product.channel.kind === undefined || product.channel.kind === 'WHOLESALE')
+      ? product.channel
+      : null)
+  // 매칭 제목: 원본글 제목 → 도매원본품명 → (최후) 가공 상품명
+  const matchTitle = product.collectedPost?.title ?? product.sourceProductName ?? product.name ?? null
+  if (!srcChannel?.channelKey || !srcChannel?.name || !matchTitle) return undefined
   const priceMap = (product.variants || [])
     .map((v) => ({ from: Math.round(Number(v.wholesalePrice ?? 0)), to: Math.round(Number(v.price ?? 0)) }))
     .filter((p) => p.from > 0 && p.to > 0)
   return {
-    sourceBandKey: src.channel.channelKey,
-    sourceBandName: src.channel.name,
-    sourceMatchTitle: src.title,
+    sourceBandKey: srcChannel.channelKey,
+    sourceBandName: srcChannel.name,
+    sourceMatchTitle: matchTitle,
     priceMap,
   }
 }
@@ -365,7 +377,10 @@ export class PublishService {
               wholesalePrice: true,
             },
           },
-          // 크로스포스트용: 원본 도매글 제목(매칭키) + 도매밴드(name/key)
+          // 크로스포스트용: 원본 도매글 제목(매칭키) + 도매밴드(name/key).
+          // 가공 후 collectedPost 가 삭제되어도 Product.channel(도매 소스)·sourceProductName 으로 폴백.
+          sourceProductName: true,
+          channel: { select: { name: true, channelKey: true, kind: true } },
           collectedPost: {
             select: {
               title: true,
@@ -1059,7 +1074,10 @@ export class PublishService {
               wholesalePrice: true,
             },
           },
-          // 크로스포스트용: 원본 도매글 제목(매칭키) + 도매밴드(name/key)
+          // 크로스포스트용: 원본 도매글 제목(매칭키) + 도매밴드(name/key).
+          // 가공 후 collectedPost 가 삭제되어도 Product.channel(도매 소스)·sourceProductName 으로 폴백.
+          sourceProductName: true,
+          channel: { select: { name: true, channelKey: true, kind: true } },
           collectedPost: {
             select: {
               title: true,
