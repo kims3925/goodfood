@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Store, Save, Trash2, Edit, X, Calendar, Link2, Power, Globe, Image as ImageIcon, Key, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { ArrowLeft, Store, Save, Trash2, Edit, X, Calendar, Link2, Power, Globe, Image as ImageIcon, Key, CheckCircle, XCircle, Clock, Plus } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+import ShopFormModal from '@/components/shop/ShopFormModal'
 import { useToast } from '@/components/ui/Toast'
 
 interface ChannelTheme {
@@ -97,6 +98,8 @@ export default function ChannelDetailPage({
   // Shop 목록
   const [shops, setShops] = useState<Shop[]>([])
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null)
+  // 채널 상세에서 직접 새 쇼핑몰 생성 → 즉시 연결
+  const [showShopCreateModal, setShowShopCreateModal] = useState(false)
 
   // 세션 상태
   const [sessionStatus, setSessionStatus] = useState<{
@@ -828,6 +831,17 @@ export default function ChannelDetailPage({
                             <p className="mt-2 text-xs text-slate-500">
                               이 채널에서 발행할 때 연결될 Shop을 선택합니다.
                             </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowShopCreateModal(true)}
+                              className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-700 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+                            >
+                              <Plus size={15} />
+                              새 쇼핑몰 만들기
+                            </button>
+                            <p className="mt-1.5 text-xs text-slate-400">
+                              쇼핑몰을 새로 만들면 이 채널에 자동으로 선택됩니다. 이후 <b>저장</b>을 눌러 연결을 반영하세요.
+                            </p>
                           </>
                         ) : (
                           <div className="flex items-center gap-3 bg-white rounded-lg p-3 border border-indigo-100">
@@ -1093,6 +1107,21 @@ export default function ChannelDetailPage({
         confirmText="삭제"
         variant="danger"
         isLoading={isDeleting}
+      />
+
+      {/* 채널 상세에서 새 쇼핑몰 생성 → 즉시 이 채널에 연결 */}
+      <ShopFormModal
+        isOpen={showShopCreateModal}
+        onClose={() => setShowShopCreateModal(false)}
+        onSuccess={(savedShop) => {
+          // 목록 갱신 후, 새로 만든 쇼핑몰을 이 채널의 연결 대상으로 자동 선택
+          loadShops()
+          if (savedShop?.id) {
+            setSelectedShopId(savedShop.id)
+            toast.success('새 쇼핑몰을 이 채널에 선택했습니다. 저장을 눌러 연결을 반영하세요.')
+          }
+        }}
+        shop={null}
       />
     </div>
   )

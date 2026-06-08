@@ -24,7 +24,8 @@ interface Shop {
 interface ShopFormModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: () => void
+  /** 생성/수정 성공 시 호출. 새로 생성/수정된 쇼핑몰을 인자로 전달(채널 연결에서 자동 선택용). */
+  onSuccess: (savedShop?: Shop) => void
   shop: Shop | null
 }
 
@@ -249,7 +250,7 @@ export default function ShopFormModal({
 
       if (result.success) {
         toast.success(shop ? '쇼핑몰이 수정되었습니다.' : '쇼핑몰이 등록되었습니다.')
-        onSuccess()
+        onSuccess(result.data)
         onClose()
         resetForm()
       } else {
