@@ -105,6 +105,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // 매니저 관리(매니저 목록/추가)는 어드민 고유 기능 — 매니저가 직접 URL 로 접근해도 차단.
+  // (어드민 패널의 /admin/users/* 로 일원화. /sourcing/user/profile 은 매니저 본인용이라 제외)
+  if (pathname.startsWith('/sourcing/user/list') || pathname.startsWith('/sourcing/user/invite')) {
+    const adminToken = readAuthToken(request, /* preferAdmin */ true)
+    const adminOnlyPayload = adminToken ? await verifyToken(adminToken) : null
+    if (!adminOnlyPayload || adminOnlyPayload.role !== 'ADMIN') {
+      // 매니저/비인가 → 매니저 대시보드로 되돌림
+      return NextResponse.redirect(new URL('/sourcing/dashboard', request.url))
+    }
+    return NextResponse.next()
+  }
+
   if (!token) {
     // 로그인이 안 되어있으면 로그인 페이지로 리다이렉트
     const loginUrl = new URL('/login', request.url)

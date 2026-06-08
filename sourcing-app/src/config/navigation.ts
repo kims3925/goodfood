@@ -116,15 +116,9 @@ export const sourcingMenuItems: MenuItem[] = [
       { label: '프롬프트 / 가격 정책', href: '/sourcing/settings/prompt', icon: FileText },
       { label: '구글 시트', href: '/sourcing/settings/google-sheets', icon: FileSpreadsheet },
       { label: '알림', href: '/sourcing/notification', icon: Bell },
-      {
-        label: '매니저 관리',
-        icon: Users,
-        children: [
-          { label: '매니저 목록', href: '/sourcing/user/list', icon: Users },
-          { label: '매니저 추가', href: '/sourcing/user/invite', icon: UserPlus },
-          { label: '내 정보 / 비밀번호', href: '/sourcing/user/profile', icon: KeyRound },
-        ],
-      },
+      // '매니저 관리'(매니저 목록/추가)는 어드민 고유 기능 → 어드민 패널(/admin/users/*)에만 둔다.
+      // 매니저 탭에서는 제거하고, 매니저 본인용 '내 정보/비밀번호'만 설정 직속으로 유지.
+      { label: '내 정보 / 비밀번호', href: '/sourcing/user/profile', icon: KeyRound },
     ],
   },
 ]
