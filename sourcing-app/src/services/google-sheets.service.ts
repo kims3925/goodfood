@@ -77,6 +77,76 @@ export class GoogleSheetsService {
     }
   }
 
+  // 단건 append 전용 헤더 (A:N 14열) — syncOrdersToSheet 의 날짜그룹 포맷과 별개의 평면 누적 시트.
+  private static readonly APPEND_HEADER = [
+    '주문번호', '쇼핑몰', '주문일시', '상품명', '수량', '판매가', '배송비', '합계',
+    '받는분', '연락처', '주소', '보내는분', '비고', '이메일',
+  ]
+
+  /**
+   * 주문 1건의 행들을 시트에 "추가"(append)한다 — 기존 데이터를 지우지 않는다.
+   * syncOrdersToSheet(전체 덮어쓰기)와 달리, 주문 상세에서 버튼 1클릭으로 누적 기록하는 용도.
+   * 전용 탭(기본 '쇼핑몰주문')을 사용해 도매발주 동기화(전체 clear)와 충돌하지 않게 한다.
+   */
+  async appendOrderRows(
+    userId: number,
+    rows: SheetRowData[],
+    sheetTabName: string = '쇼핑몰주문'
+  ): Promise<{ success: boolean; message: string; url?: string; appended: number }> {
+    const serviceAccountJson = await settingsService.getGoogleSheetServiceAccount(userId)
+    if (!serviceAccountJson) {
+      throw new Error('구글 시트 설정이 없습니다. 설정 페이지에서 먼저 설정해주세요.')
+    }
+    const settings = await settingsService.getGoogleSheetSettings(userId)
+    if (!settings) {
+      throw new Error('구글 시트 설정이 없습니다.')
+    }
+
+    const sheets = await this.getSheetsClient(serviceAccountJson)
+    const spreadsheetId = settings.spreadsheetId
+
+    // 탭 보장
+    await this.ensureSheetExists(sheets, spreadsheetId, sheetTabName)
+
+    // 헤더 존재 여부 확인 (A1 비어있으면 헤더 먼저 기록)
+    const head = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetTabName}!A1:N1`,
+    })
+    const hasHeader = Array.isArray(head.data.values) && head.data.values.length > 0
+    if (!hasHeader) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${sheetTabName}!A1`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [GoogleSheetsService.APPEND_HEADER] },
+      })
+    }
+
+    // 데이터 행 구성 후 append
+    const values = rows.map((r) => [
+      r.orderNumber, r.shopName, r.timestamp, r.productName, r.quantity,
+      r.productAmount, r.shippingFee, r.totalAmount, r.recipientName, r.recipientPhone,
+      r.fullAddress, r.senderName, r.cashReceipt, r.email,
+    ])
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${sheetTabName}!A:N`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values },
+    })
+
+    await settingsService.updateGoogleSheetLastSynced(userId)
+
+    return {
+      success: true,
+      message: `${rows.length}건의 항목이 구글 시트('${sheetTabName}')에 추가되었습니다.`,
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
+      appended: rows.length,
+    }
+  }
+
   /**
    * 시트 존재 여부 확인 및 생성
    */

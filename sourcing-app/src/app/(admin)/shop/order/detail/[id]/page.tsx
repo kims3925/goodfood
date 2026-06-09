@@ -30,6 +30,7 @@ import Loading from '@/components/ui/Loading'
 import ConfirmModal from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
 import OrderTextCopyButton from '@/components/order/OrderTextCopyButton'
+import OrderSheetSyncButton from '@/components/order/OrderSheetSyncButton'
 
 type OrderSource = 'SHOPPING_MALL' | 'GOOGLE_FORM'
 
@@ -954,6 +955,13 @@ export default function UnifiedOrderDetailPage() {
                 orderSubtotal={(order as any).subtotalAmount}
                 orderTotal={(order as any).totalAmount}
                 orderDiscount={(order as any).discountAmount}
+              />
+            )}
+
+            {isShoppingMall && (
+              <OrderSheetSyncButton
+                order={order}
+                disabled={!order.shippingAddress}
               />
             )}
 
