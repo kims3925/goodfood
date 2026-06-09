@@ -7,6 +7,8 @@ interface ChannelSessionStatus {
   name: string
   hasSession: boolean
   isValid: boolean
+  // 저장된 세션이 어느 밴드 로그인 계정 것인지 (null = 구버전 저장분, 계정 미상)
+  sessionAccountEmail: string | null
   expiresAt: string | null
   remainingMinutes: number | null
 }

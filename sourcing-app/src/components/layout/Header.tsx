@@ -224,7 +224,14 @@ const SessionIndicator = memo(function SessionIndicator() {
           <div className="space-y-1.5 max-h-40 overflow-y-auto">
             {channels.map((ch) => (
               <div key={ch.id} className="flex items-center justify-between text-xs">
-                <span className="text-gray-600 truncate max-w-[140px]">{ch.name}</span>
+                <span className="text-gray-600 truncate max-w-[140px]">
+                  {ch.name}
+                  {ch.sessionAccountEmail && (
+                    <span className="block text-[10px] text-violet-500 truncate" title={ch.sessionAccountEmail}>
+                      {ch.sessionAccountEmail}
+                    </span>
+                  )}
+                </span>
                 {ch.isValid ? (
                   <span className="flex items-center gap-1 text-green-600">
                     <Wifi size={10} />

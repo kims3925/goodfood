@@ -39,28 +39,37 @@ export async function GET(request: NextRequest) {
         name: true,
         bandSessionCookie: true,
         sessionExpiresAt: true,
+        sessionAccountEmail: true,
       },
     })
 
     const now = new Date()
 
-    // 같은 계정이므로 하나의 채널만 실제 검증하면 됨
+    // 계정별 검증 (2026-06-10): 매니저별로 밴드 계정이 다를 수 있으므로
+    // sessionAccountEmail 값별로 그룹핑해 계정당 1개 채널씩만 실제 검증.
+    // (같은 계정의 세션은 동일 쿠키이므로 그룹 대표 1개로 충분.
+    //  구버전 저장분 null 은 '(unknown)' 그룹으로 묶어 기존처럼 1회 검증.)
     let sessionVerified = false
-    let sessionActuallyValid: boolean | null = null
     let verifiedAt: string | null = null
+    const verifyResultByAccount = new Map<string, boolean>()
 
-    // 세션이 있는 첫 번째 채널로 검증
     if (shouldVerify) {
-      const channelWithSession = channels.find((c) => c.bandSessionCookie)
-      if (channelWithSession) {
+      const byAccount = new Map<string, (typeof channels)[number]>()
+      for (const c of channels) {
+        if (!c.bandSessionCookie) continue
+        const key = c.sessionAccountEmail ?? '(unknown)'
+        if (!byAccount.has(key)) byAccount.set(key, c)
+      }
+      for (const [account, channel] of Array.from(byAccount.entries())) {
         try {
-          console.log(`[Band Session] Verifying session via channel ${channelWithSession.id}: ${channelWithSession.name}`)
-          sessionActuallyValid = await sessionManager.testSession(channelWithSession.id)
+          console.log(`[Band Session] Verifying session account=${account} via channel ${channel.id}: ${channel.name}`)
+          const valid = await sessionManager.testSession(channel.id)
+          verifyResultByAccount.set(account, valid)
           sessionVerified = true
           verifiedAt = new Date().toISOString()
           // 세션 무효화는 testSession 내부에서 해당 채널에 대해서만 처리
         } catch (error: any) {
-          console.error(`[Band Session] Verify failed:`, error.message)
+          console.error(`[Band Session] Verify failed (account=${account}):`, error.message)
         }
       }
     }
@@ -74,8 +83,9 @@ export async function GET(request: NextRequest) {
       // - sessionExpiresAt이 있고 만료된 경우에만 무효로 처리
       let isValid = hasSession && (expiresAt === null || new Date(expiresAt) > now)
 
-      // 실제 검증 결과 적용 (세션 만료 시 모두 만료)
-      if (sessionVerified && sessionActuallyValid === false) {
+      // 실제 검증 결과 적용 — 같은 계정 그룹의 채널만 만료 처리
+      const accountKey = channel.sessionAccountEmail ?? '(unknown)'
+      if (sessionVerified && verifyResultByAccount.get(accountKey) === false) {
         isValid = false
       }
 
@@ -91,6 +101,7 @@ export async function GET(request: NextRequest) {
         name: channel.name,
         hasSession,
         isValid,
+        sessionAccountEmail: channel.sessionAccountEmail,
         expiresAt: expiresAt?.toISOString() || null,
         remainingMinutes,
         verifiedAt: sessionVerified ? verifiedAt : null,
