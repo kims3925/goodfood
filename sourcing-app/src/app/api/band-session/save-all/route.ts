@@ -49,13 +49,38 @@ export async function POST(request: NextRequest) {
 
     // 요청 본문에서 쿠키 데이터 추출
     const body = await request.json()
-    const { cookieString, sessionExpiresAt: providedExpiresAt } = body
+    const { cookieString, sessionExpiresAt: providedExpiresAt, bandAccountEmail } = body
 
     if (!cookieString) {
       return NextResponse.json(
         { success: false, error: '쿠키 데이터가 없습니다.' },
         { status: 400, headers: corsHeaders }
       )
+    }
+
+    // 밴드 로그인 계정 검증 (2026-06-10)
+    // User.bandLoginEmail 이 설정된 사용자는 확장에서 보낸 계정과 일치해야 저장 허용.
+    // 미설정(null) 이면 검증 생략 — 기존 동작 보존 (하위호환).
+    const me = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { bandLoginEmail: true },
+    })
+    const expected = me?.bandLoginEmail?.toLowerCase() ?? null
+    const provided = (bandAccountEmail ?? '').trim().toLowerCase() || null
+
+    if (expected) {
+      if (!provided) {
+        return NextResponse.json(
+          { success: false, error: `이 계정은 밴드 로그인 계정이 [${expected}] 로 설정되어 있습니다. 확장 프로그램에서 현재 밴드 로그인 계정을 확인 후 다시 저장해주세요.` },
+          { status: 409, headers: corsHeaders }
+        )
+      }
+      if (provided !== expected) {
+        return NextResponse.json(
+          { success: false, error: `밴드 로그인 계정 불일치: 설정=[${expected}], 현재 브라우저=[${provided}]. ${expected} 로 band.us 에 로그인한 브라우저에서 저장해주세요.` },
+          { status: 409, headers: corsHeaders }
+        )
+      }
     }
 
     // 사용자의 모든 소매 채널 조회
@@ -117,11 +142,13 @@ export async function POST(request: NextRequest) {
       data: {
         bandSessionCookie: cookieString,
         sessionExpiresAt: expiresAt,
+        // 이 세션이 어느 밴드 계정 것인지 기록 (계정 검증 통과값 또는 설정값)
+        sessionAccountEmail: provided ?? expected,
       },
     })
 
     console.log(
-      `[BandSession] 일괄 세션 저장 완료: userId=${payload.userId}, 채널 ${updateResult.count}개, 만료=${expiresAt.toISOString()}`
+      `[BandSession] 일괄 세션 저장 완료: userId=${payload.userId}, 채널 ${updateResult.count}개, 계정=${provided ?? expected ?? '(미상)'}, 만료=${expiresAt.toISOString()}`
     )
 
     return NextResponse.json(
