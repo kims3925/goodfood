@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260610-004 | Done(코드)/배포 대기 | 2026-06-10 | - | 소싱 현황판 신설 — /sourcing/pipeline + GET /api/sourcing/pipeline-status. 수집→AI가공→소매밴드/쇼핑몰 발행 단계를 기존 상품 포함 한눈에 (단계 필터/검색/채널/기간) | Low | Claude |
+| TR-20260610-003 | Done(코드)/배포 대기 + 운영DB 직접반영 완료 | 2026-06-10 | - | WholesaleWatch 활성화 — 운영 채널 40/41 bandNo 설정(82999897/85260087)+AgentDefinition seed(SQL). deleteBandPost=true (도매방 모니터링만, 소매밴드/쇼핑몰만 삭제 반영) | Medium | Claude |
 | TR-20260610-002 | Done(코드)/운영 db push 대기 | 2026-06-10 | - | AgentTask/AgentLog userId 추가 (SaaS P0-2 테넌트 식별) — 이벤트 data.userId / 로그 metadata.userId 기록, null=전역 | Low | Claude |
 | TR-20260610-001 | Done(코드)/운영 db push·확장 재배포 대기 | 2026-06-10 | - | 밴드 로그인 계정 설정 (SaaS P0-1/P0-4) — User.bandLoginEmail + Channel.sessionAccountEmail, save-all 계정 검증(409), status 계정별 검증, 설정 UI, 확장 v1.2.0 계정 확인 체크박스 + background 자동저장 계정 회신 | Medium | Claude |
 | TR-20260527-003 | Done(코드)/db push 대기 | 2026-05-27 | - | 경영밴드 SaaS Phase 4.1: 채널별 만료정책 (Channel.expiryDaysNormal/Com/autoExpireEnabled + GET/PUT /api/channel/[id]/expiry-policy + runContentExpiry autoExpire skip & 안전 per-channel 후처리) | Medium | Claude |

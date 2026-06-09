@@ -449,3 +449,10 @@ const finalAmount = customTotalAmount ?? calculateAutoTotal()
 - 저장 시 `bandAccountEmail` 회신, 성공 시 `chrome.storage.local.confirmedBandAccountEmail` 저장.
 - background 자동저장(1시간 주기)은 팝업에서 확인된 계정을 회신 — 미확인 상태로 409 거부되면
   팝업을 열어 1회 수동 저장하면 이후 자동저장이 재개됨.
+
+### `/sourcing/pipeline` (소싱 현황판, 2026-06-10 신설)
+
+- 사이드바 "상품 > 소싱 현황" 메뉴. 기존 post/list(미가공만)와 달리 **가공·발행된 기존 게시물 포함 전체**를 보여줌.
+- 단계 요약 카드 4개(전체/수집됨·미가공/가공완료·미발행/발행완료)가 클릭 필터로 동작.
+- 행: 수집일 / 도매채널 / 원본 상품명(+가공명) / AI가공 시각 / 소매밴드 발행 칩 / 쇼핑몰 발행 칩 / 바로가기(가공상품 상세·도매 원본글).
+- 검색·도매채널·수집일 범위 필터 + 20/50/100 페이지네이션.

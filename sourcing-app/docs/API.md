@@ -1716,3 +1716,9 @@ interface PipelineDashboardResponse {
 - `GET /api/band-session/status` — 채널 응답에 `sessionAccountEmail` 추가.
   `verify=true` 시 "첫 채널 1개만 검증"(단일 계정 가정)을 제거하고 **sessionAccountEmail 값별로
   계정당 1개 채널씩 검증**. 검증 실패 시 같은 계정 그룹의 채널만 만료 처리.
+
+### 2026-06-10 추가 — 소싱 현황판
+
+| 엔드포인트 | 메서드 | 설명 |
+|---|---|---|
+| `/api/sourcing/pipeline-status` | GET | 수집(CollectedPost)→AI가공(Product)→발행(ChannelProduct/ShopProduct) 단계를 게시물 단위로 조회. 쿼리: page/limit/search/channelId/stage(all·collected·processed·published)/startDate/endDate. 단계별 summary 카운트 포함 |
