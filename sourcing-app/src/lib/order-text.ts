@@ -49,6 +49,22 @@ function commonShipping(items: OrderTextItem[]): number {
   return items.reduce((max, i) => Math.max(max, i.shippingFee || 0), 0)
 }
 
+/**
+ * 공급가(도매원가) 표시 줄 생성.
+ * - 배송비 별도 + foldShipping: "공급가 : 25,000원 (배송비-4,000원포함)" (도매가+배송비 합산 표시)
+ * - 배송비 별도 + !foldShipping(다품목 합배송): "공급가 : 21,000원 (배송비 별도)" (배송비는 하단 합배송 안내)
+ * - 무료배송: "공급가 : 25,000원 (무료배송)"
+ */
+function formatSupplyLine(wholesaleAmount: number, ship: number, foldShipping: boolean): string {
+  if (ship > 0) {
+    if (foldShipping) {
+      return `■ 공급가 : ${(wholesaleAmount + ship).toLocaleString()}원 (배송비-${ship.toLocaleString()}원포함)`
+    }
+    return `■ 공급가 : ${wholesaleAmount.toLocaleString()}원 (배송비 별도)`
+  }
+  return `■ 공급가 : ${wholesaleAmount.toLocaleString()}원 (무료배송)`
+}
+
 function buildShippingBlock(
   shipping: OrderTextShipping,
   customerName?: string,
@@ -124,7 +140,8 @@ export function generateOrderText(data: OrderTextData): string {
 
   lines.push(`■ 판매가 : ${sellPrice.toLocaleString()}원`)
   if (totalWholesale > 0) {
-    lines.push(`■ 공급가 : ${totalWholesale.toLocaleString()}원`)
+    // 단일 블록(전 품목 묶음) → 공급가에 배송비 합산 표시
+    lines.push(formatSupplyLine(totalWholesale, ship, true))
   }
   lines.push(`■ 배송비 : ${ship > 0 ? `${ship.toLocaleString()}원` : '무료'}`)
   lines.push(`■ 합계   : ${grandTotal.toLocaleString()}원`)
@@ -183,7 +200,8 @@ export function generateOrderTextsPerItem(data: OrderTextData): string[] {
 
     lines.push(`■ 판매가 : ${itemPrice.toLocaleString()}원`)
     if (itemWholesale > 0) {
-      lines.push(`■ 공급가 : ${itemWholesale.toLocaleString()}원`)
+      // 단일 품목 → 공급가에 배송비 합산 표시 / 다품목 → 배송비는 하단 합배송 안내(중복합산 방지)
+      lines.push(formatSupplyLine(itemWholesale, ship, isSingle))
     }
     if (isSingle) {
       const finalTotal = hasOrderTotals && data.orderTotal != null

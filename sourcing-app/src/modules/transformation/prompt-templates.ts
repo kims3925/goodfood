@@ -30,29 +30,19 @@ export const EXTRACTION_RULES = `# 🚫 수집 제외 규칙
 
 # 📦 상품 정보 추출 규칙
 
-## 1. 상품명 (카피형 네이밍, 20-35자)
+## 1. 상품명 (원본 제목 그대로 — 변형 절대 금지)
 
-### 네이밍 공식
-[임팩트 키워드] + [원산지/브랜드] + [품질 수식어] + [상품명] + (옵션 요약)
+**productName 은 원본 게시글 "제목"을 한 글자도 바꾸지 말고 그대로 사용한다.**
+기존 "20-35자 카피형 네이밍 생성" 규칙은 **폐기**됨 — 더 이상 새 상품명을 만들지 않는다.
 
-### 임팩트 키워드 예시
-| 카테고리 | 추천 키워드 |
-|---------|-----------|
-| 수산물 | 싱싱한, 통통한, 당일조업, 자연산, 활 |
-| 농산물 | 꿀맛, 햇, 유기농, 무농약, 산지직송 |
-| 가공식품 | N년전통, 수제, 프리미엄, 명품, 홈메이드 |
-| 축산물 | 신선한, 1등급, 프리미엄, 한우, 국내산 |
-
-### 작성 규칙
-- 첫 단어에 임팩트 있는 형용사 배치
-- 원산지/지역명으로 신뢰도 확보
-- 느낌표는 최대 1개 (없어도 됨)
-- 20~35자 이내로 간결하게
+### 규칙 (필수)
+- 제목 문구를 띄어쓰기·기호·이모지·숫자·괄호까지 **원본 그대로** 복사한다.
+- ❌ 임팩트 키워드/수식어 추가, 단어 재배열·축약, 오타 "교정", 옵션요약 덧붙이기 — 모두 금지.
+- 제목이 비어있을 때만 본문 첫 줄의 상품명 문구를 그대로 사용한다.
 
 ### 예시
-✅ "싱싱한 통영산 활돌문어 (대/특대)"
-✅ "꿀달수 무안 황토 고구마 10kg"
-❌ "낙지!!!" (너무 짧거나 느낌표 등의 표현이 과다함)
+원본 제목 "고흥 활낙지" → productName "고흥 활낙지" (그대로)
+❌ "당일조업 고흥 활낙지 (세발/얼치기/소)" — 변형 금지
 
 ---
 
@@ -102,6 +92,11 @@ export const EXTRACTION_RULES = `# 🚫 수집 제외 규칙
 ---
 
 ## 3. 옵션 및 가격 추출
+
+### ⭐ 옵션 원문 보존 (필수)
+optionSummary 와 options 의 각 value 는 **원본 게시글에 적힌 옵션 문구를 그대로** 사용한다.
+- ❌ "세발낙지 10마리" → "세발 10미" 처럼 축약·재명명·단위변경 금지
+- ✅ 원본 표기(단위·띄어쓰기·기호 포함) 그대로 유지. groupName(분류명)만 적절히 부여한다.
 
 ### 가격 패턴 인식
 일반: 48,000원, 48000원, ₩48,000, ￦48000
@@ -219,7 +214,7 @@ export const SINGLE_RESPONSE_FORMAT = `# 📝 응답 형식
 
 ## 정상 응답 (순수 JSON, 마크다운 금지)
 {
-  "productName": "string (20-35자)",
+  "productName": "string (원본 제목 그대로 — 변형 금지)",
   "description": "string (300-600자)",
   "category": "string",
   "options": [
@@ -258,19 +253,19 @@ export const SINGLE_EXAMPLE = `# 💡 예시
 
 출력:
 {
-  "productName": "당일조업 고흥 활낙지 (세발/얼치기/소)",
+  "productName": "고흥 활낙지",
   "description": "1. 크기와 규격\\n• 세발낙지: 다리가 가늘고 부드러운 소형 낙지\\n• 얼치기: 중간 크기로 적당한 식감\\n• 소낙지: 통통하게 살이 오른 대형 낙지\\n• 마리당 100~300g 내외\\n\\n2. 신선도와 원산지\\n• 전남 고흥 청정 갯벌에서 당일 조업!\\n• 펄떡펄떡 살아있는 상태로 산소포장\\n• 받으시면 아직도 움직이는 낙지를 확인하실 수 있어요.\\n\\n3. 맛과 품질\\n• 갯벌에서 자란 뻘낙지 특유의 고소한 맛!\\n• 비린내 없이 감칠맛이 가득합니다.\\n• 산지 어부가 직접 선별하여 품질 보장 😊\\n\\n4. 추천 요리법\\n• 세발낙지: 탕탕이, 연포탕, 낙지전골\\n• 얼치기/소낙지: 낙지볶음, 낙지숙회, 산낙지회",
   "category": "수산물",
   "options": [
-    { "groupName": "규격", "values": ["세발 10미", "세발 5미", "얼치기 10미", "얼치기 5미", "소낙지 10미"] }
+    { "groupName": "규격", "values": ["세발낙지 10마리", "세발낙지 5미", "얼치기 10마리", "얼치기 5미", "소낙지 10마리"] }
   ],
   "pricing": { "wholesalePrice": 29000, "price": 29000, "currency": "KRW" },
   "variants": [
-    { "optionSummary": "세발 10미", "options": { "규격": "세발 10미" }, "wholesalePrice": 48000, "price": 48000, "bundleUnit": 1 },
-    { "optionSummary": "세발 5미", "options": { "규격": "세발 5미" }, "wholesalePrice": 29000, "price": 29000, "bundleUnit": 1 },
-    { "optionSummary": "얼치기 10미", "options": { "규격": "얼치기 10미" }, "wholesalePrice": 55000, "price": 55000, "bundleUnit": 1 },
+    { "optionSummary": "세발낙지 10마리", "options": { "규격": "세발낙지 10마리" }, "wholesalePrice": 48000, "price": 48000, "bundleUnit": 1 },
+    { "optionSummary": "세발낙지 5미", "options": { "규격": "세발낙지 5미" }, "wholesalePrice": 29000, "price": 29000, "bundleUnit": 1 },
+    { "optionSummary": "얼치기 10마리", "options": { "규격": "얼치기 10마리" }, "wholesalePrice": 55000, "price": 55000, "bundleUnit": 1 },
     { "optionSummary": "얼치기 5미", "options": { "규격": "얼치기 5미" }, "wholesalePrice": 32500, "price": 32500, "bundleUnit": 1 },
-    { "optionSummary": "소낙지 10미", "options": { "규격": "소낙지 10미" }, "wholesalePrice": 70000, "price": 70000, "bundleUnit": 1 }
+    { "optionSummary": "소낙지 10마리", "options": { "규격": "소낙지 10마리" }, "wholesalePrice": 70000, "price": 70000, "bundleUnit": 1 }
   ],
   "shipping": { "shippingFee": 5000, "shippingInfo": "택배비 별도 5,000원", "bundleMaxQty": 1 }
 }`
@@ -312,7 +307,7 @@ export const BATCH_RESPONSE_FORMAT = `# 📋 데이터 구조 규칙 (필수!)
 [
   {
     "postId": 게시물ID숫자,
-    "productName": "string (20-35자)",
+    "productName": "string (원본 제목 그대로 — 변형 금지)",
     "description": "string (300-600자)",
     "category": "string",
     "options": [

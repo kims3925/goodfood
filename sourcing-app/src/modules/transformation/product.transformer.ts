@@ -928,12 +928,18 @@ function buildProductDraft(
     }]
   }
 
+  // 상품명: 원본 게시글 "제목"을 그대로 사용한다 (사용자 요구: 한 글자도 변형 금지).
+  // 프롬프트로도 동일하게 지시하지만, AI 가 드리프트해도 제목이 있으면 제목으로 강제한다.
+  // 제목이 비어있을 때만 AI 추출 상품명(본문 첫 줄)으로 폴백.
+  const originalTitle = (post.title || '').trim()
+  const finalName = originalTitle || analysis.productName
+
   // 카테고리 자동 분류 (AI가 넘긴 자연어 값 대신 영문 코드 체계 사용)
-  const classification = classifyProduct(analysis.productName, analysis.description)
+  const classification = classifyProduct(finalName, analysis.description)
 
   // Build product draft
   const draft: ProductDraft = {
-    name: analysis.productName,
+    name: finalName,
     description: analysis.description,
     categoryId: classification.categoryId, // SEA/AGR/MEA/MKT/PRC/HLT/ETC
     thumbnailUrl: thumbnailUrl || undefined,
