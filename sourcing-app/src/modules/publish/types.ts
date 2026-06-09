@@ -9,6 +9,9 @@ export interface PublishToChannelParams {
   channelId: number
   // 다단계 발행 fan-out 묶음 ID (saga 추적). 지정 시 ChannelProduct.publishBatchId 에 스냅샷.
   publishBatchId?: string
+  // 발행 시점 밴드 발행 방식 강제 override (모달에서 사용자가 선택).
+  // 'CROSSPOST'=다른밴드올리기, 'COMPOSE'=AI가공 본문작성. 미지정 시 채널 설정(bandPublishMethod) 사용.
+  publishMethodOverride?: 'COMPOSE' | 'CROSSPOST'
 }
 
 export interface PublishToChannelResult {
@@ -35,6 +38,8 @@ export interface PublishBatchParams {
   onProgress?: (current: number, total: number, result: PublishToChannelResult) => void | Promise<void>
   // 다단계 발행 fan-out 묶음 ID (saga 추적)
   publishBatchId?: string
+  // 발행 시점 밴드 발행 방식 강제 override (모달 선택값을 그대로 전달)
+  publishMethodOverride?: 'COMPOSE' | 'CROSSPOST'
 }
 
 export interface PublishBatchResult {
@@ -54,6 +59,8 @@ export interface PublishMultiChannelParams {
   productIds: number[]
   channelIds: number[]
   cooldownMs?: number
+  // 발행 시점 밴드 발행 방식 강제 override (모달 선택값)
+  publishMethodOverride?: 'COMPOSE' | 'CROSSPOST'
 }
 
 export interface PublishMultiChannelResult {

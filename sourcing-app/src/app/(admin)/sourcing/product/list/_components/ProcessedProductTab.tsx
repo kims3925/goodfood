@@ -183,6 +183,8 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
     individual: true,
     digest: false,
   })
+  // 밴드 발행 방식 — 'COMPOSE'=AI가공 본문작성(기본), 'CROSSPOST'=다른밴드올리기(원본 보존 공유)
+  const [autoPublishMethod, setAutoPublishMethod] = useState<'COMPOSE' | 'CROSSPOST'>('COMPOSE')
   // 자동발행 지연 (분). 0 = 즉시.
   const [autoPublishDelayMinutes, setAutoPublishDelayMinutes] = useState<number>(0)
   // 예약된 자동발행 — 서버 측 workflow 의 메타데이터. delayMinutes > 0 일 때만 set.
@@ -1231,6 +1233,7 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
             individual: autoPublishMode.individual,
             digest: autoPublishMode.digest,
           },
+          publishMethod: autoPublishMethod,
           digestMaxImagesPerProduct: 4,
           delayMinutes,
         }),
@@ -2117,6 +2120,48 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
                 {autoPublishMode.individual && autoPublishMode.digest && (
                   <div className="mt-2 p-2 rounded-md bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
                     ℹ️ 둘 다 선택하면 <b>개별발행 → 종합발행</b> 순서로 실행됩니다.
+                  </div>
+                )}
+              </div>
+
+              {/* 밴드 발행 방식 (개별발행 소매밴드에만 적용) */}
+              <div>
+                <span className="text-sm font-semibold text-gray-800 mb-2 block">🪧 밴드 발행 방식</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className={`flex items-start gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    autoPublishMethod === 'COMPOSE' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="autoPublishMethod"
+                      checked={autoPublishMethod === 'COMPOSE'}
+                      onChange={() => setAutoPublishMethod('COMPOSE')}
+                      className="mt-0.5 w-4 h-4 border-gray-300 text-blue-600"
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900 text-sm">AI 가공</p>
+                      <p className="text-xs text-gray-500 mt-0.5">가공된 본문·이미지로 새 게시글 작성 (기존 방식).</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-start gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    autoPublishMethod === 'CROSSPOST' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="autoPublishMethod"
+                      checked={autoPublishMethod === 'CROSSPOST'}
+                      onChange={() => setAutoPublishMethod('CROSSPOST')}
+                      className="mt-0.5 w-4 h-4 border-gray-300 text-indigo-600"
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900 text-sm">다른 밴드에 올리기</p>
+                      <p className="text-xs text-gray-500 mt-0.5">원본 도매글(영상·디자인)을 그대로 공유 후 가격 치환.</p>
+                    </div>
+                  </label>
+                </div>
+                {autoPublishMethod === 'CROSSPOST' && (
+                  <div className="mt-2 p-2 rounded-md bg-indigo-50 border border-indigo-200 text-[11px] text-indigo-800">
+                    ℹ️ <b>다른 밴드에 올리기</b>는 <b>개별발행(소매밴드)</b>에만 적용됩니다. 원본글 매칭 실패 시 자동으로 AI 가공 발행으로 폴백합니다. (종합발행·쇼핑몰은 영향 없음)
                   </div>
                 )}
               </div>

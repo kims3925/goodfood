@@ -32,6 +32,9 @@ export interface ProcessedJobInput {
   mode: { individual: boolean; digest: boolean }
   digestMaxImagesPerProduct: 1 | 2 | 4
   delayMinutes: number
+  // 밴드 발행 방식 강제 override (모달 선택). 'CROSSPOST'=다른밴드올리기, 'COMPOSE'=AI가공.
+  // 미지정 시 각 채널의 bandPublishMethod 설정을 따른다.
+  publishMethod?: 'COMPOSE' | 'CROSSPOST'
   // 디지스트 HTTP 루프백용 — 캡처된 쿠키/베이스URL
   loopback: { baseUrl: string; cookieHeader: string }
 }
@@ -140,7 +143,7 @@ async function runDigest(input: {
 export async function runProcessedJob(input: ProcessedJobInput): Promise<void> {
   const {
     userId, workflowId, productIds, retailChannelIds, shopIds, mode,
-    digestMaxImagesPerProduct, delayMinutes, loopback,
+    digestMaxImagesPerProduct, delayMinutes, publishMethod, loopback,
   } = input
 
   console.log(`[processed-job:${workflowId}] 시작 — products=${productIds.length} retail=${retailChannelIds.length} shops=${shopIds.length} mode=${JSON.stringify(mode)} delay=${delayMinutes}분`)
@@ -177,6 +180,7 @@ export async function runProcessedJob(input: ProcessedJobInput): Promise<void> {
           userId,
           productIds,
           channelIds: retailChannelIds,
+          publishMethodOverride: publishMethod,
         })
         totalSuccess += res.successCount
         totalFailed += res.failedCount

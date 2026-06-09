@@ -62,9 +62,12 @@ function buildCrossPostInfo(
     channel?: { name: string; channelKey: string; kind?: string; bandNo?: number | null } | null
     collectedPost?: { title: string | null; channel?: { name: string; channelKey: string; bandNo?: number | null } | null } | null
   },
-  tier: string
+  tier: string,
+  // 발행 시점 모달 선택값. 지정 시 채널 설정(bandPublishMethod)보다 우선한다.
+  publishMethodOverride?: 'COMPOSE' | 'CROSSPOST'
 ): CrossPostInfo | undefined {
-  if ((channel.bandPublishMethod || 'COMPOSE') !== 'CROSSPOST') return undefined
+  const effectiveMethod = publishMethodOverride || channel.bandPublishMethod || 'COMPOSE'
+  if (effectiveMethod !== 'CROSSPOST') return undefined
   if (tier !== 'RETAIL') return undefined // 도매(WHOLESALE) tier 는 기존 방식 유지
   // 원본 도매밴드: collectedPost.channel 우선, 없으면 Product.channel(도매)로 폴백
   const srcChannel =
@@ -280,7 +283,7 @@ export class PublishService {
    * 단일 상품을 단일 채널에 발행 (쿼터 에러 시 재시도)
    */
   async publishToChannel(params: PublishToChannelParams, retryCount: number = 0): Promise<PublishToChannelResult> {
-    const { userId, productId, channelId, publishBatchId } = params
+    const { userId, productId, channelId, publishBatchId, publishMethodOverride } = params
 
     // 가격이미지 검출/마킹 (Gemini Vision, isPriceBanner=NULL 인 것만 첫 발행 시 분석)
     await maybeMarkPriceImagesForRetailPublish(userId, productId)
@@ -488,9 +491,9 @@ export class PublishService {
             content: postContent,
             imageUrls,
             commentContent: orderLink ? `주문하기 👉 ${orderLink}` : undefined,
-            // 크로스포스트 opt-in (CROSSPOST 채널만). 실패 시 위 본문작성으로 자동 폴백.
-            // 미설정 채널은 undefined → 기존 동작 100% 동일.
-            crossPost: buildCrossPostInfo(channel, product, tier),
+            // 크로스포스트 opt-in (CROSSPOST 채널 또는 모달 override). 실패 시 위 본문작성으로 자동 폴백.
+            // 미설정 + override 없음 → undefined → 기존 동작 100% 동일.
+            crossPost: buildCrossPostInfo(channel, product, tier, publishMethodOverride),
           })
 
           if (playwrightResult.success && playwrightResult.postKey) {
@@ -617,7 +620,7 @@ export class PublishService {
    * Playwright 세션이 있으면 이미지 포함, 없으면 Band API로 텍스트만 발행
    */
   async publishBatch(params: PublishBatchParams): Promise<PublishBatchResult> {
-    const { userId, productIds, channelId, onProgress, publishBatchId } = params
+    const { userId, productIds, channelId, onProgress, publishBatchId, publishMethodOverride } = params
 
     // 채널 정보 조회 (Shop 정보 포함)
     const channel = await prisma.channel.findFirst({
@@ -686,7 +689,7 @@ export class PublishService {
         await delay(cooldownMs)
       }
 
-      const result = await this.publishToChannel({ userId, productId, channelId, publishBatchId })
+      const result = await this.publishToChannel({ userId, productId, channelId, publishBatchId, publishMethodOverride })
       results.push(result)
 
       // 다음 쿨다운을 위해 발행 방식 저장
@@ -730,7 +733,7 @@ export class PublishService {
    * 여러 상품을 여러 채널에 발행
    */
   async publishMultiChannel(params: PublishMultiChannelParams): Promise<PublishMultiChannelResult> {
-    const { userId, productIds, channelIds } = params
+    const { userId, productIds, channelIds, publishMethodOverride } = params
 
     const channelResults: PublishBatchResult[] = []
     let totalSuccess = 0
@@ -738,7 +741,7 @@ export class PublishService {
     let totalSkipped = 0
 
     for (const channelId of channelIds) {
-      const result = await this.publishBatch({ userId, productIds, channelId })
+      const result = await this.publishBatch({ userId, productIds, channelId, publishMethodOverride })
       channelResults.push(result)
       totalSuccess += result.successCount
       totalFailed += result.failedCount

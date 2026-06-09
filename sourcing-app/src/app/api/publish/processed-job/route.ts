@@ -50,6 +50,11 @@ export async function POST(request: NextRequest) {
       : body?.digestMaxImagesPerProduct === 2 ? 2
       : 4
     const delayMinutes = Math.max(0, Math.min(MAX_DELAY_MINUTES, Math.floor(Number(body?.delayMinutes ?? 0) || 0)))
+    // 밴드 발행 방식 override (모달 선택): 'CROSSPOST'=다른밴드올리기, 'COMPOSE'=AI가공. 미지정 시 채널 설정 사용.
+    const publishMethod: 'COMPOSE' | 'CROSSPOST' | undefined =
+      body?.publishMethod === 'CROSSPOST' ? 'CROSSPOST'
+      : body?.publishMethod === 'COMPOSE' ? 'COMPOSE'
+      : undefined
 
     // ── 입력 검증 ──
     if (productIds.length === 0) {
@@ -173,6 +178,7 @@ export async function POST(request: NextRequest) {
         mode,
         digestMaxImagesPerProduct,
         delayMinutes,
+        publishMethod,
         loopback: { baseUrl, cookieHeader },
       }).catch((err) => {
         console.error(`[processed-job:${workflow.id}] runner 진입 실패`, err)

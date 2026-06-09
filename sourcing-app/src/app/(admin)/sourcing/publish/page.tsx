@@ -1303,6 +1303,8 @@ function PublishPageContent() {
     individual: true,
     digest: false,
   })
+  // 밴드 발행 방식 — 'COMPOSE'=AI가공(기본), 'CROSSPOST'=다른밴드올리기(원본 보존)
+  const [republishMethod, setRepublishMethod] = useState<'COMPOSE' | 'CROSSPOST'>('COMPOSE')
   // 재발행 지연 (분). 0 = 즉시.
   const [republishDelayMinutes, setRepublishDelayMinutes] = useState<number>(0)
   // 예약된 재발행 — 서버 측 workflow 의 메타데이터. delayMinutes > 0 일 때만 set.
@@ -1399,6 +1401,7 @@ function PublishPageContent() {
             individual: republishMode.individual,
             digest: republishMode.digest,
           },
+          publishMethod: republishMethod,
           digestMaxImagesPerProduct: 4,
           delayMinutes,
         }),
@@ -2335,6 +2338,35 @@ function PublishPageContent() {
                   탭 닫아도 서버에서 진행됩니다.
                 </span>
               </div>
+              {/* 밴드 발행 방식 (개별발행 소매밴드에만 적용) */}
+              <div className="mt-2 flex items-center gap-4 text-xs">
+                <span className="font-semibold text-gray-700">밴드 방식:</span>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="radio"
+                    name="republishMethod"
+                    checked={republishMethod === 'COMPOSE'}
+                    onChange={() => setRepublishMethod('COMPOSE')}
+                    className="w-4 h-4 border-gray-300 text-blue-600"
+                  />
+                  <span className="text-gray-800">🖋️ AI 가공</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="radio"
+                    name="republishMethod"
+                    checked={republishMethod === 'CROSSPOST'}
+                    onChange={() => setRepublishMethod('CROSSPOST')}
+                    className="w-4 h-4 border-gray-300 text-indigo-600"
+                  />
+                  <span className="text-gray-800">🔗 다른 밴드에 올리기</span>
+                </label>
+              </div>
+              {republishMethod === 'CROSSPOST' && (
+                <p className="mt-1.5 text-[11px] text-indigo-700">
+                  ℹ️ 원본 도매글(영상·디자인)을 그대로 공유 후 가격 치환. 개별발행(소매밴드)에만 적용되며, 매칭 실패 시 AI 가공으로 자동 폴백됩니다.
+                </p>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
