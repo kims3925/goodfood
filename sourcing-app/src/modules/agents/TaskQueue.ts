@@ -72,10 +72,15 @@ export class TaskQueue {
     event: AgentEvent,
     priority: 'CRITICAL' | 'HIGH' | 'NORMAL' | 'LOW' = 'NORMAL'
   ): Promise<string> {
+    // SaaS 테넌트 식별 (2026-06-10): 이벤트 data 에 userId 가 실려 있으면 태스크 소유자로 기록.
+    // 없으면 null = 전역/시스템 태스크 (기존 동작 보존).
+    const userId = typeof event.data?.userId === 'number' ? event.data.userId : null
+
     // Create DB record
     const task = await prisma.agentTask.create({
       data: {
         agentId,
+        userId,
         eventType: event.type,
         payload: JSON.parse(JSON.stringify(event)),
         status: TaskStatus.QUEUED,

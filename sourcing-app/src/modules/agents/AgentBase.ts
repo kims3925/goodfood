@@ -115,6 +115,8 @@ export abstract class AgentBase {
       await prisma.agentLog.create({
         data: {
           agentId,
+          // SaaS 테넌트 식별 (2026-06-10): metadata.userId 가 있으면 로그 소유자로 기록
+          userId: typeof metadata?.userId === 'number' ? metadata.userId : null,
           level: level as LogLevel,
           message,
           metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : undefined,
