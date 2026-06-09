@@ -52,6 +52,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Chrome Extension에서 밴드 로그인 계정 설정 조회 허용 (2026-06-10)
+  // Bearer 토큰 요청만 통과 — 인증은 라우트에서 verifyToken 으로 자체 검증 (실패 시 401)
+  if (pathname === '/api/settings/band-account' && request.headers.get('authorization')?.startsWith('Bearer ')) {
+    return NextResponse.next()
+  }
+
   // CORS preflight 요청 허용
   if (request.method === 'OPTIONS') {
     return NextResponse.next()
