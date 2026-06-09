@@ -1697,3 +1697,22 @@ interface PipelineDashboardResponse {
 
 - `SESSION_MISSING` — pre-flight 차단 시 `{ invalidChannels[], guideUrl }` 추가 반환 (HTTP 400)
 - 푸터 이미지 hotfix: 내부 API 이미지(`/api/images/{channel|product|post}/file/*`) 는 발행 시 로컬 파일에서 직접 읽음 (HTTP self-loop 회피)
+
+## 2026-06-10 변경사항 (밴드 로그인 계정 설정 + 세션 계정 검증)
+
+자세한 내역은 docs/tracking/CHANGELOG.md TR-20260610-001 ~ TR-20260610-002 참조.
+
+### 신규 API
+
+| 엔드포인트 | 메서드 | 설명 |
+|---|---|---|
+| `/api/settings/band-account` | GET/PUT | 사용자 밴드 로그인 계정(User.bandLoginEmail) 조회/저장. Bearer 토큰(Chrome 확장) + 세션 쿠키 인증 모두 지원, CORS 허용 |
+
+### 변경 API
+
+- `POST /api/band-session/save-all` — 요청 body 에 `bandAccountEmail` 추가 수신.
+  `User.bandLoginEmail` 설정 사용자는 일치해야 저장 허용 (불일치/누락 시 **409** + 안내 메시지).
+  저장 시 `Channel.sessionAccountEmail` 에 계정 기록. 미설정 사용자는 기존과 동일(하위호환).
+- `GET /api/band-session/status` — 채널 응답에 `sessionAccountEmail` 추가.
+  `verify=true` 시 "첫 채널 1개만 검증"(단일 계정 가정)을 제거하고 **sessionAccountEmail 값별로
+  계정당 1개 채널씩 검증**. 검증 실패 시 같은 계정 그룹의 채널만 만료 처리.

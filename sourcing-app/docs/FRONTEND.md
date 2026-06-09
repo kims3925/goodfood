@@ -430,3 +430,22 @@ const finalAmount = customTotalAmount ?? calculateAutoTotal()
 ### 페이지 동작 변경
 
 - `/sourcing/product/list` ProcessedProductTab, `/sourcing/publish` 재발행, `/sourcing/post/list` Stage2 — 모두 백그라운드 잡으로 (탭 닫아도 진행)
+
+## 2026-06-10 변경사항
+
+### `/sourcing/settings/api` (API 설정)
+
+- Band API 탭 상단에 **"밴드 로그인 계정"** 섹션 추가 — `User.bandLoginEmail` 입력/저장
+  (`GET/PUT /api/settings/band-account`, 기존 SourcingApiConfig 저장과 별개 상태/버튼).
+- 발행·삭제 작업에 사용할 밴드 마스터 계정을 등록하면 세션 저장 시 계정 일치를 서버가 검증.
+
+### Header 세션 인디케이터
+
+- 세션 상태 툴팁의 채널 행에 저장된 세션의 밴드 계정(`sessionAccountEmail`) 표시 (보라색 작은 글씨).
+
+### Chrome 확장 (band-session-extension v1.2.0)
+
+- 팝업: 서버에 설정된 밴드 로그인 계정 표시 + 확인 체크박스 (체크 전 저장 버튼 비활성).
+- 저장 시 `bandAccountEmail` 회신, 성공 시 `chrome.storage.local.confirmedBandAccountEmail` 저장.
+- background 자동저장(1시간 주기)은 팝업에서 확인된 계정을 회신 — 미확인 상태로 409 거부되면
+  팝업을 열어 1회 수동 저장하면 이후 자동저장이 재개됨.

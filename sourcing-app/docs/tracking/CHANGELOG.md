@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260610-002 | Done(코드)/운영 db push 대기 | 2026-06-10 | - | AgentTask/AgentLog userId 추가 (SaaS P0-2 테넌트 식별) — 이벤트 data.userId / 로그 metadata.userId 기록, null=전역 | Low | Claude |
+| TR-20260610-001 | Done(코드)/운영 db push·확장 재배포 대기 | 2026-06-10 | - | 밴드 로그인 계정 설정 (SaaS P0-1/P0-4) — User.bandLoginEmail + Channel.sessionAccountEmail, save-all 계정 검증(409), status 계정별 검증, 설정 UI, 확장 v1.2.0 계정 확인 체크박스 + background 자동저장 계정 회신 | Medium | Claude |
 | TR-20260527-003 | Done(코드)/db push 대기 | 2026-05-27 | - | 경영밴드 SaaS Phase 4.1: 채널별 만료정책 (Channel.expiryDaysNormal/Com/autoExpireEnabled + GET/PUT /api/channel/[id]/expiry-policy + runContentExpiry autoExpire skip & 안전 per-channel 후처리) | Medium | Claude |
 | TR-20260527-002 | Done(배포완료) | 2026-05-27 | - | 경영밴드 SaaS Phase 1: Band OAuth 토큰 자동갱신(defensive — tokenExpiry 절대시각 저장 + 만료10분전 refresh, 성공시에만 덮어쓰기, 미설정시 no-op) | Medium | Claude |
 | TR-20260527-001 | Done(배포완료) | 2026-05-27 | - | 경영밴드 SaaS Phase 0: Product 하드삭제 → 소프트삭제 전환 (데이터 유실 재발 방지). destructive cascade 제거, Product+발행물 soft-delete, 복원 가능 | Critical | Claude |

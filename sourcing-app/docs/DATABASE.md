@@ -172,6 +172,7 @@ npx prisma studio --schema prisma
 | phone | String? | 전화번호 |
 | role | UserRole | 권한 (USER/MANAGER/ADMIN) |
 | shopId | Int? | 가입된 쇼핑몰 FK |
+| bandLoginEmail | String? | 발행/삭제에 사용할 밴드 로그인 네이버 ID. 세션 저장 시 일치 검증, null=검증 생략 (2026-06-10) |
 
 **Relations:**
 - `channels`, `products`, `orders` - 사용자 소유 데이터
@@ -190,6 +191,7 @@ npx prisma studio --schema prisma
 | name | String | 채널명 |
 | bandSessionCookie | String? | Band 세션 쿠키 |
 | sessionExpiresAt | DateTime? | 세션 만료일 |
+| sessionAccountEmail | String? | 저장된 세션이 어느 밴드 계정 것인지 기록 (저장 시점 기입, null=구버전 저장분) (2026-06-10) |
 | shopId | Int? | 연결된 쇼핑몰 |
 | publishPriceTier | PriceTier | 다단계 발행: 발행 가격 기준 (기본 `RETAIL`=소매가, `WHOLESALE`=도매가/가족도매방). RETAIL 채널에만 의미 |
 
@@ -662,3 +664,10 @@ Low (신규 테이블 추가, 기존 스키마 영향 없음)
 운영 DB push (2026-05-15) 시 다음 부작용 발생:
 - `pricing_policy.tier_rules` 컬럼 드롭 — HEAD schema 에 없어서. 데이터 1행 손실
 - 사전 변경(워킹트리 +2줄) 정리 시 함께 부활 필요
+
+## 2026-06-10 변경사항 (밴드 로그인 계정 + 에이전트 테넌트 식별)
+
+- `User.bandLoginEmail String?` — 이 사용자의 발행/삭제 작업에 사용할 밴드 로그인 네이버 ID. 세션 저장(save-all) 시 확장이 보낸 계정과 일치해야 저장 허용. null=검증 생략(하위호환).
+- `Channel.sessionAccountEmail String?` — 현재 bandSessionCookie 가 어느 밴드 계정의 세션인지 기록. 세션 상태 API 가 이 값별로 그룹핑해 계정당 1회씩 실제 검증.
+- `AgentTask.userId Int?` / `AgentLog.userId Int?` — SaaS 테넌트 식별 (P0-2). 이벤트 data.userId / 로그 metadata.userId 가 있으면 기록. null=전역/시스템. `@@index([userId, createdAt])` 추가.
+- 로컬 db push 적용 완료. **운영 DB 반영 필요** (nullable 컬럼+인덱스 추가만 — 비파괴적).
