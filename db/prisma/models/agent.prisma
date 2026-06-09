@@ -71,6 +71,9 @@ model AgentTask {
   id          String        @id @default(cuid())
   agentId     String
   agent       AgentDefinition @relation(fields: [agentId], references: [id])
+  // SaaS 테넌트 식별 (2026-06-10): 이 태스크가 어느 사용자(매니저)의 작업인지.
+  // null = 전역/시스템 태스크 (기존 데이터 포함). 에이전트 실행 루프는 전역 유지.
+  userId      Int?          @map("user_id")
   eventType   String
   payload     Json
   status      TaskStatus    @default(QUEUED)
@@ -86,6 +89,7 @@ model AgentTask {
   @@index([agentId, status])
   @@index([eventType, createdAt])
   @@index([status, priority, createdAt])
+  @@index([userId, createdAt])
   @@map("agent_tasks")
 }
 
@@ -93,6 +97,8 @@ model AgentLog {
   id        String   @id @default(cuid())
   agentId   String
   agent     AgentDefinition @relation(fields: [agentId], references: [id])
+  // SaaS 테넌트 식별 (2026-06-10): 어느 사용자(매니저) 관련 로그인지. null = 전역.
+  userId    Int?     @map("user_id")
   level     LogLevel @default(INFO)
   message   String   @db.Text
   metadata  Json?
@@ -101,6 +107,7 @@ model AgentLog {
 
   @@index([agentId, level, createdAt])
   @@index([taskId])
+  @@index([userId, createdAt])
   @@map("agent_logs")
 }
 
