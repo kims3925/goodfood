@@ -97,22 +97,25 @@ export async function register() {
     )
 
     // ── 도매밴드 5분 변동 감시 (경영수산비공개 / 외주상품방 등 화이트리스트) ──
-    // 게시글 직접 조회로 "삭제글/품절 키워드"(확실 신호)만 인정 → 쇼핑몰·소매밴드 발행물 비활성(가역).
-    // ⚠️ deleteBandPost=false 기본 — 실제 밴드 글 Playwright 삭제는 검증 후 명시 활성화.
+    // 게시글 직접 조회로 "삭제글/품절 키워드"(확실 신호)만 인정.
+    // 정책 (2026-06-10 사용자 지시): 도매밴드는 모니터링만 (삭제 권한/이유 없음 — 코드상
+    // 도매 글 삭제 경로 자체가 없음). 감지 시 반영은 소매밴드·쇼핑몰에만:
+    //  - 쇼핑몰(ShopProduct)/소매발행(ChannelProduct) soft-delete (가역)
+    //  - deleteBandPost=true — 소매밴드의 실제 발행 글도 Playwright 로 삭제
     try {
       const { wholesaleWatchAgent } = await import('@/modules/agents/implementations/WholesaleWatchAgent')
       scheduler.register('wholesale-watch', '*/5 * * * *', async () => {
         try {
           await wholesaleWatchAgent.runWholesaleWatch({
             autoFix: true,
-            deleteBandPost: false,
+            deleteBandPost: true,
             limitPerRun: 25,
           })
         } catch (err) {
           console.error('[Instrumentation] 도매밴드 변동 감시 실패:', err)
         }
       })
-      console.log('[Instrumentation] ✓ 도매밴드 5분 변동 감시 등록 (*/5, autoFix=true, deleteBandPost=false)')
+      console.log('[Instrumentation] ✓ 도매밴드 5분 변동 감시 등록 (*/5, autoFix=true, deleteBandPost=true — 소매밴드/쇼핑몰만 반영)')
     } catch (err) {
       console.error('[Instrumentation] 도매밴드 변동 감시 등록 실패:', err)
     }
