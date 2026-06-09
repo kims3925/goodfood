@@ -86,6 +86,11 @@ model User {
   manager   User?  @relation("ManagerStaff", fields: [managerId], references: [id])
   staff     User[] @relation("ManagerStaff")
 
+  // 밴드 로그인 계정 설정 (2026-06-10): 이 사용자의 발행/삭제 작업에 사용할
+  // 밴드 로그인 네이버 ID. 세션 저장 시 이 값과 일치하는지 검증.
+  // null 이면 검증 생략 (기존 동작 보존 — 운영자 계정 등).
+  bandLoginEmail String? @map("band_login_email") @db.VarChar(255)
+
   @@index([shopId])
   @@index([email])
   @@index([phone])

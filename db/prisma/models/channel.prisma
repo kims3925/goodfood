@@ -14,6 +14,9 @@ model Channel {
   shopId            Int?             @map("shop_id")
   bandSessionCookie String?          @map("band_session_cookie") @db.Text
   sessionExpiresAt  DateTime?        @map("session_expires_at")
+  // 현재 bandSessionCookie 가 어느 밴드 로그인 계정의 세션인지 기록 (저장 시점 기입).
+  // null = 구버전 저장분 (계정 미상)
+  sessionAccountEmail String?        @map("session_account_email") @db.VarChar(255)
   orderDeadline     String?          @map("order_deadline") @db.VarChar(50) // 도매방 주문 마감시간 (예: "오후 3시", "14:00")
   // 지침서 Phase 1: 도매방별 취급 가격 범위. 본문에서 추출한 가격이 이 범위 밖이면
   // collection 파이프라인이 게시글을 스킵. null이면 해당 방향 무제한.
