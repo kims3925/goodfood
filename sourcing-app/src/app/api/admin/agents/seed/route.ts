@@ -68,6 +68,27 @@ const AGENT_SEEDS = [
       skills: ['validateProductPricing', 'detectPriceInImages', 'deletePublishedProduct', 'requestRepublish', 'runFullAudit', 'analyzeSeasonBestsellers', 'republishToBandTop', 'respondBestsellerRequest'],
     },
   },
+  {
+    name: 'wholesale-watch',
+    displayName: '🛰️ Wholesale Watch',
+    layer: 'SOURCING' as const,
+    icon: 'Radar',
+    description: '도매밴드(경영수산비공개/외주상품방 등) 5분 감시 — 원본글 품절/가격변동/삭제 감지 후 쇼핑몰·소매밴드 발행물 반영',
+    priority: 2,
+    maxConcurrent: 1,
+    aiModel: 'none',
+    retryPolicy: { maxRetries: 1, backoff: 'linear', delays: [3000] },
+    schedule: '*/5 * * * *',
+    config: {
+      maxConcurrent: 1,
+      schedule: '*/5 * * * *',
+      autoFix: true,
+      deleteBandPost: false,
+      limitPerRun: 25,
+      whitelist: ['경영수산', '외주상품'],
+      skills: ['runWholesaleWatch'],
+    },
+  },
 
   // ── OPERATIONS (2) ──
   {

@@ -96,6 +96,27 @@ export async function register() {
       }
     )
 
+    // ── 도매밴드 5분 변동 감시 (경영수산비공개 / 외주상품방 등 화이트리스트) ──
+    // 게시글 직접 조회로 "삭제글/품절 키워드"(확실 신호)만 인정 → 쇼핑몰·소매밴드 발행물 비활성(가역).
+    // ⚠️ deleteBandPost=false 기본 — 실제 밴드 글 Playwright 삭제는 검증 후 명시 활성화.
+    try {
+      const { wholesaleWatchAgent } = await import('@/modules/agents/implementations/WholesaleWatchAgent')
+      scheduler.register('wholesale-watch', '*/5 * * * *', async () => {
+        try {
+          await wholesaleWatchAgent.runWholesaleWatch({
+            autoFix: true,
+            deleteBandPost: false,
+            limitPerRun: 25,
+          })
+        } catch (err) {
+          console.error('[Instrumentation] 도매밴드 변동 감시 실패:', err)
+        }
+      })
+      console.log('[Instrumentation] ✓ 도매밴드 5분 변동 감시 등록 (*/5, autoFix=true, deleteBandPost=false)')
+    } catch (err) {
+      console.error('[Instrumentation] 도매밴드 변동 감시 등록 실패:', err)
+    }
+
     // ── 이전글 자동 정리: 매일 03:00 KST — 🛑 사용자 요청으로 비활성화 (2026-05-04) ──
     // 사고: 4/30~5/3 동안 매일 channel_deleted=500/shop_deleted=500/band_deleted=437
     // 풀 limit 으로 정리되며, Band 페이지에서 가족함께수산 등 소매밴드의 옛 글이
