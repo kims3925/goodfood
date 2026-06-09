@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Save, TestTube, Check, AlertCircle, Store, Globe, ShoppingBag, Package, FileText } from 'lucide-react'
+import { Settings, Save, TestTube, Check, AlertCircle, Store, Globe, ShoppingBag, Package, FileText, Chrome } from 'lucide-react'
 
 interface APISettings {
   // Band API
@@ -58,6 +58,10 @@ export default function APISettingsPage() {
     }
   })
   const [isSaving, setIsSaving] = useState(false)
+  // 밴드 로그인 계정 설정 (SourcingApiConfig 와 별개 저장 — User.bandLoginEmail)
+  const [bandLoginEmail, setBandLoginEmail] = useState('')
+  const [isSavingBandAccount, setIsSavingBandAccount] = useState(false)
+  const [bandAccountMessage, setBandAccountMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; solution?: string; detail?: string; errorCode?: number } | null>(null)
   const [testSuccess, setTestSuccess] = useState<Record<APIProvider, boolean>>({
     band: false,
@@ -106,7 +110,51 @@ export default function APISettingsPage() {
 
   useEffect(() => {
     loadSettings()
+    loadBandAccount()
   }, [])
+
+  const loadBandAccount = async () => {
+    try {
+      const response = await fetch('/api/settings/band-account')
+      const data = await response.json()
+      if (data.success) {
+        setBandLoginEmail(data.data.bandLoginEmail ?? '')
+      }
+    } catch (error) {
+      console.error('밴드 로그인 계정 로드 실패:', error)
+    }
+  }
+
+  const saveBandAccount = async () => {
+    try {
+      setIsSavingBandAccount(true)
+      setBandAccountMessage(null)
+
+      const response = await fetch('/api/settings/band-account', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bandLoginEmail }),
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        setBandLoginEmail(data.data.bandLoginEmail ?? '')
+        setBandAccountMessage({
+          type: 'success',
+          text: data.data.bandLoginEmail
+            ? `밴드 로그인 계정이 [${data.data.bandLoginEmail}] 로 저장되었습니다. 세션 저장 시 이 계정과 일치하는지 확인합니다.`
+            : '밴드 로그인 계정 설정이 해제되었습니다. (세션 저장 시 계정 검증 생략)',
+        })
+      } else {
+        setBandAccountMessage({ type: 'error', text: data.error || '저장에 실패했습니다.' })
+      }
+    } catch (error) {
+      console.error('밴드 로그인 계정 저장 실패:', error)
+      setBandAccountMessage({ type: 'error', text: '저장 중 오류가 발생했습니다.' })
+    } finally {
+      setIsSavingBandAccount(false)
+    }
+  }
 
   const loadSettings = async () => {
     try {
@@ -268,6 +316,47 @@ export default function APISettingsPage() {
             {/* Band API Settings */}
             {activeTab === 'band' && (
               <div className="space-y-4 border-t pt-6">
+                {/* 밴드 로그인 계정 (User.bandLoginEmail — API 설정과 별개 저장) */}
+                <div className="bg-violet-50 border border-violet-200 rounded-md p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Chrome className="h-5 w-5 text-violet-600" />
+                    <h3 className="text-lg font-semibold text-gray-900">밴드 로그인 계정</h3>
+                  </div>
+                  <p className="text-xs text-violet-700">
+                    발행·삭제 작업에 사용할 밴드 로그인 네이버 ID입니다. 밴드 마스터 권한(게시글 삭제 등)이
+                    있는 계정을 입력하세요. 세션 저장 시 이 계정과 일치하는지 확인합니다.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={bandLoginEmail}
+                      onChange={(e) => {
+                        setBandLoginEmail(e.target.value)
+                        setBandAccountMessage(null)
+                      }}
+                      placeholder="예: terror8710@naver.com"
+                      className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={saveBandAccount}
+                      disabled={isSavingBandAccount}
+                      className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    >
+                      {isSavingBandAccount ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      계정 저장
+                    </button>
+                  </div>
+                  {bandAccountMessage && (
+                    <p className={`text-xs ${bandAccountMessage.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
+                      {bandAccountMessage.text}
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex items-center gap-2 mb-4">
                   <Store className="h-5 w-5 text-blue-600" />
                   <h3 className="text-lg font-semibold text-gray-900">Band API 설정</h3>
