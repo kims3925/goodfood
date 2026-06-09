@@ -15,6 +15,12 @@ const saveSpinner = document.getElementById('saveSpinner');
 const openBandBtn = document.getElementById('openBandBtn');
 const openAppBtn = document.getElementById('openAppBtn');
 const retryBtn = document.getElementById('retryBtn');
+const accountConfirm = document.getElementById('accountConfirm');
+const expectedAccount = document.getElementById('expectedAccount');
+const accountCheckbox = document.getElementById('accountCheckbox');
+
+// 서버에 설정된 밴드 로그인 계정 (null = 미설정, 검증 생략)
+let expectedEmail = null;
 // 서버 URL은 config.js에서 로드됨 (SERVER_URL)
 if (typeof SERVER_URL === 'undefined') {
   console.error('config.js가 로드되지 않았거나 SERVER_URL이 정의되지 않았습니다.');
@@ -83,6 +89,21 @@ async function checkBandLoginStatus() {
   return hasBandSession;
 }
 
+// 서버에 설정된 밴드 로그인 계정 조회 (미설정/조회실패 시 null = 검증 생략)
+async function fetchExpectedBandAccount(authToken) {
+  try {
+    const response = await fetch(`${SERVER_URL}/api/settings/band-account`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (!response.ok) return null;
+    const result = await response.json();
+    return result.success ? (result.data.bandLoginEmail || null) : null;
+  } catch (error) {
+    console.warn('밴드 로그인 계정 설정 조회 실패 (검증 생략):', error.message);
+    return null;
+  }
+}
+
 // 상태 확인 및 UI 업데이트
 async function checkStatus() {
   hideAllStates();
@@ -110,7 +131,19 @@ async function checkStatus() {
       return;
     }
 
-    // 3. 모두 준비됨
+    // 3. 설정된 밴드 로그인 계정 확인 (설정 시 체크박스 확인 전까지 저장 비활성)
+    expectedEmail = await fetchExpectedBandAccount(authToken);
+    if (expectedEmail) {
+      expectedAccount.textContent = expectedEmail;
+      accountConfirm.classList.remove('hidden');
+      accountCheckbox.checked = false;
+      saveBtn.disabled = true;
+    } else {
+      accountConfirm.classList.add('hidden');
+      saveBtn.disabled = false;
+    }
+
+    // 4. 모두 준비됨
     hideAllStates();
     readyToSave.classList.remove('hidden');
     saveBtn.classList.remove('hidden');
@@ -143,7 +176,7 @@ async function saveSession() {
       throw new Error('Band 쿠키를 찾을 수 없습니다.');
     }
 
-    // 서버로 전송
+    // 서버로 전송 (bandAccountEmail: 서버 설정값을 그대로 회신 — 사용자가 체크박스로 확인)
     const response = await fetch(`${SERVER_URL}/api/band-session/save-all`, {
       method: 'POST',
       headers: {
@@ -151,17 +184,21 @@ async function saveSession() {
         'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({
-        cookieString: JSON.stringify(bandCookies)
+        cookieString: JSON.stringify(bandCookies),
+        bandAccountEmail: expectedEmail || undefined
       })
     });
 
     const result = await response.json();
 
     if (result.success) {
+      // 확인된 계정을 저장 — background 자동저장이 같은 값을 회신할 수 있도록
+      await chrome.storage.local.set({ confirmedBandAccountEmail: expectedEmail || null });
       hideAllStates();
       hideAllButtons();
+      accountConfirm.classList.add('hidden');
       saveComplete.classList.remove('hidden');
-      saveResultDesc.textContent = `${result.data.channelCount}개 채널에 세션이 저장되었습니다`;
+      saveResultDesc.textContent = `${result.data.updatedCount ?? result.data.channelCount}개 채널에 세션이 저장되었습니다`;
     } else {
       throw new Error(result.error || '저장에 실패했습니다');
     }
@@ -173,7 +210,8 @@ async function saveSession() {
     errorDesc.textContent = error.message;
     retryBtn.classList.remove('hidden');
   } finally {
-    saveBtn.disabled = false;
+    // 계정 확인이 필요한 경우 체크 상태를 유지한 채 버튼 상태 복원
+    saveBtn.disabled = expectedEmail ? !accountCheckbox.checked : false;
     saveBtnText.textContent = '세션 저장하기';
     saveSpinner.classList.add('hidden');
   }
@@ -181,6 +219,11 @@ async function saveSession() {
 
 // 이벤트 리스너
 saveBtn.addEventListener('click', saveSession);
+
+// 계정 확인 체크박스 — 체크 전까지 저장 버튼 비활성
+accountCheckbox.addEventListener('change', () => {
+  saveBtn.disabled = !accountCheckbox.checked;
+});
 
 openBandBtn.addEventListener('click', () => {
   chrome.tabs.create({ url: 'https://band.us/home' });

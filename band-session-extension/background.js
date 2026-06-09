@@ -115,7 +115,13 @@ async function performSessionSave() {
     throw new Error('Band 쿠키를 찾을 수 없습니다.');
   }
 
-  // 4. 서버로 전송 (타임아웃 포함)
+  // 4. 팝업에서 사용자가 확인한 밴드 로그인 계정 회신 (계정 검증용).
+  //    서버에 bandLoginEmail 이 설정돼 있는데 이 값이 없거나 다르면 서버가 409 로 거부 —
+  //    사용자가 팝업을 열어 계정 확인 후 1회 수동 저장하면 이후 자동저장이 다시 동작한다.
+  const stored = await chrome.storage.local.get(['confirmedBandAccountEmail']);
+  const confirmedBandAccountEmail = stored.confirmedBandAccountEmail || undefined;
+
+  // 5. 서버로 전송 (타임아웃 포함)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30초 타임아웃
 
@@ -127,7 +133,8 @@ async function performSessionSave() {
         'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({
-        cookieString: JSON.stringify(bandCookies)
+        cookieString: JSON.stringify(bandCookies),
+        bandAccountEmail: confirmedBandAccountEmail
       }),
       signal: controller.signal
     });
@@ -192,11 +199,11 @@ async function autoSaveSession() {
     // 성공 시 상태 업데이트
     lastAutoSaveTime = now;
     await chrome.storage.local.set({ lastAutoSaveTime: now });
-    console.log(`[Band Session] 자동 저장 완료: ${data.channelCount}개 채널`);
+    console.log(`[Band Session] 자동 저장 완료: ${data.updatedCount ?? data.channelCount}개 채널`);
 
   } catch (error) {
-    // 검증 실패는 스킵으로 처리 (로그인 안됨 등)
-    if (error.message.includes('로그인') || error.message.includes('쿠키')) {
+    // 검증 실패는 스킵으로 처리 (로그인 안됨, 계정 확인 필요 등)
+    if (error.message.includes('로그인') || error.message.includes('쿠키') || error.message.includes('계정')) {
       console.log(`[Band Session] 자동 저장 스킵: ${error.message}`);
     } else {
       console.error('[Band Session] 자동 저장 에러:', error.message);
@@ -291,12 +298,12 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
         // 성공 시 상태 업데이트
         lastAutoSaveTime = Date.now();
         await chrome.storage.local.set({ lastAutoSaveTime });
-        console.log(`[Band Session] 웹 앱 요청 저장 완료: ${data.channelCount}개 채널`);
+        console.log(`[Band Session] 웹 앱 요청 저장 완료: ${data.updatedCount ?? data.channelCount}개 채널`);
 
         sendResponse({
           success: true,
           data: {
-            channelCount: data.channelCount,
+            channelCount: data.updatedCount ?? data.channelCount,
             savedAt: new Date().toISOString()
           }
         });
