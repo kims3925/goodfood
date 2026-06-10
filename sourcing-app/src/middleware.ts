@@ -53,8 +53,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // Chrome Extension에서 밴드 로그인 계정 설정 조회 허용 (2026-06-10)
-  // Bearer 토큰 요청만 통과 — 인증은 라우트에서 verifyToken 으로 자체 검증 (실패 시 401)
-  if (pathname === '/api/settings/band-account' && request.headers.get('authorization')?.startsWith('Bearer ')) {
+  // Bearer 토큰 또는 확장 키 요청만 통과 — 인증은 라우트에서 자체 검증 (실패 시 401)
+  if (
+    pathname === '/api/settings/band-account' &&
+    (request.headers.get('authorization')?.startsWith('Bearer ') || request.headers.get('x-extension-key'))
+  ) {
     return NextResponse.next()
   }
 

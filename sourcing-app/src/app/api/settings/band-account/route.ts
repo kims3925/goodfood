@@ -16,15 +16,23 @@ import { getCurrentUser, verifyToken } from '@/modules/auth/auth.service'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Extension-Key',
 }
 
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders })
 }
 
-/** Bearer 토큰(확장) 우선, 없으면 세션 쿠키(웹)로 사용자 식별 */
+/** 확장 키 → Bearer 토큰 → 세션 쿠키(웹) 순으로 사용자 식별 */
 async function resolveUserId(request: NextRequest): Promise<number | null> {
+  const extKey = request.headers.get('X-Extension-Key')
+  if (extKey) {
+    const keyUser = await prisma.user.findUnique({
+      where: { extensionApiKey: extKey },
+      select: { id: true },
+    })
+    return keyUser?.id ?? null
+  }
   const authHeader = request.headers.get('Authorization')
   if (authHeader?.startsWith('Bearer ')) {
     const payload = await verifyToken(authHeader.substring(7))

@@ -13,7 +13,7 @@ import { verifyToken } from '@/modules/auth/auth.service'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Extension-Key',
 }
 
 /**
@@ -28,21 +28,45 @@ export async function OPTIONS() {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Authorization 헤더에서 토큰 추출
-    const authHeader = request.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: '인증 토큰이 없습니다.' },
-        { status: 401, headers: corsHeaders }
-      )
+    // ── 인증: X-Extension-Key 우선 (확장 자동저장용 — JWT 만료와 무관, 2026-06-10),
+    //    없으면 기존 Bearer JWT (하위호환) ──
+    let userId: number | null = null
+    const extKey = request.headers.get('X-Extension-Key')
+    if (extKey) {
+      const keyUser = await prisma.user.findUnique({
+        where: { extensionApiKey: extKey },
+        select: { id: true },
+      })
+      if (!keyUser) {
+        return NextResponse.json(
+          { success: false, error: '유효하지 않은 확장 키입니다. 설정에서 재발급하세요.' },
+          { status: 401, headers: corsHeaders }
+        )
+      }
+      userId = keyUser.id
+    } else {
+      const authHeader = request.headers.get('Authorization')
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return NextResponse.json(
+          { success: false, error: '인증 토큰이 없습니다.' },
+          { status: 401, headers: corsHeaders }
+        )
+      }
+
+      const token = authHeader.substring(7) // 'Bearer ' 제거
+      const payload = await verifyToken(token)
+
+      if (!payload) {
+        return NextResponse.json(
+          { success: false, error: '유효하지 않은 토큰입니다.' },
+          { status: 401, headers: corsHeaders }
+        )
+      }
+      userId = payload.userId
     }
-
-    const token = authHeader.substring(7) // 'Bearer ' 제거
-    const payload = await verifyToken(token)
-
-    if (!payload) {
+    if (userId === null) {
       return NextResponse.json(
-        { success: false, error: '유효하지 않은 토큰입니다.' },
+        { success: false, error: '인증에 실패했습니다.' },
         { status: 401, headers: corsHeaders }
       )
     }
@@ -62,7 +86,7 @@ export async function POST(request: NextRequest) {
     // User.bandLoginEmail 이 설정된 사용자는 확장에서 보낸 계정과 일치해야 저장 허용.
     // 미설정(null) 이면 검증 생략 — 기존 동작 보존 (하위호환).
     const me = await prisma.user.findUnique({
-      where: { id: payload.userId },
+      where: { id: userId },
       select: { bandLoginEmail: true },
     })
     const expected = me?.bandLoginEmail?.toLowerCase() ?? null
@@ -86,7 +110,7 @@ export async function POST(request: NextRequest) {
     // 사용자의 모든 소매 채널 조회
     const retailChannels = await prisma.channel.findMany({
       where: {
-        userId: payload.userId,
+        userId,
         kind: 'RETAIL',
       },
       select: {
@@ -148,7 +172,7 @@ export async function POST(request: NextRequest) {
     })
 
     console.log(
-      `[BandSession] 일괄 세션 저장 완료: userId=${payload.userId}, 채널 ${updateResult.count}개, 계정=${provided ?? expected ?? '(미상)'}, 만료=${expiresAt.toISOString()}`
+      `[BandSession] 일괄 세션 저장 완료: userId=${userId}, 채널 ${updateResult.count}개, 계정=${provided ?? expected ?? '(미상)'}, 만료=${expiresAt.toISOString()}`
     )
 
     return NextResponse.json(
@@ -171,4 +195,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
+
