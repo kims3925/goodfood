@@ -860,7 +860,16 @@ export class BandPostAutomation {
     // 2) 원본글 매칭 — CollectedPost.title(본문 첫줄)로 피드에서 탐색.
     //    피드 초기 로드는 10~20개뿐이라 발행 시점(수집 후 수 시간)엔 원본글이 아래로
     //    밀려 매칭 실패 → compose 폴백이 잦았음 (2026-06-10). 스크롤로 추가 로드하며 재탐색.
-    const needle = (sourceMatchTitle || '').replace(/\s+/g, '').slice(0, 14)
+    // 제목이 HTML 엔티티로 저장된 경우(&amp; 등) 피드 textContent(디코드됨)와 불일치 → 디코드 후 매칭
+    const decodeEntities = (s: string) =>
+      s
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#0?39;/g, "'")
+        .replace(/&nbsp;/g, ' ')
+    const needle = decodeEntities(sourceMatchTitle || '').replace(/\s+/g, '').slice(0, 14)
     if (needle.length < 4) fail('크로스포스트 매칭 키가 너무 짧습니다.')
     const findMatchIdx = (): Promise<number> =>
       page.evaluate((nd) => {
