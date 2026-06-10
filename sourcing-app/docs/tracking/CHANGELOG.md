@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260611-001 | Done(코드)/배포 대기 | 2026-06-11 | - | 설정 메뉴에 "밴드 연동 / API" 항목 추가 (/sourcing/settings/api 직접 진입 — 밴드 로그인 계정·Band/AliExpress API·확장프로그램 키 설정 페이지가 메뉴에 없어 URL 직접 입력으로만 접근 가능했던 문제) | Low | Claude |
 | TR-20260610-007 | Done(코드)/배포·확장 재배포 대기 | 2026-06-10 | - | 밴드 세션 자동화 — 확장 전용 키(User.extensionApiKey, X-Extension-Key 인증), 확장 v1.3.0(쿠키변경 즉시 동기화·연속실패 뱃지/알림·키 자동주입), 설정 키발급 UI, 세션배너 [지금 갱신], SessionKeeper keep-alive(6h, 계정별 1회, 보수적 무효화 유지) | Large | Claude |
 | TR-20260610-006 | Done(코드) | 2026-06-10 | - | 상품 삭제 관리 메뉴 신설 (/sourcing/cleanup) — 기간·카테고리(COM 기본 보호)·원본소실 조건 미리보기 → 남길/삭제 선택 실행. 소매밴드/쇼핑몰만, 도매밴드 비대상. 밴드 실글 삭제 옵션(30건/회) | Medium | Claude |
 | TR-20260610-005 | Done(코드) | 2026-06-10 | - | 종합발행 상단 상품목록 포스터 + 상품명 나열(✅체크리스트) — includeTopPoster 기본 ON, digest-poster-renderer 신설 | Low | Claude |

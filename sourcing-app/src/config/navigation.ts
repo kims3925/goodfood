@@ -38,6 +38,7 @@ import {
   GitMerge,
   ExternalLink,
   KeyRound,
+  Plug,
   UserPlus,
   Megaphone,
   LayoutGrid,
@@ -115,6 +116,8 @@ export const sourcingMenuItems: MenuItem[] = [
     label: '설정',
     icon: Settings,
     children: [
+      // 밴드 로그인 계정 + Band/AliExpress API + 확장프로그램 키 설정 페이지
+      { label: '밴드 연동 / API', href: '/sourcing/settings/api', icon: Plug },
       { label: 'AI / API', href: '/sourcing/settings/ai', icon: Bot },
       { label: '프롬프트 / 가격 정책', href: '/sourcing/settings/prompt', icon: FileText },
       { label: '구글 시트', href: '/sourcing/settings/google-sheets', icon: FileSpreadsheet },
