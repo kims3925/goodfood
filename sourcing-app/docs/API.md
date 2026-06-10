@@ -1730,3 +1730,12 @@ interface PipelineDashboardResponse {
 | `/api/publish/digest` | POST | body 에 `includeTopPoster`(기본 true)·`posterNoticeText` 추가 — digest 모드에서 본문 상단 상품명 나열(+✅체크리스트)과 갤러리 맨 앞 상품목록 포스터 PNG 1장 자동 생성 |
 | `/api/sourcing/cleanup/preview` | POST | 수동 삭제 미리보기 — cutoffDate/targets(retail·shop)/categoryIds/excludeCom(기본 true)/channelIds/includeMissingSource. 상품 단위 후보 + 발행물 상세 반환 |
 | `/api/sourcing/cleanup/execute` | POST | 선택한 channelProductIds/shopProductIds 만 soft-delete + 옵션 deleteBandPosts(소매밴드 실글, 1회 30건 상한). 도매밴드는 비대상 |
+
+### 2026-06-10 추가 — 밴드 세션 자동화 (확장 키 + keep-alive)
+
+| 엔드포인트 | 메서드 | 설명 |
+|---|---|---|
+| `/api/settings/extension-key` | GET/POST | 확장 전용 API 키 발급(POST, 재발급 시 구 키 즉시 무효)/발급여부 조회(GET, 끝 6자리만). 쿠키 인증 |
+
+- `POST /api/band-session/save-all` — **X-Extension-Key 헤더 인증 추가** (JWT 만료와 무관한 확장 자동저장용). 기존 Bearer JWT 하위호환 유지. CORS 허용 헤더에 X-Extension-Key 추가.
+- `GET/PUT /api/settings/band-account` — X-Extension-Key 인증 지원 (키만으로 확장 팝업 동작).

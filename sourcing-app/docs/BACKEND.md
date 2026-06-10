@@ -433,3 +433,9 @@ export function calculateSellingPrice(
 **변경 이력:**
 - TR-20260115-008: 대시보드 마진액 계산 버그 수정 (INCLUDED 타입 처리)
 
+
+## 밴드 세션 keep-alive (2026-06-10, P4)
+
+- `BandSessionManager.keepAliveSession(channelId)` — 저장된 쿠키로 band.us/home 을 열어 세션을 연장하고, 회전된 쿠키(Playwright cookie JSON)를 같은 sessionAccountEmail 채널 전체에 재저장. 로그인 리다이렉트 감지 시 false (호출자가 보수적 invalidate 경로 — 즉시 NULL 금지).
+- `SessionKeeperAgent.checkAllSessions()` — 기존 6시간 주기(schedule.session.check)에 keep-alive 통합: 계정(sessionAccountEmail)별 대표 채널 1개만 터치(밴드 이상트래픽 회피), 발행/파이프라인 RUNNING 사용자 스킵(browserPool 경합 방지), 성공 시 band.session.renewed 이벤트 + session_keepalive_ok/failed KPI.
+- 효과: 사용자 크롬이 꺼져 있어도 세션이 살아있음. 밴드 비번 변경/강제 로그아웃 시에만 재로그인 1회 필요.

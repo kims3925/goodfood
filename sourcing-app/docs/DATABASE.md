@@ -671,3 +671,5 @@ Low (신규 테이블 추가, 기존 스키마 영향 없음)
 - `Channel.sessionAccountEmail String?` — 현재 bandSessionCookie 가 어느 밴드 계정의 세션인지 기록. 세션 상태 API 가 이 값별로 그룹핑해 계정당 1회씩 실제 검증.
 - `AgentTask.userId Int?` / `AgentLog.userId Int?` — SaaS 테넌트 식별 (P0-2). 이벤트 data.userId / 로그 metadata.userId 가 있으면 기록. null=전역/시스템. `@@index([userId, createdAt])` 추가.
 - 로컬 db push 적용 완료. **운영 DB 반영 필요** (nullable 컬럼+인덱스 추가만 — 비파괴적).
+
+- `User.extensionApiKey String? @unique` / `extensionApiKeyCreatedAt` (2026-06-10) — 확장 전용 API 키(밴드 세션 저장 전용, 만료 없음, 재발급 시 교체). 운영 DB 반영 필요 (nullable + unique 인덱스).
