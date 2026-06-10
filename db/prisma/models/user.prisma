@@ -91,6 +91,11 @@ model User {
   // null 이면 검증 생략 (기존 동작 보존 — 운영자 계정 등).
   bandLoginEmail String? @map("band_login_email") @db.VarChar(255)
 
+  // 확장프로그램 전용 API 키 (2026-06-10): 밴드 세션 저장 전용.
+  // 소싱앱 JWT(7일)와 달리 만료 없음 — 재발급 시 교체. null = 미발급.
+  extensionApiKey          String?   @unique @map("extension_api_key") @db.VarChar(64)
+  extensionApiKeyCreatedAt DateTime? @map("extension_api_key_created_at")
+
   @@index([shopId])
   @@index([email])
   @@index([phone])
