@@ -375,7 +375,12 @@ export async function runTransformPipeline(
       )
 
       // 가격 정책 적용 검증 (정책이 설정된 경우에만)
-      if (batchPolicyContent && draft.variants && draft.variants.length > 0) {
+      // 무마진 정책 예외 (2026-06-10): "판매가 그대로 사용 (마진 없음)" 류 정책
+      // (킹도매방/경영수산비공개/외주상품방)은 도매가=소매가가 의도된 정상 결과이므로
+      // 동일가 검증을 건너뛴다. 이전엔 무마진 채널의 가공이 전부 "정책 미적용"으로 오판됨.
+      const isZeroMarginPolicy =
+        !!batchPolicyContent && /(마진\s*없음|판매가\s*그대로|도매가\s*그대로|무\s*마진)/.test(batchPolicyContent)
+      if (batchPolicyContent && !isZeroMarginPolicy && draft.variants && draft.variants.length > 0) {
         const unpricedVariants = draft.variants.filter(v =>
           v.wholesalePrice !== undefined &&
           v.wholesalePrice !== null &&
