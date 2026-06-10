@@ -196,6 +196,75 @@ export class BandSessionManager {
   }
 
   /**
+   * 세션 keep-alive (2026-06-10, P4) — 저장된 쿠키로 band.us 를 열어 세션을 연장하고
+   * 회전된 쿠키를 DB 에 재저장한다. 같은 sessionAccountEmail 을 공유하는 채널 전체에
+   * 일괄 반영. 사용자 크롬이 꺼져 있어도 세션이 살아있게 하는 것이 목적.
+   *
+   * @returns true = 연장 성공(쿠키 재저장), false = 세션 무효 의심
+   *          (호출자가 보수적 invalidateSession 경로로 처리 — 즉시 NULL 금지)
+   */
+  async keepAliveSession(channelId: number): Promise<boolean> {
+    let session: BandSession | null = null
+    try {
+      session = await this.getValidSession(channelId)
+    } catch {
+      return false // 세션 없음/만료 확정 — keep-alive 대상 아님
+    }
+    if (!session) return false
+
+    const context = await browserPool.getContext(channelId, session.cookies)
+    const page = await context.newPage()
+    try {
+      await page.goto('https://band.us/home', { waitUntil: 'domcontentloaded', timeout: 30000 })
+      await page.waitForTimeout(2500) // 쿠키 회전/리다이렉트 안정화 대기
+
+      // 로그인 상태 확인 (로그인 페이지로 리다이렉트되면 세션 무효 의심)
+      const url = page.url()
+      if (url.includes('/login') || url.includes('signin') || url.includes('auth.band.us')) {
+        return false
+      }
+
+      // 회전된 쿠키 수집 → DB 재저장 (Playwright cookie 형식은 browserPool.parseCookies 가
+      // 변환 없이 그대로 addCookies 할 수 있는 형식이라 JSON 그대로 저장해도 안전)
+      const cookies = await context.cookies()
+      const relevant = cookies.filter(
+        (c) => c.domain.includes('band.us') || c.domain.includes('naver.com')
+      )
+      if (relevant.length === 0) return false
+      const hasBandSession = relevant.some((c) => c.name === 'band_session')
+      if (!hasBandSession) return false // 핵심 세션 쿠키가 사라졌으면 갱신하지 않음
+
+      const channel = await prisma.channel.findFirst({
+        where: { id: channelId },
+        select: { userId: true, sessionAccountEmail: true },
+      })
+      if (!channel) return false
+
+      // 같은 계정 세션을 쓰는 채널 전체 갱신 (계정 미상 구버전 저장분은 본 채널만)
+      const where = channel.sessionAccountEmail
+        ? { userId: channel.userId, sessionAccountEmail: channel.sessionAccountEmail, bandSessionCookie: { not: null } }
+        : { id: channelId }
+
+      const updated = await prisma.channel.updateMany({
+        where,
+        data: {
+          bandSessionCookie: JSON.stringify(relevant),
+          // keep-alive 가 지속 갱신하므로 만료일 없는 세션으로 취급 (기존 정책과 동일)
+          sessionExpiresAt: null,
+        },
+      })
+
+      console.log(
+        `[BandSessionManager] keep-alive 성공: 채널 ${channelId} 기준 ${updated.count}개 채널 쿠키 갱신 (계정=${channel.sessionAccountEmail ?? '미상'})`
+      )
+      return true
+    } finally {
+      await page.close().catch(() => null)
+      await browserPool.releaseContext(channelId)
+    }
+  }
+
+  /**
    * 세션 테스트 (실제로 로그인되어 있는지 확인)
    */
   async testSession(channelId: number): Promise<boolean> {

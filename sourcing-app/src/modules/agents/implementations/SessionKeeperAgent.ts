@@ -342,6 +342,7 @@ export class SessionKeeperAgent extends AgentBase {
         id: true,
         name: true,
         sessionExpiresAt: true,
+        sessionAccountEmail: true,
         userId: true,
       },
     })
@@ -421,6 +422,47 @@ export class SessionKeeperAgent extends AgentBase {
       }
     }
 
+    // ── 세션 keep-alive (2026-06-10, P4) ──
+    // 계정(sessionAccountEmail)별 대표 채널 1개만 band.us 를 터치해 세션 연장 + 회전 쿠키 재저장.
+    // 6시간 주기(기존 schedule.session.check)에 계정당 1회만 — 밴드 측 이상 트래픽 회피.
+    // 발행 작업이 돌고 있는 사용자는 스킵 (browserPool 경합 방지).
+    let keepAliveOk = 0
+    let keepAliveFailed = 0
+    const accountGroups = new Map<string, { channelId: number; userId: number }>()
+    for (const channel of channels) {
+      const key = `${channel.userId}:${channel.sessionAccountEmail ?? '(unknown)'}`
+      if (!accountGroups.has(key)) accountGroups.set(key, { channelId: channel.id, userId: channel.userId })
+    }
+    for (const [groupKey, rep] of Array.from(accountGroups.entries())) {
+      try {
+        const runningWorkflows = await prisma.workflowLog.count({
+          where: { userId: rep.userId, status: 'RUNNING' },
+        })
+        if (runningWorkflows > 0) {
+          await this.log('INFO', `keep-alive 스킵 (발행/파이프라인 진행 중): ${groupKey}`)
+          continue
+        }
+        const ok = await sessionManager.keepAliveSession(rep.channelId)
+        if (ok) {
+          keepAliveOk++
+          await this.emitEvent('band.session.renewed', { channelId: rep.channelId, group: groupKey })
+        } else {
+          keepAliveFailed++
+          // 보수적 무효화 경로 — 즉시 NULL 금지 (2026-05-17 정책), 3회 임계 카운터 누적
+          await sessionManager.invalidateSession(rep.channelId, {
+            reason: 'keepAlive: band.us redirect to login',
+          })
+        }
+      } catch (error: any) {
+        // keep-alive 자체 에러(타임아웃 등)는 카운트만 — 다음 주기에 재시도
+        keepAliveFailed++
+        await this.log('WARN', `keep-alive 오류 (다음 주기 재시도): ${groupKey} → ${error.message}`)
+      }
+    }
+    if (accountGroups.size > 0) {
+      await this.log('INFO', `keep-alive 완료: 성공 ${keepAliveOk} / 실패 ${keepAliveFailed} (계정그룹 ${accountGroups.size}개)`)
+    }
+
     // KPI 기록
     await this.recordKpi('session_checked', stats.checked)
     await this.recordKpi('session_valid', stats.valid)
@@ -429,8 +471,10 @@ export class SessionKeeperAgent extends AgentBase {
     await this.recordKpi('session_notified_d3', stats.notifiedD3)
     await this.recordKpi('session_notified_d1', stats.notifiedD1)
     await this.recordKpi('session_notified_expired', stats.notifiedExpired)
+    await this.recordKpi('session_keepalive_ok', keepAliveOk)
+    await this.recordKpi('session_keepalive_failed', keepAliveFailed)
 
-    await this.log('INFO', '세션 점검 완료', stats)
+    await this.log('INFO', '세션 점검 완료', { ...stats, keepAliveOk, keepAliveFailed })
 
     return stats
   }
