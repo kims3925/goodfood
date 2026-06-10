@@ -64,7 +64,9 @@ function buildCrossPostInfo(
   },
   tier: string,
   // 발행 시점 모달 선택값. 지정 시 채널 설정(bandPublishMethod)보다 우선한다.
-  publishMethodOverride?: 'COMPOSE' | 'CROSSPOST'
+  publishMethodOverride?: 'COMPOSE' | 'CROSSPOST',
+  // 쇼핑몰 주문 링크 — 공유 본문 끝에 덧붙임 (2026-06-10: 본문에도 링크 첨부 요청)
+  orderLink?: string
 ): CrossPostInfo | undefined {
   const effectiveMethod = publishMethodOverride || channel.bandPublishMethod || 'COMPOSE'
   if (effectiveMethod !== 'CROSSPOST') return undefined
@@ -87,6 +89,7 @@ function buildCrossPostInfo(
     sourceMatchTitle: matchTitle,
     sourceBandNo: (srcChannel as { bandNo?: number | null }).bandNo ?? null,
     priceMap,
+    appendBodyText: orderLink ? `🛒 주문하기 👉 ${orderLink}` : undefined,
   }
 }
 // Playwright 발행 쿨다운 지연 시간 (2초)
@@ -493,7 +496,7 @@ export class PublishService {
             commentContent: orderLink ? `주문하기 👉 ${orderLink}` : undefined,
             // 크로스포스트 opt-in (CROSSPOST 채널 또는 모달 override). 실패 시 위 본문작성으로 자동 폴백.
             // 미설정 + override 없음 → undefined → 기존 동작 100% 동일.
-            crossPost: buildCrossPostInfo(channel, product, tier, publishMethodOverride),
+            crossPost: buildCrossPostInfo(channel, product, tier, publishMethodOverride, orderLink),
           })
 
           if (playwrightResult.success && playwrightResult.postKey) {
@@ -1214,7 +1217,7 @@ export class PublishService {
             imageUrls,
             commentContent: orderLink ? `주문하기 👉 ${orderLink}` : undefined,
             // 크로스포스트 opt-in (CROSSPOST 채널만). 실패 시 본문작성으로 자동 폴백.
-            crossPost: buildCrossPostInfo(channel, product, tier),
+            crossPost: buildCrossPostInfo(channel, product, tier, undefined, orderLink),
             signal, // 취소 신호 전달
             // 진행률 콜백 전달
             onStageProgress: onStageProgress

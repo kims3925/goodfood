@@ -827,7 +827,7 @@ export class BandPostAutomation {
   async crossPostToBand(page: Page, params: BandCrossPostParams): Promise<BandPublishResult> {
     const {
       sourceBandKey, sourceBandName, sourceMatchTitle, sourceBandNo,
-      targetBandKey, targetBandName, priceMap, commentContent, signal,
+      targetBandKey, targetBandName, priceMap, appendBodyText, commentContent, signal,
     } = params
     const fail = (msg: string): never => {
       throw new BandPlaywrightError(msg, BandPlaywrightErrorCode.POST_FAILED)
@@ -945,6 +945,22 @@ export class BandPostAutomation {
       return { ok: true, replaced }
     }, priceMap)
     console.log(`[크로스포스트] 가격치환 ${editStat.replaced}건 적용`)
+
+    // 5-1) 본문 끝에 쇼핑몰 주문 링크 덧붙이기 (2026-06-10 — 댓글뿐 아니라 본문에도 링크)
+    if (appendBodyText && appendBodyText.trim()) {
+      const appended: boolean = await page.evaluate((txt) => {
+        const editor = document.querySelector('[contenteditable="true"]')
+        if (!editor) return false
+        for (const line of ['', ...txt.split('\n')]) {
+          const div = document.createElement('div')
+          if (line) div.textContent = line
+          else div.innerHTML = '<br>'
+          editor.appendChild(div)
+        }
+        return true
+      }, appendBodyText)
+      console.log(`[크로스포스트] 본문 링크 덧붙임 ${appended ? '완료' : '실패(편집기 없음)'}`)
+    }
 
     // 6) 게시 (보이고 활성화된 버튼만)
     checkCancel()

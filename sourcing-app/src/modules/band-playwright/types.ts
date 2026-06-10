@@ -42,6 +42,8 @@ export interface CrossPostInfo {
   sourceBandNo?: number | null
   /** 도매가→판매가 매핑 (ProductVariant 기반). 편집기에서 정확 치환용. */
   priceMap: Array<{ from: number; to: number }>
+  /** 공유 편집기 본문 끝에 덧붙일 텍스트 (쇼핑몰 주문 링크 등). 2026-06-10 */
+  appendBodyText?: string
 }
 
 /** 크로스포스트 실행 파라미터 (BandPostAutomation.crossPostToBand) */
@@ -54,6 +56,8 @@ export interface BandCrossPostParams {
   targetBandKey: string
   targetBandName: string
   priceMap: Array<{ from: number; to: number }>
+  /** 본문 끝에 덧붙일 텍스트 (쇼핑몰 주문 링크 등). 댓글(commentContent)과 별개. */
+  appendBodyText?: string
   commentContent?: string
   signal?: AbortSignal
 }

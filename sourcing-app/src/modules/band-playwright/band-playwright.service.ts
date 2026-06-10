@@ -81,6 +81,7 @@ export class BandPlaywrightService {
               targetBandKey: params.bandKey,
               targetBandName: params.bandName,
               priceMap: params.crossPost.priceMap,
+              appendBodyText: params.crossPost.appendBodyText,
               commentContent: params.commentContent,
               signal: params.signal,
             })
