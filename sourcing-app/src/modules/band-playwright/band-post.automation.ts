@@ -857,17 +857,37 @@ export class BandPostAutomation {
     }
     await page.waitForTimeout(2500)
 
-    // 2) 원본글 매칭 — CollectedPost.title(본문 첫줄)로 피드에서 탐색
+    // 2) 원본글 매칭 — CollectedPost.title(본문 첫줄)로 피드에서 탐색.
+    //    피드 초기 로드는 10~20개뿐이라 발행 시점(수집 후 수 시간)엔 원본글이 아래로
+    //    밀려 매칭 실패 → compose 폴백이 잦았음 (2026-06-10). 스크롤로 추가 로드하며 재탐색.
     const needle = (sourceMatchTitle || '').replace(/\s+/g, '').slice(0, 14)
     if (needle.length < 4) fail('크로스포스트 매칭 키가 너무 짧습니다.')
-    const matchIdx: number = await page.evaluate((nd) => {
-      const posts = Array.from(document.querySelectorAll('article._postMainWrap'))
-      for (let i = 0; i < posts.length; i++) {
-        const t = (posts[i].textContent || '').replace(/\s+/g, '')
-        if (t.includes(nd)) return i
-      }
-      return -1
-    }, needle)
+    const findMatchIdx = (): Promise<number> =>
+      page.evaluate((nd) => {
+        const posts = Array.from(document.querySelectorAll('article._postMainWrap'))
+        for (let i = 0; i < posts.length; i++) {
+          const t = (posts[i].textContent || '').replace(/\s+/g, '')
+          if (t.includes(nd)) return i
+        }
+        return -1
+      }, needle)
+
+    let matchIdx: number = await findMatchIdx()
+    const MAX_FEED_SCROLLS = 10
+    for (let s = 0; s < MAX_FEED_SCROLLS && matchIdx < 0; s++) {
+      checkCancel()
+      const before: number = await page.evaluate(
+        () => document.querySelectorAll('article._postMainWrap').length
+      )
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+      await page.waitForTimeout(1500)
+      const after: number = await page.evaluate(
+        () => document.querySelectorAll('article._postMainWrap').length
+      )
+      matchIdx = await findMatchIdx()
+      if (matchIdx < 0 && after <= before) break // 더 로드되는 글 없음 — 피드 끝
+      if (matchIdx >= 0) console.log(`[크로스포스트] 스크롤 ${s + 1}회 후 매칭 (피드 ${after}개 로드)`)
+    }
     if (matchIdx < 0) fail(`원본글을 도매밴드 피드에서 찾지 못함 (title="${(sourceMatchTitle || '').slice(0, 20)}")`)
     console.log(`[크로스포스트] 원본글 매칭 인덱스=${matchIdx}`)
 
