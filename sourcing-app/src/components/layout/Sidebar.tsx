@@ -36,6 +36,7 @@ import {
   CreditCard,
   Shield,
   Lock,
+  Trash2,
   MonitorDot,
   UserCog,
   Network,
@@ -94,6 +95,7 @@ const iconMap: Record<string, React.ReactNode> = {
   CreditCard: <CreditCard size={20} />,
   Shield: <Shield size={20} />,
   Lock: <Lock size={20} />,
+  Trash2: <Trash2 size={20} />,
 }
 
 const smallIconMap: Record<string, React.ReactNode> = {
@@ -124,6 +126,7 @@ const smallIconMap: Record<string, React.ReactNode> = {
   CreditCard: <CreditCard size={16} />,
   Shield: <Shield size={16} />,
   Lock: <Lock size={16} />,
+  Trash2: <Trash2 size={16} />,
 }
 
 function getIcon(iconComponent: unknown, small = false): React.ReactNode {

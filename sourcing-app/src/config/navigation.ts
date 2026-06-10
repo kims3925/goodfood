@@ -41,6 +41,7 @@ import {
   UserPlus,
   Megaphone,
   LayoutGrid,
+  Trash2,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -70,6 +71,7 @@ export const sourcingMenuItems: MenuItem[] = [
       { label: '상품소싱', href: '/sourcing/post/list', icon: FileText },
       { label: '가공상품', href: '/sourcing/product/list', icon: Package },
       { label: '발행', href: '/sourcing/publish', icon: Upload },
+      { label: '삭제 관리', href: '/sourcing/cleanup', icon: Trash2 },
     ],
   },
   {
@@ -252,6 +254,7 @@ export const sourcingPathToMenuMap: Record<string, string> = {
   '/sourcing/publish/ad': '광고&마케팅',
   // 상품
   '/sourcing/pipeline': '상품',
+  '/sourcing/cleanup': '상품',
   '/sourcing/post': '상품',
   '/sourcing/collected-product': '상품',
   '/sourcing/product': '상품',
