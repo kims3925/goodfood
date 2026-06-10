@@ -44,6 +44,23 @@ export default function BandSessionGuidePage() {
           </p>
         </div>
 
+        {/* 자동화 안내 (v1.3.0, 2026-06-10) */}
+        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-5 mb-8">
+          <div className="flex items-start gap-3">
+            <CheckCircle size={22} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h2 className="font-bold text-emerald-900 mb-1">이제 수동 저장은 사실상 필요 없습니다</h2>
+              <p className="text-sm text-emerald-800 leading-relaxed">
+                <a href="/sourcing/settings/api" className="underline font-semibold">설정 &gt; API</a>에서{' '}
+                <strong>확장프로그램 키를 1회 발급</strong>하면, 확장이 소싱앱 로그인 만료와 무관하게 밴드 세션을
+                자동 동기화합니다 (1시간 주기 + 밴드 쿠키 변경 시 즉시). 서버도 6시간마다 세션을 연장(keep-alive)하므로,
+                밴드 비밀번호 변경·강제 로그아웃 시에만 band.us 재로그인 1회가 필요합니다.
+                자동 동기화가 끊기면 확장 아이콘에 <span className="font-mono text-red-600">!</span> 뱃지와 알림이 표시됩니다.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* 다운로드 섹션 */}
         <div className="bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl p-6 mb-8 text-white">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">

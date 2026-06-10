@@ -15,9 +15,11 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
-  AlertTriangle, XCircle, ChevronDown, ChevronUp, RefreshCw, ExternalLink, ShieldAlert, Wifi, Clock,
+  AlertTriangle, XCircle, ChevronDown, ChevronUp, RefreshCw, ExternalLink, ShieldAlert, Wifi, Clock, Zap,
 } from 'lucide-react'
+import { saveSessionViaExtension } from '@/lib/band-extension'
 
 type Severity = 'HEALTHY' | 'WARNING' | 'CRITICAL'
 
@@ -46,10 +48,13 @@ interface HealthSummary {
 }
 
 export default function SessionHealthBanner() {
+  const router = useRouter()
   const [data, setData] = useState<HealthSummary | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [dismissedUntil, setDismissedUntil] = useState<number | null>(null) // 사용자 임시 닫기 (1시간)
+  const [renewing, setRenewing] = useState(false)
+  const [renewMessage, setRenewMessage] = useState<string | null>(null)
 
   const fetchHealth = useCallback(async () => {
     setLoading(true)
@@ -104,6 +109,26 @@ export default function SessionHealthBanner() {
 
   const dismissOneHour = () => {
     setDismissedUntil(Date.now() + 60 * 60 * 1000)
+  }
+
+  // 원클릭 갱신 (2026-06-10) — 확장 saveSession 호출. 무응답이면 가이드로 이동.
+  const renewNow = async () => {
+    if (renewing) return
+    setRenewing(true)
+    setRenewMessage(null)
+    try {
+      const result = await saveSessionViaExtension()
+      if (result.success) {
+        setRenewMessage(`✅ ${result.data?.channelCount ?? ''}개 채널 세션 재저장 완료`)
+        await fetchHealth()
+      } else {
+        setRenewMessage(null)
+        // 확장 무응답/실패 → 가이드 페이지로
+        router.push(data?.guideUrl || '/sourcing/guide/band-session')
+      }
+    } finally {
+      setRenewing(false)
+    }
   }
 
   return (
@@ -164,12 +189,22 @@ export default function SessionHealthBanner() {
 
           {/* 액션 버튼 */}
           <div className="flex flex-wrap items-center gap-2 mb-2">
+            <button
+              onClick={renewNow}
+              disabled={renewing}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold ${colors.button} transition-colors disabled:opacity-60`}
+              title="확장프로그램으로 즉시 세션 재저장"
+            >
+              {renewing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+              지금 갱신
+            </button>
+            {renewMessage && <span className="text-xs text-green-700 font-medium">{renewMessage}</span>}
             <Link
               href={data.guideUrl}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold ${colors.button} transition-colors`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-white/70 hover:bg-white ${colors.text} border ${colors.border}`}
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              세션 재저장 가이드 열기
+              세션 재저장 가이드
             </Link>
             {severityChannels.length > 0 && (
               <button

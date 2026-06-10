@@ -25,6 +25,9 @@ interface ExtensionResponse<T = unknown> {
 interface SessionStatus {
   bandLoggedIn: boolean
   appLoggedIn: boolean
+  /** 확장 전용 키 설정 여부 (v1.3.0+) */
+  extensionKeySet?: boolean
+  keyTail?: string | null
   lastSaveTime: number | null
 }
 
@@ -127,4 +130,16 @@ export async function saveSessionViaExtension(): Promise<{ success: boolean; dat
 export async function getExtensionVersion(): Promise<string | null> {
   const response = await sendMessage<ExtensionResponse>({ action: 'ping' })
   return response?.version || null
+}
+
+/**
+ * 확장 전용 API 키를 확장에 주입 (v1.3.0 setApiKey 액션).
+ * 성공 시 확장 자동저장이 소싱앱 로그인 만료와 무관하게 동작한다.
+ */
+export async function setExtensionApiKey(key: string): Promise<{ success: boolean; error?: string }> {
+  const response = await sendMessage<ExtensionResponse>({ action: 'setApiKey', key })
+  if (!response) {
+    return { success: false, error: 'Extension과 통신할 수 없습니다. (미설치 또는 구버전)' }
+  }
+  return { success: response.success, error: response.error }
 }

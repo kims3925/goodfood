@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Save, TestTube, Check, AlertCircle, Store, Globe, ShoppingBag, Package, FileText, Chrome } from 'lucide-react'
+import { Settings, Save, TestTube, Check, AlertCircle, Store, Globe, ShoppingBag, Package, FileText, Chrome, KeyRound, Copy } from 'lucide-react'
+import { setExtensionApiKey, checkExtensionInstalled } from '@/lib/band-extension'
 
 interface APISettings {
   // Band API
@@ -62,6 +63,11 @@ export default function APISettingsPage() {
   const [bandLoginEmail, setBandLoginEmail] = useState('')
   const [isSavingBandAccount, setIsSavingBandAccount] = useState(false)
   const [bandAccountMessage, setBandAccountMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  // 확장프로그램 전용 키 (User.extensionApiKey — 세션 자동저장이 로그인 만료와 무관하게 동작)
+  const [extKeyInfo, setExtKeyInfo] = useState<{ issued: boolean; keyTail: string | null; createdAt: string | null } | null>(null)
+  const [isIssuingKey, setIsIssuingKey] = useState(false)
+  const [extKeyMessage, setExtKeyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [fallbackKey, setFallbackKey] = useState<string | null>(null) // 확장 미설치 시 1회 노출
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; solution?: string; detail?: string; errorCode?: number } | null>(null)
   const [testSuccess, setTestSuccess] = useState<Record<APIProvider, boolean>>({
     band: false,
@@ -111,7 +117,61 @@ export default function APISettingsPage() {
   useEffect(() => {
     loadSettings()
     loadBandAccount()
+    loadExtensionKey()
   }, [])
+
+  const loadExtensionKey = async () => {
+    try {
+      const response = await fetch('/api/settings/extension-key')
+      const data = await response.json()
+      if (data.success) setExtKeyInfo(data.data)
+    } catch (error) {
+      console.error('확장 키 정보 로드 실패:', error)
+    }
+  }
+
+  const issueExtensionKey = async () => {
+    if (extKeyInfo?.issued && !window.confirm('키를 재발급하면 기존 키는 즉시 무효화됩니다. 계속할까요?')) return
+    try {
+      setIsIssuingKey(true)
+      setExtKeyMessage(null)
+      setFallbackKey(null)
+
+      const response = await fetch('/api/settings/extension-key', { method: 'POST' })
+      const data = await response.json()
+      if (!data.success) throw new Error(data.error || '키 발급 실패')
+      const key: string = data.data.key
+
+      // 확장에 자동 주입 (설치돼 있으면 복사/붙여넣기 불필요)
+      const installed = await checkExtensionInstalled()
+      if (installed) {
+        const injected = await setExtensionApiKey(key)
+        if (injected.success) {
+          setExtKeyMessage({
+            type: 'success',
+            text: '확장에 키가 저장되었습니다. 이후 자동 동기화는 로그인 만료와 무관하게 동작합니다.',
+          })
+        } else {
+          setFallbackKey(key)
+          setExtKeyMessage({
+            type: 'error',
+            text: `자동 주입 실패(${injected.error || '확장 구버전?'}) — 아래 키를 복사해 두세요. 확장 새로고침 후 재발급하면 자동 주입됩니다.`,
+          })
+        }
+      } else {
+        setFallbackKey(key)
+        setExtKeyMessage({
+          type: 'error',
+          text: '확장이 감지되지 않아 키를 1회 노출합니다. 확장 설치/새로고침 후 다시 발급하면 자동 주입됩니다.',
+        })
+      }
+      await loadExtensionKey()
+    } catch (error: any) {
+      setExtKeyMessage({ type: 'error', text: error.message || '키 발급 중 오류' })
+    } finally {
+      setIsIssuingKey(false)
+    }
+  }
 
   const loadBandAccount = async () => {
     try {
@@ -354,6 +414,57 @@ export default function APISettingsPage() {
                     <p className={`text-xs ${bandAccountMessage.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
                       {bandAccountMessage.text}
                     </p>
+                  )}
+                </div>
+
+                {/* 확장프로그램 전용 키 — 세션 자동저장이 소싱앱 로그인 만료와 무관하게 동작 */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-md p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-5 w-5 text-emerald-600" />
+                    <h3 className="text-lg font-semibold text-gray-900">확장프로그램 키 (세션 자동저장)</h3>
+                  </div>
+                  <p className="text-xs text-emerald-700">
+                    키를 발급하면 Chrome 확장의 밴드 세션 자동저장이 <strong>소싱앱 로그인 만료와 무관하게</strong> 계속
+                    동작합니다. 발급 시 확장에 자동 저장되며, 수동으로 세션을 저장할 일이 사실상 없어집니다.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-700">
+                      상태:{' '}
+                      {extKeyInfo?.issued ? (
+                        <span className="text-emerald-700 font-medium">발급됨 (…{extKeyInfo.keyTail})</span>
+                      ) : (
+                        <span className="text-gray-500">미발급</span>
+                      )}
+                    </span>
+                    <button
+                      onClick={issueExtensionKey}
+                      disabled={isIssuingKey}
+                      className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                    >
+                      {isIssuingKey ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <KeyRound className="h-4 w-4" />
+                      )}
+                      {extKeyInfo?.issued ? '키 재발급' : '키 발급'}
+                    </button>
+                  </div>
+                  {extKeyMessage && (
+                    <p className={`text-xs ${extKeyMessage.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
+                      {extKeyMessage.text}
+                    </p>
+                  )}
+                  {fallbackKey && (
+                    <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-md px-3 py-2">
+                      <code className="text-xs flex-1 break-all">{fallbackKey}</code>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(fallbackKey)}
+                        className="p-1.5 text-gray-500 hover:text-gray-800"
+                        title="복사"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
                   )}
                 </div>
 
