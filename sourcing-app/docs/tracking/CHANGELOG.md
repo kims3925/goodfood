@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260610-006 | Done(코드) | 2026-06-10 | - | 상품 삭제 관리 메뉴 신설 (/sourcing/cleanup) — 기간·카테고리(COM 기본 보호)·원본소실 조건 미리보기 → 남길/삭제 선택 실행. 소매밴드/쇼핑몰만, 도매밴드 비대상. 밴드 실글 삭제 옵션(30건/회) | Medium | Claude |
+| TR-20260610-005 | Done(코드) | 2026-06-10 | - | 종합발행 상단 상품목록 포스터 + 상품명 나열(✅체크리스트) — includeTopPoster 기본 ON, digest-poster-renderer 신설 | Low | Claude |
 | TR-20260610-004 | Done(코드)/배포 대기 | 2026-06-10 | - | 소싱 현황판 신설 — /sourcing/pipeline + GET /api/sourcing/pipeline-status. 수집→AI가공→소매밴드/쇼핑몰 발행 단계를 기존 상품 포함 한눈에 (단계 필터/검색/채널/기간) | Low | Claude |
 | TR-20260610-003 | Done(코드)/배포 대기 + 운영DB 직접반영 완료 | 2026-06-10 | - | WholesaleWatch 활성화 — 운영 채널 40/41 bandNo 설정(82999897/85260087)+AgentDefinition seed(SQL). deleteBandPost=true (도매방 모니터링만, 소매밴드/쇼핑몰만 삭제 반영) | Medium | Claude |
 | TR-20260610-002 | Done(코드)/운영 db push 대기 | 2026-06-10 | - | AgentTask/AgentLog userId 추가 (SaaS P0-2 테넌트 식별) — 이벤트 data.userId / 로그 metadata.userId 기록, null=전역 | Low | Claude |

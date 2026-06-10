@@ -1722,3 +1722,11 @@ interface PipelineDashboardResponse {
 | 엔드포인트 | 메서드 | 설명 |
 |---|---|---|
 | `/api/sourcing/pipeline-status` | GET | 수집(CollectedPost)→AI가공(Product)→발행(ChannelProduct/ShopProduct) 단계를 게시물 단위로 조회. 쿼리: page/limit/search/channelId/stage(all·collected·processed·published)/startDate/endDate. 단계별 summary 카운트 포함 |
+
+### 2026-06-10 추가 — 종합발행 상단 포스터 / 수동 삭제 관리
+
+| 엔드포인트 | 메서드 | 설명 |
+|---|---|---|
+| `/api/publish/digest` | POST | body 에 `includeTopPoster`(기본 true)·`posterNoticeText` 추가 — digest 모드에서 본문 상단 상품명 나열(+✅체크리스트)과 갤러리 맨 앞 상품목록 포스터 PNG 1장 자동 생성 |
+| `/api/sourcing/cleanup/preview` | POST | 수동 삭제 미리보기 — cutoffDate/targets(retail·shop)/categoryIds/excludeCom(기본 true)/channelIds/includeMissingSource. 상품 단위 후보 + 발행물 상세 반환 |
+| `/api/sourcing/cleanup/execute` | POST | 선택한 channelProductIds/shopProductIds 만 soft-delete + 옵션 deleteBandPosts(소매밴드 실글, 1회 30건 상한). 도매밴드는 비대상 |
