@@ -290,6 +290,7 @@ export const shopPathToMenuMap: Record<string, string> = {
 
 export const adminPathToMenuMap: Record<string, string> = {
   '/admin/dashboard': '플랫폼 현황',
+  '/admin/wholesale-catalog': 'SaaS 운영',
   '/admin/agents': '에이전트 관리',
   '/admin/users': '사용자 관리',
   '/admin/system': '시스템',

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
+import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Search,
@@ -401,6 +402,21 @@ function ChannelListContent() {
               </div>
             </div>
           </button>
+          {/* 도매밴드 카탈로그 카드 — 플랫폼 가등록 도매밴드에서 선택 연결 */}
+          <Link
+            href="/sourcing/channel/catalog"
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-emerald-300 hover:bg-emerald-50 transition-colors cursor-pointer text-left block"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-emerald-100 rounded-lg">
+                <Boxes size={24} className="text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">도매밴드</p>
+                <p className="text-lg font-bold text-emerald-600">카탈로그에서 연결</p>
+              </div>
+            </div>
+          </Link>
           {/* 채널 삭제 카드 */}
           <button
             onClick={handleDeleteSelected}

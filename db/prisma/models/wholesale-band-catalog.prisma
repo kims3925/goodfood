@@ -1,0 +1,33 @@
+// 도매밴드 가등록 카탈로그 (2026-06-11, REQ: 플랫폼이 소싱 도매밴드를 미리 확보·가등록하고
+// 각 매니저가 그중에서 소싱처를 선택해 연결).
+//
+// - 어드민이 플랫폼 계정(예: jins3925@naver.com)으로 가입해 둔 도매밴드를 카탈로그에 등록.
+// - 매니저는 카탈로그 목록에서 선택("연결") → 본인 소유 WHOLESALE Channel 이 자동 생성됨
+//   (Channel.catalogId 로 출처 추적). 연결 시 sourceChannel(플랫폼 채널)의 밴드 세션을
+//   복사하므로 매니저 본인이 해당 도매밴드 멤버가 아니어도 수집 가능.
+// - 세션 신선도: SessionKeeperAgent keep-alive 가 sessionAccountEmail 기준으로 회전 쿠키를
+//   전파하므로 복사본도 함께 갱신된다 (band-session-manager.keepAliveSession 참조).
+model WholesaleBandCatalog {
+  id              Int       @id @default(autoincrement())
+  // Band 채널 키 (Channel.channelKey 와 동일 체계 — band.us 키)
+  bandKey         String    @unique @map("band_key") @db.VarChar(255)
+  // Band 웹 숫자 밴드ID (band.us/band/{bandNo}) — Playwright 직접 진입용 (Channel.bandNo 와 동일 의미)
+  bandNo          Int?      @map("band_no")
+  name            String    @db.VarChar(255)
+  description     String?   @db.Text
+  coverUrl        String?   @map("cover_url") @db.VarChar(500)
+  isActive        Boolean   @default(true) @map("is_active")
+  sortOrder       Int       @default(0) @map("sort_order")
+  // 가등록한 어드민 userId (참조용 — FK 미설정)
+  createdById     Int?      @map("created_by_id")
+  // 매니저 연결 시 밴드 세션 복사 출처가 되는 플랫폼 소유 채널 (보통 어드민의 WHOLESALE 채널)
+  sourceChannelId Int?      @map("source_channel_id")
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamp(0)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  channels        Channel[]
+
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("wholesale_band_catalog")
+}

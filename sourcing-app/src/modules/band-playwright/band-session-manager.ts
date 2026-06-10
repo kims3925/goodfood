@@ -240,9 +240,14 @@ export class BandSessionManager {
       })
       if (!channel) return false
 
-      // 같은 계정 세션을 쓰는 채널 전체 갱신 (계정 미상 구버전 저장분은 본 채널만)
+      // 같은 계정 세션을 쓰는 채널 전체 갱신 (계정 미상 구버전 저장분은 본 채널만).
+      // 사용자(userId) 제한 없이 sessionAccountEmail 전체에 전파 (2026-06-11) — 도매밴드
+      // 카탈로그 연결로 플랫폼 세션이 다른 매니저 채널에 복사되는데, 쿠키가 회전하면
+      // 복사본이 무효화되므로 같은 밴드 계정을 쓰는 모든 채널이 함께 갱신되어야 한다.
+      // sessionAccountEmail 은 서버가 검증·기입하는 값이라 (save-all 409 검증 / 카탈로그
+      // connect) 임의 사용자가 타인 계정 그룹에 끼어들 수 없다.
       const where = channel.sessionAccountEmail
-        ? { userId: channel.userId, sessionAccountEmail: channel.sessionAccountEmail, bandSessionCookie: { not: null } }
+        ? { sessionAccountEmail: channel.sessionAccountEmail, bandSessionCookie: { not: null } }
         : { id: channelId }
 
       const updated = await prisma.channel.updateMany({

@@ -46,6 +46,10 @@ model Channel {
   expiryDaysNormal  Int?             @map("expiry_days_normal")  // 일반 카테고리 만료 일수
   expiryDaysCom     Int?             @map("expiry_days_com")     // COM(상시상품) 만료 일수
   autoExpireEnabled Boolean          @default(true) @map("auto_expire_enabled") // 이 채널 자동만료 ON/OFF
+  // 도매밴드 카탈로그 연결 출처 (2026-06-11): 매니저가 카탈로그에서 선택해 생성된 채널이면 기입.
+  // null = 매니저가 직접 등록한 채널 (기존 동작).
+  catalogId         Int?             @map("catalog_id")
+  catalog           WholesaleBandCatalog? @relation(fields: [catalogId], references: [id], onDelete: SetNull)
   shop              Shop?            @relation(fields: [shopId], references: [id])
   user              User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   collectedPosts    CollectedPost[]
@@ -63,5 +67,6 @@ model Channel {
   @@index([isActive])
   @@index([deletedAt])
   @@index([kind, platform])
+  @@index([catalogId])
   @@map("channel")
 }

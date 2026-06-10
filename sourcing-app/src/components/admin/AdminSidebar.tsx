@@ -45,6 +45,7 @@ const adminNav: NavItem[] = [
     icon: Building2,
     children: [
       { label: '테넌트 관리', href: '/admin/tenants', icon: Building2 },
+      { label: '도매밴드 카탈로그', href: '/admin/wholesale-catalog', icon: Store },
       { label: '사용량 모니터링', href: '/admin/usage', icon: BarChart3 },
       { label: '결제 관리', href: '/admin/billing', icon: CreditCard },
     ],
