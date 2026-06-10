@@ -99,8 +99,11 @@ export default function ChannelFormModal({
       const data = await response.json()
       if (data.success && data.settings) {
         const platforms: string[] = []
-        // Band API 설정 확인
-        if (data.settings.band?.accessToken) {
+        // Band API 설정 확인 — 본인 토큰 또는 일괄설정(공용 토큰 등록 시)
+        if (
+          data.settings.band?.accessToken ||
+          (data.settings.band?.useGlobalToken && data.settings.band?.globalTokenConfigured)
+        ) {
           platforms.push('BAND')
         }
         // Aliexpress API 설정 확인

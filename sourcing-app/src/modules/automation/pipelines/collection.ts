@@ -16,6 +16,7 @@ import {
 } from '../types'
 import { postService } from '@/modules/sourcing/domain/src/post/services/post.service'
 import { refreshBandTokenIfNeeded } from '@/modules/sourcing/domain/src/channel/services/band-token.service'
+import { settingsService } from '@/modules/config/domain/src/settings'
 import { checkPriceWithinRange } from '../utils/price-extractor'
 
 // =============================================
@@ -74,14 +75,8 @@ export async function runCollectionPipeline(
   // Band 토큰 만료 임박 시 자동 갱신 (tokenExpiry 미설정이면 no-op — 안전).
   await refreshBandTokenIfNeeded(userId)
 
-  // 사용자의 Band API 설정 조회
-  const apiConfig = await prisma.sourcingApiConfig.findFirst({
-    where: {
-      userId,
-      platform: 'BAND',
-      isActive: true,
-    },
-  })
+  // 유효 Band 토큰 해석 — 일괄설정(useGlobalToken) 모드면 어드민 공용 토큰 사용
+  const { accessToken: bandAccessToken } = await settingsService.getEffectiveBandToken(userId)
 
   if (wholesaleChannels.length === 0) {
     console.log('[Collection] No active wholesale channels found')
@@ -147,13 +142,13 @@ export async function runCollectionPipeline(
       console.log(`[Collection] Collecting from channel: ${channel.name}`)
 
       // API 토큰 확인
-      if (!apiConfig?.accessToken) {
+      if (!bandAccessToken) {
         throw new Error('API 토큰이 설정되지 않았습니다')
       }
 
       // Band API 호출하여 게시물 가져오기
       const bandPosts = await fetchBandPosts(
-        apiConfig.accessToken,
+        bandAccessToken,
         channel.channelKey,
         config.limit || 20
       )

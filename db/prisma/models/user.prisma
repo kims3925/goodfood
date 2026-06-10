@@ -137,6 +137,9 @@ model SourcingApiConfig {
   updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   bandCookieExpiry  DateTime?        @map("band_cookie_expiry") @db.Timestamp(0)
   bandSessionCookie String?          @map("band_session_cookie") @db.Text
+  // 플랫폼 일괄설정 모드 (2026-06-11, BAND 전용): true 면 본인 accessToken 대신
+  // 어드민(ADMIN role)이 등록한 플랫폼 공용 토큰을 사용한다 (settings.service.getEffectiveBandToken).
+  useGlobalToken    Boolean          @default(false) @map("use_global_token")
   user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, platform])

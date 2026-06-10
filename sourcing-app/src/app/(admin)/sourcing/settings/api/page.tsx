@@ -10,6 +10,10 @@ interface APISettings {
     clientId: string
     clientSecret: string
     accessToken: string
+    // 플랫폼 일괄설정 — true 면 어드민이 등록한 공용 토큰 사용 (본인 토큰 입력 불필요)
+    useGlobalToken: boolean
+    // 어드민 공용 토큰 등록 여부 (서버가 내려주는 읽기 전용 안내값)
+    globalTokenConfigured: boolean
   }
   // AliExpress API
   aliexpress: {
@@ -49,7 +53,9 @@ export default function APISettingsPage() {
     band: {
       clientId: '',
       clientSecret: '',
-      accessToken: ''
+      accessToken: '',
+      useGlobalToken: false,
+      globalTokenConfigured: false
     },
     aliexpress: {
       apiKey: '',
@@ -473,38 +479,115 @@ export default function APISettingsPage() {
                   <h3 className="text-lg font-semibold text-gray-900">Band API 설정</h3>
                 </div>
 
-                {/* Band API Key */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Access Token *
+                {/* 토큰 사용 방식 선택 — 플랫폼 일괄설정 vs 내 API 직접 등록 */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Access Token 사용 방식
                   </label>
-                  <textarea
-                    value={settings.band.accessToken}
-                    onChange={(e) => updateSetting('band', 'accessToken', e.target.value)}
-                    placeholder="Band Access Token 입력"
-                    rows={3}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Band Developers에서 발급받은 Access Token을 입력하세요.
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          band: { ...prev.band, useGlobalToken: true },
+                        }))
+                      }
+                      className={`p-3 border-2 rounded-lg text-left transition-all ${
+                        settings.band.useGlobalToken
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="font-semibold text-gray-900 text-sm mb-1">플랫폼 일괄설정</p>
+                      <p className="text-xs text-gray-500">
+                        관리자가 등록한 공용 Access Token을 사용합니다. 별도 입력이 필요 없습니다.
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          band: { ...prev.band, useGlobalToken: false },
+                        }))
+                      }
+                      className={`p-3 border-2 rounded-lg text-left transition-all ${
+                        !settings.band.useGlobalToken
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="font-semibold text-gray-900 text-sm mb-1">내 API 직접 등록</p>
+                      <p className="text-xs text-gray-500">
+                        Band Developers에서 발급받은 본인의 Access Token을 입력합니다.
+                      </p>
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    방식 변경 후 하단의 [설정 저장]을 눌러야 적용됩니다.
                   </p>
                 </div>
 
-                {/* Band Developers Button */}
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                  <p className="text-xs text-blue-700 mb-3">
-                    Band Developers에서 앱을 생성하고 Access Token을 발급받으세요
-                  </p>
-                  <a
-                    href="https://developers.band.us"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-md transition-colors"
+                {settings.band.useGlobalToken ? (
+                  /* 일괄설정 모드 — 공용 토큰 상태 안내 */
+                  <div
+                    className={`border rounded-md p-4 ${
+                      settings.band.globalTokenConfigured
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-amber-50 border-amber-200'
+                    }`}
                   >
-                    <Globe className="w-4 h-4" />
-                    Band Developers 열기
-                  </a>
-                </div>
+                    {settings.band.globalTokenConfigured ? (
+                      <p className="text-xs text-green-700">
+                        <Check className="inline h-3.5 w-3.5 mr-1" />
+                        플랫폼 공용 토큰이 등록되어 있습니다. 저장하면 밴드 목록 조회·수집에 공용
+                        토큰이 사용됩니다.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-700">
+                        <AlertCircle className="inline h-3.5 w-3.5 mr-1" />
+                        아직 플랫폼 공용 토큰이 등록되지 않았습니다. 관리자에게 등록을 요청해
+                        주세요. (어드민 패널 &gt; SaaS 운영 &gt; 플랫폼 Band API)
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {/* Band API Key */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Access Token *
+                      </label>
+                      <textarea
+                        value={settings.band.accessToken}
+                        onChange={(e) => updateSetting('band', 'accessToken', e.target.value)}
+                        placeholder="Band Access Token 입력"
+                        rows={3}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Band Developers에서 발급받은 Access Token을 입력하세요.
+                      </p>
+                    </div>
+
+                    {/* Band Developers Button */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                      <p className="text-xs text-blue-700 mb-3">
+                        Band Developers에서 앱을 생성하고 Access Token을 발급받으세요
+                      </p>
+                      <a
+                        href="https://developers.band.us"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-md transition-colors"
+                      >
+                        <Globe className="w-4 h-4" />
+                        Band Developers 열기
+                      </a>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

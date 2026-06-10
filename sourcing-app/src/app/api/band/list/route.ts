@@ -1,9 +1,9 @@
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import prisma from '@bandauto/db'
 import { getCurrentUser } from '@/modules/auth/auth.service'
 import { NaverBandClient } from '@/modules/sourcing/domain/src/channel/services/band-client.service'
+import { settingsService } from '@/modules/config/domain/src/settings'
 
 // GET: 사용자의 밴드 목록 조회
 export async function GET() {
@@ -16,16 +16,10 @@ export async function GET() {
       )
     }
 
-    // 사용자의 BAND API 설정 조회
-    const apiConfig = await prisma.sourcingApiConfig.findFirst({
-      where: {
-        userId: currentUser.userId,
-        platform: 'BAND',
-        isActive: true,
-      },
-    })
+    // 유효 토큰 해석 — 일괄설정(useGlobalToken) 모드면 어드민 공용 토큰 사용
+    const { accessToken } = await settingsService.getEffectiveBandToken(currentUser.userId)
 
-    if (!apiConfig || !apiConfig.accessToken) {
+    if (!accessToken) {
       return NextResponse.json(
         { success: false, error: 'Band API 설정을 먼저 등록해주세요.' },
         { status: 404 }
@@ -33,7 +27,7 @@ export async function GET() {
     }
 
     // Band API로 밴드 목록 조회
-    const bandClient = new NaverBandClient(apiConfig.accessToken)
+    const bandClient = new NaverBandClient(accessToken)
     const bands = await bandClient.getBands()
 
     return NextResponse.json({

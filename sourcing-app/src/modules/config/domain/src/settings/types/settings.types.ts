@@ -4,6 +4,10 @@ export interface ApiSettings {
     clientSecret: string
     accessToken: string
     refreshToken: string
+    // 플랫폼 일괄설정 모드 — true 면 어드민 등록 공용 토큰 사용 (본인 토큰 입력 불필요)
+    useGlobalToken: boolean
+    // 어드민 공용 토큰이 등록되어 있는지 (UI 안내용 — 토큰 값 자체는 노출하지 않음)
+    globalTokenConfigured: boolean
   }
   aliexpress: {
     apiKey: string

@@ -199,9 +199,25 @@ export async function POST(request: NextRequest) {
     let testResult: { success: boolean; message: string; detail?: string }
 
     switch (provider) {
-      case 'band':
-        testResult = await testBandConnection(settings)
+      case 'band': {
+        // 일괄설정 모드면 입력 토큰 대신 어드민 공용 토큰으로 테스트
+        let bandSettings = settings
+        if (settings?.useGlobalToken) {
+          const { settingsService } = await import('@/modules/config/domain/src/settings')
+          const { accessToken } = await settingsService.getEffectiveBandToken(currentUser.userId)
+          if (!accessToken) {
+            testResult = {
+              success: false,
+              message: '플랫폼 공용 토큰이 등록되어 있지 않습니다.',
+              detail: '관리자가 어드민 패널에서 플랫폼 Band API 토큰을 등록해야 합니다.',
+            }
+            break
+          }
+          bandSettings = { ...settings, accessToken }
+        }
+        testResult = await testBandConnection(bandSettings)
         break
+      }
       case 'aliexpress':
         testResult = await testAliExpressConnection(settings)
         break

@@ -61,6 +61,20 @@ export class SettingsRepository {
     })
   }
 
+  // 플랫폼 공용(일괄설정) Band 토큰 — ADMIN role 사용자가 등록한 BAND 설정 중 최신.
+  // 일괄설정 모드(useGlobalToken=true) 매니저의 토큰 해석에 사용된다.
+  async findGlobalBandConfig() {
+    return prisma.sourcingApiConfig.findFirst({
+      where: {
+        platform: 'BAND',
+        isActive: true,
+        accessToken: { not: null },
+        user: { role: 'ADMIN' },
+      },
+      orderBy: { updatedAt: 'desc' },
+    })
+  }
+
   async upsertApiConfig(userId: number, platform: string, data: any) {
     const existing = await this.findApiConfigByPlatform(userId, platform)
 

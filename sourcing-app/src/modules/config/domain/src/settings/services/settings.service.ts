@@ -5,6 +5,7 @@ export class SettingsService {
   // API 설정 조회
   async getApiSettings(userId: number): Promise<ApiSettings> {
     const configs = await settingsRepository.findApiConfigs(userId)
+    const globalConfig = await settingsRepository.findGlobalBandConfig()
 
     const settings: ApiSettings = {
       band: {
@@ -12,6 +13,8 @@ export class SettingsService {
         clientSecret: '',
         accessToken: '',
         refreshToken: '',
+        useGlobalToken: false,
+        globalTokenConfigured: !!globalConfig,
       },
       aliexpress: {
         apiKey: '',
@@ -28,6 +31,8 @@ export class SettingsService {
         clientSecret: '',
         accessToken: bandConfig.accessToken || '',
         refreshToken: '',
+        useGlobalToken: bandConfig.useGlobalToken,
+        globalTokenConfigured: !!globalConfig,
       }
     }
 
@@ -67,22 +72,28 @@ export class SettingsService {
     }
 
     if (provider === 'band') {
-      configData.accessToken = settings.accessToken || null
-      configData.refreshToken = settings.refreshToken || null
-      // 토큰 자동 갱신용 절대 만료시각 (expiresIn[초] → now + expiresIn).
-      // refreshBandTokenIfNeeded 가 이 값으로 만료 임박을 판단. expiresIn 없으면 null(자동갱신 비활성).
-      configData.tokenExpiry = settings.expiresIn
-        ? new Date(Date.now() + Number(settings.expiresIn) * 1000)
-        : null
-      // OAuth 메타데이터 저장 (만료시간 등)
-      if (settings.expiresIn || settings.tokenType) {
-        configData.metadata = JSON.stringify({
-          expiresIn: settings.expiresIn || null,
-          tokenType: settings.tokenType || 'Bearer',
-          updatedAt: new Date().toISOString(),
-        })
-      } else {
-        configData.metadata = null
+      // 플랫폼 일괄설정 모드: 본인 토큰 입력 없이 어드민 공용 토큰을 사용.
+      // 모드 전환 시 기존에 저장해 둔 본인 토큰은 건드리지 않는다 (다시 직접 등록으로
+      // 돌아올 때 보존 — 일괄 모드에서는 어차피 무시됨).
+      configData.useGlobalToken = !!settings.useGlobalToken
+      if (!settings.useGlobalToken) {
+        configData.accessToken = settings.accessToken || null
+        configData.refreshToken = settings.refreshToken || null
+        // 토큰 자동 갱신용 절대 만료시각 (expiresIn[초] → now + expiresIn).
+        // refreshBandTokenIfNeeded 가 이 값으로 만료 임박을 판단. expiresIn 없으면 null(자동갱신 비활성).
+        configData.tokenExpiry = settings.expiresIn
+          ? new Date(Date.now() + Number(settings.expiresIn) * 1000)
+          : null
+        // OAuth 메타데이터 저장 (만료시간 등)
+        if (settings.expiresIn || settings.tokenType) {
+          configData.metadata = JSON.stringify({
+            expiresIn: settings.expiresIn || null,
+            tokenType: settings.tokenType || 'Bearer',
+            updatedAt: new Date().toISOString(),
+          })
+        } else {
+          configData.metadata = null
+        }
       }
     } else if (provider === 'aliexpress') {
       configData.apiKey = settings.apiKey || null
@@ -94,6 +105,48 @@ export class SettingsService {
     }
 
     return settingsRepository.upsertApiConfig(userId, platform, configData)
+  }
+
+  /**
+   * 사용자의 유효 Band Access Token 해석 (2026-06-11, 일괄설정 모드).
+   * - useGlobalToken=true → 어드민(ADMIN role)이 등록한 플랫폼 공용 토큰
+   * - 그 외 → 본인 SourcingApiConfig 의 accessToken
+   * Band Open API 를 호출하는 모든 경로(/api/band/list, 수집 파이프라인)는 이 함수를 사용한다.
+   */
+  async getEffectiveBandToken(
+    userId: number
+  ): Promise<{ accessToken: string | null; source: 'own' | 'global' | null }> {
+    const own = await settingsRepository.findApiConfigByPlatform(userId, 'BAND')
+    if (own?.useGlobalToken) {
+      const global = await settingsRepository.findGlobalBandConfig()
+      return { accessToken: global?.accessToken ?? null, source: global ? 'global' : null }
+    }
+    if (own?.isActive && own.accessToken) {
+      return { accessToken: own.accessToken, source: 'own' }
+    }
+    return { accessToken: null, source: null }
+  }
+
+  /** 플랫폼 공용 Band 토큰 상태 (어드민 UI용 — 토큰 끝 4자리만 노출) */
+  async getGlobalBandTokenInfo() {
+    const global = await settingsRepository.findGlobalBandConfig()
+    if (!global?.accessToken) {
+      return { configured: false, tokenTail: null, updatedAt: null, ownerUserId: null }
+    }
+    return {
+      configured: true,
+      tokenTail: global.accessToken.slice(-4),
+      updatedAt: global.updatedAt,
+      ownerUserId: global.userId,
+    }
+  }
+
+  /** 플랫폼 공용 Band 토큰 저장 — 요청한 어드민의 BAND SourcingApiConfig 에 기록 */
+  async saveGlobalBandToken(adminUserId: number, accessToken: string) {
+    return settingsRepository.upsertApiConfig(adminUserId, 'BAND', {
+      accessToken: accessToken.trim(),
+      isActive: true,
+    })
   }
 
   // AI 설정 조회
