@@ -93,6 +93,23 @@ function logStageError(stage: string, error: Error, context: LogContext) {
 /**
  * JSON 문자열 또는 number[] 값을 number[]로 파싱
  */
+/**
+ * 자동발행 시간대 규칙 (2026-06-10 사용자 지시):
+ * 오전에 미발행된 상품을 오후에 발행하면 안 된다 — 당일생물은 오후에 마감되므로
+ * 오후에는 그 오후(정오 이후)에 수집·가공된(=내일 발송 가능한) 상품만 발행한다.
+ *  - 오전 실행(KST 정오 이전): 오늘 00:00 KST 이후 생성 상품
+ *  - 오후 실행(KST 정오 이후): 오늘 12:00 KST 이후 생성 상품
+ * 서버 TZ가 UTC 여도 KST 기준으로 경계를 계산한다.
+ */
+function getPublishWindowStart(): Date {
+  const KST_OFFSET_MS = 9 * 60 * 60 * 1000
+  const kstNow = new Date(Date.now() + KST_OFFSET_MS)
+  const kstMidnightUtcMs =
+    Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()) - KST_OFFSET_MS
+  const isAfternoonKst = kstNow.getUTCHours() >= 12
+  return new Date(kstMidnightUtcMs + (isAfternoonKst ? 12 * 60 * 60 * 1000 : 0))
+}
+
 function parseNumberArray(value: string | number[] | null | undefined): number[] {
   if (!value) return []
   if (Array.isArray(value)) return value
@@ -497,14 +514,15 @@ export async function executeFullPipeline(
         // ⚠️ 변경: 이전엔 ProductCreate 단계에서 생성한 productIds만 발행 대상으로 사용해서,
         // 사용자가 별도로 수동 AI 가공해 만든 상품(오늘 createdAt이지만 자동 파이프라인이
         // 아닌 다른 경로로 생성)이 자동발행 시간에 누락되는 문제가 있었음.
-        // 수정: productIds 필터 제거하고 todayOnly+publishReadyOnly만 적용 — 오늘 생성된
-        // 모든 미발행 상품(자동/수동 무관)을 자동발행 대상으로 포함.
+        // 2026-06-10 규칙 추가: 오전 미발행분은 오후에 발행 금지(당일생물 오후 마감)
+        // — 같은 반일(KST 오전/오후) 생성분만 발행 (getPublishWindowStart 참조).
         const createdProductIds = productCreateResult?.details?.createdProductIds || []
-        log('DEBUG', `자동 생성 ${createdProductIds.length}개 + 오늘 생성된 다른 미발행 상품 모두 발행`, { ...logCtx, stage: 'PUBLISH' })
+        const publishWindowStart = getPublishWindowStart()
+        log('DEBUG', `자동 생성 ${createdProductIds.length}개 + 같은 반일(${publishWindowStart.toISOString()} 이후) 생성 미발행 상품 발행`, { ...logCtx, stage: 'PUBLISH' })
         publishResult = await runPublishPipeline({
           channelIds: retailChannelIds,
           publishReadyOnly: true,
-          todayOnly: true,
+          createdAfter: publishWindowStart,
         })
 
         totalItems += publishResult.totalItems
@@ -943,14 +961,15 @@ export async function executeFullPipelineWithLock(
         // ⚠️ 변경: 이전엔 ProductCreate 단계에서 생성한 productIds만 발행 대상으로 사용해서,
         // 사용자가 별도로 수동 AI 가공해 만든 상품(오늘 createdAt이지만 자동 파이프라인이
         // 아닌 다른 경로로 생성)이 자동발행 시간에 누락되는 문제가 있었음.
-        // 수정: productIds 필터 제거하고 todayOnly+publishReadyOnly만 적용 — 오늘 생성된
-        // 모든 미발행 상품(자동/수동 무관)을 자동발행 대상으로 포함.
+        // 2026-06-10 규칙 추가: 오전 미발행분은 오후에 발행 금지(당일생물 오후 마감)
+        // — 같은 반일(KST 오전/오후) 생성분만 발행 (getPublishWindowStart 참조).
         const createdProductIds = productCreateResult?.details?.createdProductIds || []
-        log('DEBUG', `자동 생성 ${createdProductIds.length}개 + 오늘 생성된 다른 미발행 상품 모두 발행`, { ...logCtx, stage: 'PUBLISH' })
+        const publishWindowStart = getPublishWindowStart()
+        log('DEBUG', `자동 생성 ${createdProductIds.length}개 + 같은 반일(${publishWindowStart.toISOString()} 이후) 생성 미발행 상품 발행`, { ...logCtx, stage: 'PUBLISH' })
         publishResult = await runPublishPipeline({
           channelIds: retailChannelIds,
           publishReadyOnly: true,
-          todayOnly: true,
+          createdAfter: publishWindowStart,
         })
 
         totalItems += publishResult.totalItems
