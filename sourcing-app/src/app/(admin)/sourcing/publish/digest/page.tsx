@@ -67,6 +67,10 @@ export default function DigestPublishPage() {
   const [headerText, setHeaderText] = useState('')
   const [footerText, setFooterText] = useState('')
   const [maxImagesPerProduct, setMaxImagesPerProduct] = useState(1)
+  // 상단 포스터 + 상품명 나열 (2026-06-10): 갤러리 맨 앞 상품목록 포스터 1장 +
+  // 본문 상단 "상품1 / 상품2 / ..." 나열 + ✅ 체크리스트 (digest 모드 전용)
+  const [includeTopPoster, setIncludeTopPoster] = useState(true)
+  const [posterNoticeText, setPosterNoticeText] = useState('')
 
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannels, setSelectedChannels] = useState<number[]>([])
@@ -371,6 +375,8 @@ export default function DigestPublishPage() {
                 footerText,
                 maxImagesPerProduct,
                 publishMode,
+                includeTopPoster,
+                posterNoticeText: posterNoticeText.trim() || undefined,
                 ...(collagePayload ? { collageOptions: collagePayload } : {}),
               }),
             })
@@ -662,6 +668,33 @@ export default function DigestPublishPage() {
               </div>
             </div>
             <div className="w-full lg:w-2/5 lg:sticky lg:top-4 lg:self-start">
+              {/* 상단 포스터 + 상품명 나열 옵션 (종합 게시글에만 적용) */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeTopPoster}
+                    onChange={(e) => setIncludeTopPoster(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium text-gray-900">🖼️ 상단 상품목록 포스터 + 상품명 나열</span>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      글 맨 위에 전체 상품명 나열(✅ 체크리스트 포함)과 상품목록 포스터 이미지 1장을
+                      자동 생성해 추가합니다. (종합 게시글에만 적용)
+                    </span>
+                  </span>
+                </label>
+                {includeTopPoster && (
+                  <input
+                    type="text"
+                    value={posterNoticeText}
+                    onChange={(e) => setPosterNoticeText(e.target.value)}
+                    placeholder="포스터 안내 문구 (예: 16시 이전 결제 시 당일 발송) — 비우면 생략"
+                    className="mt-2 w-full border border-gray-300 rounded-md px-3 py-1.5 text-xs focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+                )}
+              </div>
               <DigestPreview
                 preview={preview}
                 headerText={headerText}

@@ -22,6 +22,7 @@ import {
   type CollageCardProduct,
 } from '@/modules/publish/digest-collage-renderer'
 import { shiftDeadlineEarlier } from '@/modules/publish/deadline-utils'
+import { renderDigestPoster } from '@/modules/publish/digest-poster-renderer'
 import { CATEGORY_MAP, CATEGORY_CODES, CATEGORY_LIST, type CategoryCode } from '@/modules/category/category.keywords'
 
 export const dynamic = 'force-dynamic'
@@ -207,6 +208,14 @@ interface DigestPublishRequest {
    */
   enablePerPhotoComments?: boolean
   /**
+   * 상단 포스터 + 상품명 나열 (2026-06-10, 수산천국 접수글 스타일):
+   * - 본문 맨 위에 전체 상품명을 " / " 로 나열한 문단 + ✅ 체크리스트 추가
+   * - 갤러리 맨 앞에 상품명 목록 포스터 PNG 1장 추가 (digest 모드 전용, 기본 true)
+   */
+  includeTopPoster?: boolean
+  /** 포스터 안내 문구 (예: "16시 이전 결제 시 당일 발송"). 빈 값이면 줄 생략 */
+  posterNoticeText?: string
+  /**
    * publishMode === 'collage' 일 때 사용. 그리드 크기와 옵션을 지정.
    * - 선택 상품 수가 gridCols × gridRows와 정확히 일치해야 함.
    * - 본문은 카테고리 링크 1줄만, 이미지는 합성 포스터 1장.
@@ -262,6 +271,8 @@ export async function POST(request: NextRequest) {
       publishMode = 'digest',
       individualIntervalSec = 3,
       enablePerPhotoComments = false,
+      includeTopPoster = true,
+      posterNoticeText,
       collageOptions,
     } = body
 
@@ -601,9 +612,21 @@ export async function POST(request: NextRequest) {
         '🛒 댓글란에도 번호별 주문링크가 있습니다',
         '━━━━━━━━━━━━━━━━━━━━',
       ]
+      // 상단 상품명 나열 + ✅ 체크리스트 (2026-06-10, 수산천국 접수글 스타일).
+      // 갤러리 맨 앞 포스터 PNG와 세트 — includeTopPoster=false 면 양쪽 다 생략(기존 형식).
+      const nameListing = includeTopPoster
+        ? `🧡 ${cardProducts.map((p) => p.name.trim()).join(' / ')} 🧡`
+        : ''
+      const checklist = includeTopPoster
+        ? ['👇 오늘의 상품 👇', '', ...cardProducts.map((p) => `✅ ${p.name.trim()} ✅`)].join('\n')
+        : ''
       return [
         digest.title,
         (headerText || '').trim(),
+        nameListing,
+        '',
+        checklist,
+        '',
         `총 ${digest.productCount}개 상품 | 신선 직송`,
         '',
         ...(linkCount > 0 ? bottomBanner : []),
@@ -742,13 +765,34 @@ export async function POST(request: NextRequest) {
 
         // 1) 종합 발행 — 카드 전체를 하나의 게시글로, 주문 링크는 댓글에 작성
         if (runDigest) {
+          // 갤러리 맨 앞 상품목록 포스터 (실패해도 포스터 없이 발행 진행)
+          let topPosterPath: string | null = null
+          if (includeTopPoster) {
+            try {
+              topPosterPath = await renderDigestPoster({
+                productNames: cardProducts.map((p) => p.name),
+                noticeText: posterNoticeText,
+                date: date ? new Date(date) : new Date(),
+              })
+            } catch (err: any) {
+              console.warn(`[digest] 상단 포스터 렌더링 실패 — 포스터 없이 진행: ${err?.message || err}`)
+            }
+          }
+          // Band 이미지 한도 20장: 포스터 포함 시 카드가 20장이면 마지막 카드 1장 제외
+          const digestImageUrls = [
+            ...(topPosterPath ? [topPosterPath] : []),
+            ...renderedCards.map((c) => c.filePath),
+          ].slice(0, 20)
+
           const r = await bandPlaywrightService.publishWithImages({
             channelId: channel.id,
             bandKey: channel.channelKey,
             bandName: channel.name,
             content: buildDigestBody(),
-            imageUrls: renderedCards.map((c) => c.filePath),
+            imageUrls: digestImageUrls,
             commentContent: buildDigestComment(),
+          }).finally(() => {
+            if (topPosterPath) cleanupCollagePoster(topPosterPath)
           })
           subResults.push({
             mode: 'digest',
