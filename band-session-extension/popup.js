@@ -21,6 +21,31 @@ const accountCheckbox = document.getElementById('accountCheckbox');
 
 // 서버에 설정된 밴드 로그인 계정 (null = 미설정, 검증 생략)
 let expectedEmail = null;
+// 인증 헤더 (확장 키 우선, 폴백 Bearer) — checkStatus 에서 채움
+let authHeaders = null;
+
+// 확장 키 우선 인증 자격 확보. 없으면 null.
+async function resolveAuthHeaders() {
+  const { extensionApiKey } = await chrome.storage.local.get(['extensionApiKey']);
+  if (extensionApiKey) return { 'X-Extension-Key': extensionApiKey };
+  const authToken = await getAuthToken();
+  if (authToken) return { 'Authorization': `Bearer ${authToken}` };
+  return null;
+}
+
+// 키 상태 한 줄 표시 (popup 하단)
+async function renderKeyStatus() {
+  const el = document.getElementById('keyStatus');
+  if (!el) return;
+  const { extensionApiKey } = await chrome.storage.local.get(['extensionApiKey']);
+  if (extensionApiKey) {
+    el.textContent = `확장 키: 설정됨 (…${extensionApiKey.slice(-6)}) — 로그인 만료와 무관하게 자동 동기화`;
+    el.style.color = '#166534';
+  } else {
+    el.innerHTML = '확장 키: 미설정 — <a href="' + SERVER_URL + '/sourcing/settings/api" target="_blank">설정 페이지</a>에서 발급하면 수동 저장이 필요 없어집니다';
+    el.style.color = '#92400e';
+  }
+}
 // 서버 URL은 config.js에서 로드됨 (SERVER_URL)
 if (typeof SERVER_URL === 'undefined') {
   console.error('config.js가 로드되지 않았거나 SERVER_URL이 정의되지 않았습니다.');
@@ -90,11 +115,9 @@ async function checkBandLoginStatus() {
 }
 
 // 서버에 설정된 밴드 로그인 계정 조회 (미설정/조회실패 시 null = 검증 생략)
-async function fetchExpectedBandAccount(authToken) {
+async function fetchExpectedBandAccount(headers) {
   try {
-    const response = await fetch(`${SERVER_URL}/api/settings/band-account`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    });
+    const response = await fetch(`${SERVER_URL}/api/settings/band-account`, { headers });
     if (!response.ok) return null;
     const result = await response.json();
     return result.success ? (result.data.bandLoginEmail || null) : null;
@@ -111,9 +134,11 @@ async function checkStatus() {
   loadingState.classList.remove('hidden');
 
   try {
-    // 1. Sourcing App 로그인 확인
-    const authToken = await getAuthToken();
-    if (!authToken) {
+    renderKeyStatus();
+
+    // 1. 인증 자격 확인 (확장 키 우선, 없으면 Sourcing App 로그인 쿠키)
+    authHeaders = await resolveAuthHeaders();
+    if (!authHeaders) {
       hideAllStates();
       needAppLogin.classList.remove('hidden');
       openAppBtn.classList.remove('hidden');
@@ -132,7 +157,7 @@ async function checkStatus() {
     }
 
     // 3. 설정된 밴드 로그인 계정 확인 (설정 시 체크박스 확인 전까지 저장 비활성)
-    expectedEmail = await fetchExpectedBandAccount(authToken);
+    expectedEmail = await fetchExpectedBandAccount(authHeaders);
     if (expectedEmail) {
       expectedAccount.textContent = expectedEmail;
       accountConfirm.classList.remove('hidden');
@@ -166,10 +191,10 @@ async function saveSession() {
   try {
     // 쿠키 수집
     const bandCookies = await getBandCookies();
-    const authToken = await getAuthToken();
+    if (!authHeaders) authHeaders = await resolveAuthHeaders();
 
-    if (!authToken) {
-      throw new Error('인증 토큰이 없습니다. Sourcing App에 다시 로그인해주세요.');
+    if (!authHeaders) {
+      throw new Error('인증 자격이 없습니다. Sourcing App에 로그인하거나 설정에서 확장 키를 발급해주세요.');
     }
 
     if (bandCookies.length === 0) {
@@ -181,7 +206,7 @@ async function saveSession() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
+        ...authHeaders
       },
       body: JSON.stringify({
         cookieString: JSON.stringify(bandCookies),

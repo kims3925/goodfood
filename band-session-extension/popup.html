@@ -205,6 +205,18 @@
       margin-top: 2px;
       flex-shrink: 0;
     }
+
+    .key-status {
+      margin-top: 10px;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #6b7280;
+      text-align: center;
+    }
+
+    .key-status a {
+      color: #7c3aed;
+    }
   </style>
 </head>
 <body>
@@ -274,6 +286,9 @@
     <button class="btn btn-secondary hidden" id="openAppBtn">Sourcing App 열기</button>
     <button class="btn btn-secondary hidden" id="retryBtn">다시 확인</button>
   </div>
+
+  <!-- 확장 키 상태 (v1.3.0) -->
+  <div id="keyStatus" class="key-status"></div>
 
   <script src="config.js"></script>
   <script src="popup.js"></script>

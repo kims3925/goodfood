@@ -97,10 +97,17 @@ async function checkBandLoginStatus() {
  * @throws {Error} 검증 실패 또는 네트워크 에러
  */
 async function performSessionSave() {
-  // 1. Sourcing App 로그인 확인
-  const authToken = await getAuthToken();
-  if (!authToken) {
-    throw new Error('Sourcing App에 로그인해주세요.');
+  // 1. 인증 자격 확보: 확장 전용 키 우선 (JWT 만료와 무관), 없으면 기존 서버 쿠키 폴백
+  const { extensionApiKey } = await chrome.storage.local.get(['extensionApiKey']);
+  let authHeaders;
+  if (extensionApiKey) {
+    authHeaders = { 'X-Extension-Key': extensionApiKey };
+  } else {
+    const authToken = await getAuthToken();
+    if (!authToken) {
+      throw new Error('Sourcing App에 로그인해주세요. (또는 설정 페이지에서 확장 키를 발급하세요)');
+    }
+    authHeaders = { 'Authorization': `Bearer ${authToken}` };
   }
 
   // 2. Band 로그인 확인
@@ -130,7 +137,7 @@ async function performSessionSave() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
+        ...authHeaders
       },
       body: JSON.stringify({
         cookieString: JSON.stringify(bandCookies),
@@ -180,6 +187,31 @@ async function performSessionSave() {
 // 자동 저장
 // =============================================
 
+// ── 연속 실패 알림 (v1.3.0) ──
+// 자동저장이 조용히 죽는 문제(P3) 방지: 연속 실패 시 뱃지 + 데스크톱 알림.
+const FAIL_NOTIFY_THRESHOLD = 3;
+
+async function notifyAutoSaveBroken(message) {
+  const { failCount = 0 } = await chrome.storage.local.get(['failCount']);
+  const next = failCount + 1;
+  await chrome.storage.local.set({ failCount: next });
+  chrome.action.setBadgeText({ text: '!' });
+  chrome.action.setBadgeBackgroundColor({ color: '#dc2626' });
+  if (next === FAIL_NOTIFY_THRESHOLD) {
+    chrome.notifications.create('bandSessionBroken', {
+      type: 'basic',
+      iconUrl: 'icons/icon128.png',
+      title: 'BandAuto 세션 동기화 중단',
+      message: message || '밴드 세션 자동저장이 반복 실패하고 있습니다. 확장 아이콘을 눌러 확인해주세요.'
+    });
+  }
+}
+
+async function markSaveSuccess() {
+  await chrome.storage.local.set({ failCount: 0 });
+  chrome.action.setBadgeText({ text: '' });
+}
+
 /**
  * 세션 자동 저장
  */
@@ -199,14 +231,17 @@ async function autoSaveSession() {
     // 성공 시 상태 업데이트
     lastAutoSaveTime = now;
     await chrome.storage.local.set({ lastAutoSaveTime: now });
+    await markSaveSuccess();
     console.log(`[Band Session] 자동 저장 완료: ${data.updatedCount ?? data.channelCount}개 채널`);
 
   } catch (error) {
-    // 검증 실패는 스킵으로 처리 (로그인 안됨, 계정 확인 필요 등)
-    if (error.message.includes('로그인') || error.message.includes('쿠키') || error.message.includes('계정')) {
+    // 검증 실패는 스킵으로 처리 (밴드 미로그인, 쿠키 없음, 계정 확인 필요 등)
+    if (error.message.includes('Band에 로그인') || error.message.includes('쿠키') || error.message.includes('계정')) {
       console.log(`[Band Session] 자동 저장 스킵: ${error.message}`);
     } else {
+      // 인증 실패(키/토큰)·서버 에러 — 누적되면 사용자에게 알림
       console.error('[Band Session] 자동 저장 에러:', error.message);
+      await notifyAutoSaveBroken(error.message).catch(() => {});
     }
   }
 }
@@ -228,6 +263,18 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 /**
+ * band_session 쿠키 변경 즉시 동기화 (v1.3.0, P2)
+ * 로그인/세션 회전을 감지해 다음 1시간 알람을 기다리지 않고 10초 디바운스 후 저장.
+ * (alarms 사용 — Service Worker 수면 대응)
+ */
+chrome.cookies.onChanged.addListener(({ cookie, removed }) => {
+  if (cookie.domain.includes('band.us') && cookie.name === 'band_session' && !removed) {
+    console.log('[Band Session] band_session 쿠키 변경 감지 → 10초 후 동기화');
+    chrome.alarms.create('cookieChangedSave', { delayInMinutes: 10 / 60 });
+  }
+});
+
+/**
  * Alarm 이벤트 리스너 (Service Worker 안정성을 위해 setTimeout 대신 사용)
  */
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -238,6 +285,18 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'periodicSave') {
     console.log('[Band Session] Alarm 트리거: periodicSave (1시간 주기)');
     autoSaveSession();
+  }
+  if (alarm.name === 'cookieChangedSave') {
+    // 쿠키 변경 동기화는 1시간 스로틀(autoSaveSession)을 우회해 즉시 저장
+    console.log('[Band Session] Alarm 트리거: cookieChangedSave (쿠키 변경 동기화)');
+    performSessionSave()
+      .then(async (data) => {
+        lastAutoSaveTime = Date.now();
+        await chrome.storage.local.set({ lastAutoSaveTime });
+        await markSaveSuccess();
+        console.log(`[Band Session] 쿠키 변경 동기화 완료: ${data.updatedCount ?? data.channelCount}개 채널`);
+      })
+      .catch((e) => console.log('[Band Session] 쿠키 변경 동기화 스킵:', e.message));
   }
 });
 
@@ -267,17 +326,35 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
     return true;
   }
 
+  // setApiKey: 설정 페이지에서 확장 전용 키 주입 (v1.3.0 — 복사/붙여넣기 불필요)
+  if (request.action === 'setApiKey') {
+    (async () => {
+      if (!request.key || !request.key.startsWith('bsk_')) {
+        sendResponse({ success: false, error: '키 형식 오류' });
+        return;
+      }
+      await chrome.storage.local.set({ extensionApiKey: request.key, failCount: 0 });
+      chrome.action.setBadgeText({ text: '' });
+      console.log('[Band Session] 확장 키 저장 완료 (끝자리 ' + request.key.slice(-6) + ')');
+      sendResponse({ success: true });
+    })();
+    return true;
+  }
+
   // getStatus: 현재 상태 확인
   if (request.action === 'getStatus') {
     (async () => {
       try {
         const isBandLoggedIn = await checkBandLoginStatus();
         const authToken = await getAuthToken();
+        const { extensionApiKey } = await chrome.storage.local.get(['extensionApiKey']);
         sendResponse({
           success: true,
           data: {
             bandLoggedIn: isBandLoggedIn,
             appLoggedIn: !!authToken,
+            extensionKeySet: !!extensionApiKey,
+            keyTail: extensionApiKey ? extensionApiKey.slice(-6) : null,
             lastSaveTime: lastAutoSaveTime || null
           }
         });
