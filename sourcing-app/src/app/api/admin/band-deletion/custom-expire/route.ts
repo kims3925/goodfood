@@ -20,7 +20,7 @@ import prisma from '@bandauto/db'
 import { bandPlaywrightService } from '@/modules/band-playwright'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 1800 // 30분
+export const maxDuration = 300 // Vercel Hobby 한도 300s
 
 export async function POST(request: NextRequest) {
   try {
