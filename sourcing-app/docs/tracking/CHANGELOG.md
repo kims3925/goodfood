@@ -21,6 +21,10 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260611-010 | Done(코드) | 2026-06-11 | - | [B2B Phase 5] 판매데이터 기반 추천 — ProductSalesDaily 일배치(AnalystAgent 06시 + 수동 트리거 API), 스코어(7일×3+30일+신상품 부스트−품절 페널티), 오픈 API sort=best_7d/trending, /api/shop/best 공개 피드, 어드민 소싱 의사결정용 스코어 조회 | Medium | Claude |
+| TR-20260611-009 | Done(코드) | 2026-06-11 | - | [B2B Phase 4] 오픈 API v1 — ApiClient/ApiToken/ApiCallLog, OAuth2 client_credentials(2h Bearer), scope+rate limit(분당 60), v1 카테고리/상품(증분)/발주, /b2b/developers 키 관리, openapi-v1.md. ⚠️ 외부 오픈은 SaaS P0 4건 완료 후 | Large | Claude |
+| TR-20260611-008 | Done(코드) | 2026-06-11 | - | [B2B Phase 3] B2B 회원·도매가 — B2bStatus+User b2b 필드, /b2b/apply 신청, /admin/users/b2b 승인 큐, 공급가 노출 차단(미승인 응답에서 wholesalePrice 필드 제거 — 기존 전체 노출 누수 수정), B2B 주문 공급가 단가+Order.orderType | Critical | Claude |
+| TR-20260611-007 | Done(코드) | 2026-06-11 | - | [B2B Phase 2] 소스 모니터링+중복 감지 — SourceSnapshot/PriceHistory/ProductDuplicate, WholesaleWatchAgent 영속화 연동, priceChangePolicy(NOTIFY_ONLY/AUTO_MARGIN 마진율 유지 자동 갱신), 변환 전 정규화 제목 중복 차단(AI 비용 절감), /sourcing/product/duplicates 중복 후보 화면 | Large | Claude |
 | TR-20260611-006 | Done(코드) | 2026-06-11 | - | [B2B Phase 1-3] AI 카테고리 자동 매핑 — 키워드 분류 미스(ETC) 시 Gemini 폴백(category.ai-classifier.ts, DB Category 트리 프롬프트 포함, 10분 캐시), 실패 시 categoryId='UNCLASSIFIED', 가공상품 페이지 카테고리 필터(분류 대기 포함), /api/product?categoryId= 필터 | Medium | Claude |
 | TR-20260611-005 | Done(코드) | 2026-06-11 | - | [B2B Phase 1-2] Category 트리 모델+시드+관리 — Category 모델(code unique, 최대 3단계, soft delete), 시드 32건(기존 8 대분류+식품 중분류 23+UNCLASSIFIED), 어드민 트리 CRUD(/admin/categories, 순환 방지·하위/상품 있으면 삭제 차단) | Medium | Claude |
 | TR-20260611-004 | Done(코드) | 2026-06-11 | - | [B2B Phase 1-1] 발행 타깃 옵션 — AutomationConfig.publishTarget(SHOP_ONLY/BAND_ONLY/BOTH, 기본 BOTH), runPublishPipeline 타깃 분기(SHOP_ONLY=밴드 생략+shopProducts 기준 미발행 필터), publishToShop 시 isActive=true 동기화, 자동화 설정 타깃 토글(SHOP_ONLY 시 밴드 세션 검증 면제) | Medium | Claude |

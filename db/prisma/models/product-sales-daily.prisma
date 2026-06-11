@@ -1,0 +1,17 @@
+// B2B 공급몰 전환 Phase 5 (2026-06-11): 일별 상품 판매 집계
+// sales-aggregator 일배치가 OrderItem(소매+B2B)을 집계해 채운다.
+// 추천 스코어(베스트/급상승)와 소싱 의사결정 대시보드의 원천 데이터.
+model ProductSalesDaily {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  date      DateTime @db.Date
+  orderType String   @default("RETAIL") @map("order_type") @db.VarChar(20) // RETAIL | B2B | B2B_API
+  qty       Int      @default(0)
+  revenue   Decimal  @default(0) @db.Decimal(14, 2)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@unique([productId, date, orderType])
+  @@index([date])
+  @@index([productId, date])
+  @@map("product_sales_daily")
+}

@@ -101,6 +101,15 @@ export class AnalystAgent extends AgentBase {
 
   async onSchedule(): Promise<void> {
     await this.log('INFO', '일일 분석 시작')
+    // 판매 집계 일배치 (B2B 공급몰 전환 STEP 5-1) — 어제+오늘 재집계 (idempotent)
+    try {
+      const { aggregateRecentSales } = await import('@/modules/analytics/sales-aggregator.service')
+      const agg = await aggregateRecentSales(2)
+      await this.log('INFO', `판매 집계 완료 — 주문 ${agg.ordersScanned}건 → ${agg.rowsUpserted}행`)
+      await this.recordKpi('sales_daily_rows', agg.rowsUpserted)
+    } catch (e: any) {
+      await this.log('WARN', `판매 집계 실패 (분석은 계속): ${e?.message}`)
+    }
     await this.runDailyAnalysis('daily')
   }
 
