@@ -44,6 +44,10 @@ import {
   LayoutGrid,
   Trash2,
   Copy,
+  Building2,
+  CreditCard,
+  FolderTree,
+  BadgeCheck,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -178,48 +182,143 @@ export const shopMenuItems: MenuItem[] = [
   },
 ]
 
-// ─── 어드민 패널 메뉴 (ADMIN 전용, 독립 레이아웃) ───
+// ─── 굿푸드몰 어드민패널 통합 메뉴 (ADMIN 전용) ───
+// 기존 /sourcing/*, /shop/*, /admin/* 페이지를 그대로 연결 — 페이지 코드 수정 없음
+// 소매밴드 발행(종합발행/콜라주/밴드공지)·소매밴드 관리 메뉴는 제외 (굿푸드몰 B2B 전환)
 export const adminMenuItems: MenuItem[] = [
-  { label: '플랫폼 현황', href: '/admin/dashboard', icon: MonitorDot },
+  { label: '대시보드', href: '/admin/dashboard', icon: MonitorDot },
+
   {
-    label: '에이전트 관리',
-    icon: Bot,
+    label: '상품소싱',            // ← 매니저 탭 '상품' 이관
+    icon: Package,
     children: [
-      { label: '대시보드', href: '/admin/agents/dashboard', icon: LayoutDashboard },
-      { label: '레지스트리', href: '/admin/agents/registry', icon: Network },
-      { label: '실시간 모니터링', href: '/admin/agents/monitor', icon: Radio },
-      { label: '워크플로우', href: '/admin/agents/workflows', icon: GitMerge },
-      { label: 'KPI', href: '/admin/agents/kpi', icon: Target },
-      { label: '태스크', href: '/admin/agents/tasks', icon: Workflow },
-      { label: '로그', href: '/admin/agents/logs', icon: History },
-      { label: '설정', href: '/admin/agents/settings', icon: Settings },
+      { label: '소싱 현황', href: '/sourcing/pipeline', icon: ClipboardList },
+      { label: '상품소싱', href: '/sourcing/post/list', icon: FileText },
+      { label: '가공상품', href: '/sourcing/product/list', icon: Package },
+      { label: '중복 후보', href: '/sourcing/product/duplicates', icon: Copy },
+      { label: '발행 (쇼핑몰)', href: '/sourcing/publish', icon: Upload },
+      { label: '삭제 관리', href: '/sourcing/cleanup', icon: Trash2 },
     ],
   },
   {
-    label: '사용자 관리',
-    icon: UserCog,
+    label: '소싱처/모니터링',      // ← 어드민 'SaaS 운영' 일부 + 매니저 '채널' + 신규
+    icon: Store,
     children: [
-      { label: '통합 셀러 관리', href: '/admin/users/sellers', icon: ShoppingBag },
-      { label: '전체 사용자', href: '/admin/users/list', icon: Users },
-      { label: '역할/권한', href: '/admin/users/roles', icon: Shield },
+      { label: '도매밴드 카탈로그', href: '/admin/wholesale-catalog', icon: Store },
+      { label: '채널 관리', href: '/sourcing/channel/list', icon: Network },
+      { label: '소스 모니터링', href: '/admin/monitoring', icon: Radio, badge: 'NEW' }, // 품절/가격/중복 (B2B지침서 Phase 2)
+      { label: '밴드 연동 / API', href: '/sourcing/settings/api', icon: Plug },
+    ],
+  },
+  {
+    label: '자동화',              // ← 매니저 탭 그대로
+    icon: Zap,
+    children: [
+      { label: '자동화 설정', href: '/sourcing/automation/settings', icon: Cog },
+      { label: '소싱조건 설정', href: '/sourcing/automation/sourcing-conditions', icon: Target },
+      { label: '실행 로그', href: '/sourcing/automation/logs', icon: History },
+    ],
+  },
+  {
+    label: '소싱 설정',           // ← 매니저 '설정' 잔여 항목 (밴드 연동/API는 소싱처/모니터링)
+    icon: Cog,
+    children: [
+      { label: 'AI / API', href: '/sourcing/settings/ai', icon: Bot },
+      { label: '프롬프트 / 가격 정책', href: '/sourcing/settings/prompt', icon: FileText },
+      { label: '구글 시트', href: '/sourcing/settings/google-sheets', icon: FileSpreadsheet },
+      { label: '알림', href: '/sourcing/notification', icon: Bell },
+    ],
+  },
+
+  {
+    label: '굿푸드몰 운영',        // ← 샵 탭 이관
+    icon: ShoppingBag,
+    children: [
+      { label: '쇼핑몰 관리', href: '/shop/store/list', icon: ShoppingBag },
+      { label: '상품 관리', href: '/shop/products/list', icon: Package },   // 카테고리 탭 포함
+      { label: '카테고리 관리', href: '/admin/categories', icon: FolderTree },
+      { label: '실시간 접속자', href: '/shop/visitors', icon: Eye },
+    ],
+  },
+  {
+    label: '주문/정산',           // ← 샵 탭 그대로
+    icon: ClipboardList,
+    children: [
+      { label: '주문 목록', href: '/shop/order/list', icon: ClipboardList },
+      { label: '발주 관리', href: '/shop/wholesale-orders', icon: Truck },
+      { label: '라이트주문', href: '/shop/lite-orders/list', icon: Zap },
+      { label: '정산 목록', href: '/shop/settlement/list', icon: Calculator },
+      { label: '정산 이력', href: '/shop/settlement/history', icon: History },
+      { label: '도매 정산서', href: '/shop/settlement/wholesale', icon: FileSpreadsheet },
+    ],
+  },
+  {
+    label: '회원/고객',           // ← 샵 '고객관리'+'설정' + B2B + AI 채팅
+    icon: Users,
+    children: [
+      { label: 'B2B 판매자 승인', href: '/admin/users/b2b', icon: BadgeCheck },
+      { label: '회원 목록', href: '/shop/user/list', icon: Users },
+      { label: '고객 문의', href: '/shop/cs/inquiry/list', icon: MessageSquare },
+      { label: '리뷰 관리', href: '/shop/reviews/list', icon: Star },
+      { label: '쿠폰', href: '/shop/coupon/list', icon: Ticket },
+      { label: '통합 인박스 (AI)', href: '/sourcing/inbox', icon: Bot },
+      { label: '자동응답 설정', href: '/sourcing/inbox/settings', icon: MessageSquare },
+    ],
+  },
+  {
+    label: '오픈 API',            // ← 신규 (B2B지침서 Phase 4)
+    icon: KeyRound,
+    children: [
+      { label: 'API 클라이언트', href: '/admin/openapi/clients', icon: KeyRound, badge: 'NEW' },
+      { label: '호출 로그', href: '/admin/openapi/logs', icon: ScrollText, badge: 'NEW' },
+    ],
+  },
+  {
+    label: '마케팅',              // ← 매니저 '광고&마케팅' 중 카톡광고만 유지
+    // 종합발행/콜라주/밴드공지는 소매밴드 발행용이라 제외 (굿푸드몰 전환)
+    icon: Megaphone,
+    children: [
+      { label: '카톡광고', href: '/sourcing/publish/ad/kakao', icon: MessageSquare },
+    ],
+  },
+  {
+    label: '외부 연동',           // ← 매니저 탭 그대로
+    icon: Link2,
+    children: [
+      { label: '외부몰 연동', href: '/sourcing/external-mall', icon: Store },
+      { label: 'AI 페이지빌더', href: '/sourcing/shop-builder', icon: LayoutGrid },
+    ],
+  },
+
+  {
+    label: '플랫폼 (SaaS)',       // ← AdminSidebar 하드코딩분을 navigation.ts로 흡수 (P1 해결)
+    icon: Server,
+    children: [
+      { label: '테넌트 관리', href: '/admin/tenants', icon: Building2 },
+      { label: '플랫폼 Band API', href: '/admin/band-api', icon: KeyRound },
+      { label: '사용량 모니터링', href: '/admin/usage', icon: BarChart3 },
+      { label: '결제 관리', href: '/admin/billing', icon: CreditCard },
+      { label: '신규 쇼핑몰 발행', href: '/admin/shops/publish', icon: ShoppingBag },
+      { label: '라이트 셀러', href: '/admin/lite/sellers', icon: Users },
+      { label: '자동 발행 설정', href: '/admin/lite/auto-publish', icon: Cog },
+      { label: '광고카드 발행', href: '/admin/lite/ad-cards', icon: Megaphone },
     ],
   },
   {
     label: '시스템',
-    icon: Server,
+    icon: Settings,
     children: [
+      { label: '에이전트 대시보드', href: '/admin/agents/dashboard', icon: Bot },
+      { label: '에이전트 모니터링', href: '/admin/agents/monitor', icon: Radio },
+      { label: '에이전트 로그', href: '/admin/agents/logs', icon: History },
+      { label: '통합 셀러 관리', href: '/admin/users/sellers', icon: ShoppingBag },
+      { label: '전체 사용자', href: '/admin/users/list', icon: Users },
+      { label: '역할/권한', href: '/admin/users/roles', icon: Shield },
       { label: '서비스 상태', href: '/admin/system/status', icon: Activity },
       { label: '통계/분석', href: '/admin/system/analytics', icon: BarChart3 },
       { label: '시스템 설정', href: '/admin/system/settings', icon: Settings },
-    ],
-  },
-  {
-    label: '라이트 운영',
-    icon: Zap,
-    children: [
-      { label: '라이트 셀러', href: '/admin/lite/sellers', icon: Users },
-      { label: '자동 발행 설정', href: '/admin/lite/auto-publish', icon: Cog },
-      { label: '광고카드 발행', href: '/admin/lite/ad-cards', icon: Megaphone },
+      { label: '이용약관', href: '/shop/policy/terms', icon: ScrollText },
+      { label: '개인정보처리방침', href: '/shop/policy/privacy', icon: Lock },
     ],
   },
 ]
@@ -239,7 +338,7 @@ export function getSectionFromPath(pathname: string): AppSection {
 
 export function getSectionLabel(section: AppSection): string {
   if (section === 'admin') return '어드민'
-  return section === 'sourcing' ? '매니저' : '쇼핑몰'
+  return section === 'sourcing' ? '매니저' : '굿푸드몰'
 }
 
 export function getDefaultPathBySection(section: AppSection): string {
@@ -291,14 +390,49 @@ export const shopPathToMenuMap: Record<string, string> = {
 }
 
 export const adminPathToMenuMap: Record<string, string> = {
-  '/admin/dashboard': '플랫폼 현황',
-  '/admin/wholesale-catalog': 'SaaS 운영',
-  '/admin/categories': 'SaaS 운영',
-  '/admin/band-api': 'SaaS 운영',
-  '/admin/agents': '에이전트 관리',
-  '/admin/users': '사용자 관리',
+  '/admin/dashboard': '대시보드',
+  // 구체 경로 먼저 (startsWith 첫 매치)
+  '/sourcing/publish/ad/kakao': '마케팅',
+  '/sourcing/pipeline': '상품소싱',
+  '/sourcing/post': '상품소싱',
+  '/sourcing/product': '상품소싱',
+  '/sourcing/publish': '상품소싱',
+  '/sourcing/cleanup': '상품소싱',
+  '/admin/wholesale-catalog': '소싱처/모니터링',
+  '/admin/monitoring': '소싱처/모니터링',
+  '/sourcing/channel': '소싱처/모니터링',
+  '/sourcing/settings/api': '소싱처/모니터링',
+  '/sourcing/automation': '자동화',
+  '/sourcing/settings': '소싱 설정',
+  '/sourcing/notification': '소싱 설정',
+  '/shop/store': '굿푸드몰 운영',
+  '/shop/products': '굿푸드몰 운영',
+  '/shop/category': '굿푸드몰 운영',
+  '/admin/categories': '굿푸드몰 운영',
+  '/shop/visitors': '굿푸드몰 운영',
+  '/shop/order': '주문/정산',
+  '/shop/lite-orders': '주문/정산',
+  '/shop/wholesale-orders': '주문/정산',
+  '/shop/settlement': '주문/정산',
+  '/admin/users/b2b': '회원/고객',
+  '/shop/user': '회원/고객',
+  '/shop/cs': '회원/고객',
+  '/shop/reviews': '회원/고객',
+  '/shop/coupon': '회원/고객',
+  '/sourcing/inbox': '회원/고객',
+  '/admin/openapi': '오픈 API',
+  '/sourcing/external-mall': '외부 연동',
+  '/sourcing/shop-builder': '외부 연동',
+  '/admin/tenants': '플랫폼 (SaaS)',
+  '/admin/band-api': '플랫폼 (SaaS)',
+  '/admin/usage': '플랫폼 (SaaS)',
+  '/admin/billing': '플랫폼 (SaaS)',
+  '/admin/shops': '플랫폼 (SaaS)',
+  '/admin/lite': '플랫폼 (SaaS)',
+  '/admin/agents': '시스템',
+  '/admin/users': '시스템',
   '/admin/system': '시스템',
-  '/admin/lite': '라이트 운영',
+  '/shop/policy': '시스템',
 }
 
 export function getPathToMenuMap(section: AppSection): Record<string, string> {
