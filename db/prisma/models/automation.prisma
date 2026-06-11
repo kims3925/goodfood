@@ -16,7 +16,7 @@ model PricingPolicy {
   // target이 없는 소매채널로 발행 시는 INHERIT 기본 동작 (기존 정책 그대로) — 하위 호환 보장
   targets     PricingPolicyTarget[]
 
-  @@index([userId], map: "pricing_policy_user_id_fkey")
+  @@index([userId])
   @@index([channelId])
   @@map("pricing_policy")
 }

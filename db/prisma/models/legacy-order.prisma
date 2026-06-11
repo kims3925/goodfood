@@ -23,7 +23,7 @@ model LegacyOrder {
   // 동일 거래가 여러 파일에 중복 저장돼있어도 createMany skipDuplicates 로 자연스럽게 무시.
   @@unique([orderDate, rowIndex, channelName], map: "uniq_legacy_order_day_row_channel")
   @@index([orderDate])
-  @@index([productName(length: 100)])
+  @@index([productName])
   @@index([channelName])
   @@map("legacy_order")
 }
