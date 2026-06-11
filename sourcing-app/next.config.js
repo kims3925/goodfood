@@ -114,6 +114,20 @@ const nextConfig = {
       '/**': ['./src/generated/**'],
       '/api/**': ['./src/generated/**'],
     },
+    // Vercel 250MB 함수 한도: 서버리스에서 실행 불가한 대형 네이티브 패키지 제외
+    // (Playwright 크롤링/이미지 AI는 상주 서버 전용 — Vercel에선 관리 UI/API만 제공)
+    outputFileTracingExcludes: {
+      '/**': [
+        '**/node_modules/playwright/**',
+        '**/node_modules/playwright-core/**',
+        '**/node_modules/onnxruntime-node/**',
+        '**/node_modules/@imgly/**',
+        '**/node_modules/.pnpm/playwright*/**',
+        '**/node_modules/.pnpm/onnxruntime-node*/**',
+        '**/node_modules/.pnpm/@imgly*/**',
+        '**/node_modules/.cache/**',
+      ],
+    },
     serverComponentsExternalPackages: [
       'playwright-core',
       'playwright',
