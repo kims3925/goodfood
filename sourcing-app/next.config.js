@@ -108,6 +108,12 @@ const nextConfig = {
       bodySizeLimit: '10mb',
     },
     instrumentationHook: true,
+    // Vercel(서버리스) 배포 (2026-06-11): Prisma 쿼리엔진(.so.node) 람다 번들 포함.
+    // 빌드 커맨드에서 db/src/generated 엔진을 sourcing-app/src/generated로 복사 후 트레이싱 포함.
+    outputFileTracingIncludes: {
+      '/**': ['./src/generated/**'],
+      '/api/**': ['./src/generated/**'],
+    },
     serverComponentsExternalPackages: [
       'playwright-core',
       'playwright',
