@@ -81,10 +81,13 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '10mb',
     },
-    // Vercel(서버리스) 배포: 커스텀 output(db/src/generated)의 Prisma 쿼리엔진(.so.node)을
-    // 람다 번들에 포함 (미포함 시 "could not locate the Query Engine" 런타임 에러)
+    // Vercel(서버리스) 배포: Prisma 쿼리엔진(.so.node)을 람다 번들에 포함.
+    // 빌드 커맨드에서 db/src/generated의 엔진을 shop-app/src/generated로 복사한 뒤
+    // 여기서 트레이싱에 포함 (런타임 탐색 경로 /var/task/shop-app/src/generated 매칭)
     outputFileTracingIncludes: {
-      '*': ['../db/src/generated/**'],
+      '/**': ['./src/generated/**'],
+      '/api/**': ['./src/generated/**'],
+      '/api/health': ['./src/generated/**'],
     },
   },
 }
