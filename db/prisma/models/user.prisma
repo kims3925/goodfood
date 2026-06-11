@@ -96,6 +96,13 @@ model User {
   extensionApiKey          String?   @unique @map("extension_api_key") @db.VarChar(64)
   extensionApiKeyCreatedAt DateTime? @map("extension_api_key_created_at")
 
+  // B2B 공급몰 전환 Phase 3 (2026-06-11): 사업자 인증 — 승인 시 공급가(wholesalePrice) 노출/주문.
+  // 사업자번호/상호는 기존 businessNumber/companyName 필드 재사용.
+  b2bStatus       B2bStatus @default(NONE) @map("b2b_status")
+  b2bAppliedAt    DateTime? @map("b2b_applied_at") @db.Timestamp(0)
+  b2bApprovedAt   DateTime? @map("b2b_approved_at") @db.Timestamp(0)
+  b2bRejectReason String?   @map("b2b_reject_reason") @db.VarChar(500)
+
   @@index([shopId])
   @@index([email])
   @@index([phone])

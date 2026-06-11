@@ -28,6 +28,8 @@ model Order {
   // 관리자 메모 (2026-05-21) — 주문 상세에서 운영자가 자유 기입. 고객엔 노출 X.
   adminMemo             String?               @map("admin_memo") @db.Text
   adminMemoUpdatedAt    DateTime?             @map("admin_memo_updated_at") @db.Timestamp(0)
+  // B2B 공급몰 전환 Phase 3 (2026-06-11): RETAIL(소매, 기본) | B2B(공급가 주문) | B2B_API(오픈 API 발주)
+  orderType             String                @default("RETAIL") @map("order_type") @db.VarChar(20)
   shop                  Shop?                 @relation(fields: [shopId], references: [id])
   wholesaleChannel      Channel?              @relation("OrderWholesaleChannel", fields: [wholesaleChannelId], references: [id])
   user                  User                  @relation(fields: [userId], references: [id])

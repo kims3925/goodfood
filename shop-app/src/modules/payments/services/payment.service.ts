@@ -57,6 +57,8 @@ export interface OrderPrepareData {
     discountAmount: number
     totalAmount: number
   }
+  // B2B 공급몰 전환 Phase 3: RETAIL(기본) | B2B(승인 사업자 — 공급가 단가)
+  orderType?: 'RETAIL' | 'B2B'
 }
 
 export interface ConfirmPaymentDTO {
@@ -372,6 +374,20 @@ export class PaymentService {
    */
   private async createOrderFromPrepareData(prepareData: OrderPrepareData): Promise<any> {
     let orderItems: OrderItemInput[] = []
+    // B2B 주문 (Phase 3): 승인 사업자 — variant 공급가(>0)를 단가로 사용
+    const isB2bOrder = prepareData.orderType === 'B2B'
+    const pickBasePrice = (
+      variant: { price: number; wholesalePrice: unknown } | null | undefined,
+      mainVariant: { price: number; wholesalePrice: unknown } | null | undefined
+    ): number => {
+      const v = variant ?? mainVariant
+      if (!v) return 0
+      if (isB2bOrder) {
+        const w = v.wholesalePrice == null ? 0 : Number(v.wholesalePrice)
+        if (w > 0) return Math.round(w)
+      }
+      return v.price ?? 0
+    }
 
     if (prepareData.fromCart) {
       // 장바구니에서 주문 아이템 조회
@@ -386,7 +402,7 @@ export class PaymentService {
         const product = shopProduct.product
         const variant = item.variant
         const mainVariant = product?.variants[0]
-        const basePrice = variant?.price || mainVariant?.price || 0
+        const basePrice = pickBasePrice(variant, mainVariant)
         const quantity = item.quantity
 
         // 배송비 포함된 가격 계산
@@ -441,7 +457,7 @@ export class PaymentService {
 
         const product = shopProduct.product
         const mainVariant = product?.variants[0]
-        const basePrice = variant?.price || mainVariant?.price || 0
+        const basePrice = pickBasePrice(variant, mainVariant)
         const quantity = item.quantity || 1
 
         // 배송비 포함된 가격 계산
@@ -503,6 +519,8 @@ export class PaymentService {
         shopId: prepareData.shopId ?? null,
         orderNumber: prepareData.orderId,
         status: 'PENDING',
+        // B2B 주문 구분 (Phase 3)
+        orderType: prepareData.orderType === 'B2B' ? 'B2B' : 'RETAIL',
         // 금액 정보
         subtotalAmount: new Decimal(subtotal),
         discountAmount: new Decimal(discountAmount),

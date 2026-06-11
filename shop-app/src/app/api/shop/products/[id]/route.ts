@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@bandauto/db'
 import { calculateSellingPrice } from '@/lib/price-calculator'
+import { isB2bApprovedSession } from '@/lib/b2b'
 
 export async function GET(
   req: NextRequest,
@@ -90,6 +91,11 @@ export async function GET(
     const bundleMaxQty = (product as any).bundleMaxQty ?? 1
     const bundleShippingType = (product as any).bundleShippingType || null
 
+    // B2B 회원 여부 (B2B 공급몰 전환 STEP 3-2)
+    // ⚠️ 공급가(wholesalePrice)는 b2bStatus=APPROVED 세션에만 포함 — 비로그인/미승인
+    //    응답에는 필드 자체가 존재하지 않아야 한다 (select 레벨 차단, 지침서 리스크 1).
+    const { approved: isB2b } = await isB2bApprovedSession()
+
     // variants 정보 (id 포함) - 공통 모듈 사용
     const formattedVariants = product.variants.map((variant) => ({
       id: variant.id,
@@ -97,8 +103,11 @@ export async function GET(
       // 공통 모듈로 판매가 계산 (배송비 타입에 따라 자동 처리)
       price: calculateSellingPrice(variant.price, shippingFee, bundleShippingType),
       originalPrice: variant.price, // DB에 저장된 원래 가격
-      wholesalePrice: variant.wholesalePrice,
       bundleUnit: variant.bundleUnit || 1,
+      // B2B 승인 회원에게만 공급가 노출
+      ...(isB2b && variant.wholesalePrice != null
+        ? { wholesalePrice: Number(variant.wholesalePrice) }
+        : {}),
     }))
 
     // 합배송 옵션 계산 (bundleMaxQty > 1인 경우)
@@ -167,6 +176,8 @@ export async function GET(
       // - isSoldOut: 현재는 isActive와 동일하게 처리 (재고 관리 미사용)
       isActive,
       isSoldOut: !isActive,
+      // B2B 승인 회원 여부 (공급가 라벨 표시용)
+      isB2bMember: isB2b,
     }
 
     return NextResponse.json({

@@ -30,6 +30,7 @@ import {
   CreditCard,
   KeyRound,
   FolderTree,
+  BadgeCheck,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -74,6 +75,7 @@ const adminNav: NavItem[] = [
     children: [
       { label: '전체 사용자', href: '/admin/users/list', icon: Users },
       { label: '셀러 관리', href: '/admin/users/sellers', icon: Store },
+      { label: 'B2B 사업자 승인', href: '/admin/users/b2b', icon: BadgeCheck },
       { label: '역할/권한', href: '/admin/users/roles', icon: Shield },
     ],
   },

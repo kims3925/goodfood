@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/modules/auth/auth.config'
 import { getCartService } from '@/modules/cart/services/cart.service'
 import { calculateItemPrice } from '@/lib/price-calculator'
+import { isB2bApprovedUser, resolveB2bBasePrice } from '@/lib/b2b'
 
 // Phase 7: 공통 유틸로 이전 — @/lib/order-utils
 import {
@@ -50,6 +51,8 @@ interface OrderPrepareData {
     discountAmount: number
     totalAmount: number
   }
+  // B2B 공급몰 전환 Phase 3: 승인 사업자 주문이면 'B2B' (공급가 단가)
+  orderType?: 'RETAIL' | 'B2B'
 }
 
 // Shop ID 가져오기 (미들웨어에서 설정)
@@ -113,6 +116,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // B2B 승인 사업자 여부 (Phase 3) — 승인 회원은 공급가(wholesalePrice) 단가로 주문
+    const isB2b = await isB2bApprovedUser(userId)
+
     // 주문 아이템 검증 및 금액 계산
     let orderItems: any[] = []
     let totalAmount = 0
@@ -166,20 +172,57 @@ export async function POST(req: NextRequest) {
 
       // 품절 체크는 Product 레벨의 재고 관리로 대체됨 (ShopProduct에서 isActive 필드 제거됨)
 
-      // CartService에서 계산된 itemTotal 사용
-      orderItems = formattedCart.items.map((item) => ({
-        shopProductId: item.shopProductId,
-        variantId: item.variantId || null,
-        productName: item.name,
-        optionSummary: item.optionSummary || null,
-        thumbnailUrl: item.image || null,
-        quantity: item.quantity,
-        unitPrice: item.price, // 배송비 포함된 단가 (합배송 적용)
-        itemTotal: item.itemTotal, // 합배송 적용된 정확한 총액
-      }))
+      if (isB2b) {
+        // B2B 승인 사업자 (Phase 3): 공급가 기준으로 재계산
+        // (CartService 는 소매가 기준이라, variant 공급가로 동일한 합배송 로직을 다시 적용)
+        orderItems = []
+        for (const item of formattedCart.items) {
+          const variant = item.variantId
+            ? await prisma.productVariant.findUnique({ where: { id: item.variantId } })
+            : null
+          const sp = await prisma.shopProduct.findFirst({
+            where: { id: item.shopProductId },
+            include: { product: { include: { variants: true } } },
+          })
+          const product = sp?.product
+          const mainVariant = product?.variants[0]
+          const basePrice = resolveB2bBasePrice(true, variant, mainVariant)
+          const priceResult = calculateItemPrice({
+            basePrice,
+            shippingFee: product?.shippingFee || 0,
+            quantity: item.quantity,
+            bundleMaxQty: product?.bundleMaxQty || 1,
+            bundleUnit: variant?.bundleUnit || 1,
+            bundleShippingType: product?.bundleShippingType || null,
+          })
+          orderItems.push({
+            shopProductId: item.shopProductId,
+            variantId: item.variantId || null,
+            productName: item.name,
+            optionSummary: item.optionSummary || null,
+            thumbnailUrl: item.image || null,
+            quantity: item.quantity,
+            unitPrice: priceResult.unitPrice,
+            itemTotal: priceResult.itemTotal,
+          })
+        }
+        totalAmount = orderItems.reduce((sum, item) => sum + (item.itemTotal || item.unitPrice * item.quantity), 0)
+      } else {
+        // CartService에서 계산된 itemTotal 사용
+        orderItems = formattedCart.items.map((item) => ({
+          shopProductId: item.shopProductId,
+          variantId: item.variantId || null,
+          productName: item.name,
+          optionSummary: item.optionSummary || null,
+          thumbnailUrl: item.image || null,
+          quantity: item.quantity,
+          unitPrice: item.price, // 배송비 포함된 단가 (합배송 적용)
+          itemTotal: item.itemTotal, // 합배송 적용된 정확한 총액
+        }))
 
-      // 합배송 적용된 총액 사용
-      totalAmount = formattedCart.subtotal
+        // 합배송 적용된 총액 사용
+        totalAmount = formattedCart.subtotal
+      }
     } else {
       // 직접 상품 지정 (바로구매) - 합배송 로직 적용
       if (!items || items.length === 0) {
@@ -219,7 +262,8 @@ export async function POST(req: NextRequest) {
 
         const product = shopProduct.product
         const mainVariant = product?.variants[0]
-        const basePrice = variant?.price || mainVariant?.price || 0
+        // B2B 승인 사업자는 공급가 단가 (Phase 3), 아니면 소매가
+        const basePrice = resolveB2bBasePrice(isB2b, variant, mainVariant)
         const quantity = item.quantity || 1
 
         // 공통 가격 계산 함수 사용
@@ -370,6 +414,8 @@ export async function POST(req: NextRequest) {
         discountAmount,
         totalAmount,
       },
+      // B2B 주문 구분 (Phase 3) — confirm 시 Order.orderType 저장 + 공급가 단가 재계산
+      orderType: isB2b ? 'B2B' : 'RETAIL',
     }
 
     // Phase 4: HMAC 서명으로 무결성 보장 (totalAmount 변조 방지) + 30분 만료 stamp

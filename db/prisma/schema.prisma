@@ -222,3 +222,11 @@ enum SourceStatus {
   POST_DELETED  // 원본 게시물 삭제됨
   PRICE_CHANGED
 }
+
+// B2B 공급몰 전환 Phase 3 (2026-06-11): B2B 회원(사업자) 인증 상태
+enum B2bStatus {
+  NONE     // 일반 소매 고객
+  PENDING  // 사업자 인증 대기
+  APPROVED
+  REJECTED
+}
