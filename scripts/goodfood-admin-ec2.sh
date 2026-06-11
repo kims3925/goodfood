@@ -44,7 +44,7 @@ echo "=== [3/6] docker build ==="
 docker build -f docker/Dockerfile.sourcing \
   --build-arg NEXT_PUBLIC_SHOP_BASE_URL=https://goodshop.hublink.im \
   --build-arg NEXT_PUBLIC_SHOP_DOMAIN=goodshop.hublink.im \
-  -t goodfood-admin:latest . 2>&1 | tail -80
+  -t goodfood-admin:latest . 2>&1 | tail -200
 
 echo "=== [4/6] run container (3004 -> 3001) ==="
 docker rm -f goodfood-admin 2>/dev/null || true
