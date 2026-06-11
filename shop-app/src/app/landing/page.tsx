@@ -1,5 +1,9 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import prisma from '@bandauto/db'
+
+// 상품 그리드: 60초 캐시 (오너클랜식 메인 상품 노출)
+export const revalidate = 60
 
 // 굿푸드몰 랜딩페이지 (2026-06-11)
 // 루트(goodshop.hublink.im) 접속 시 middleware가 이 페이지로 rewrite.
@@ -15,7 +19,30 @@ export const metadata: Metadata = {
 const ADMIN_URL = 'https://goodshop-admin.hublink.im'
 const SHOP_PATH = '/goodfood/main'
 
-export default function LandingPage() {
+async function getLandingProducts() {
+  try {
+    const items = await prisma.shopProduct.findMany({
+      where: {
+        deletedAt: null,
+        shop: { subdomain: 'goodfood', deletedAt: null, isActive: true },
+        product: { deletedAt: null, isActive: true },
+      },
+      include: {
+        product: {
+          select: { id: true, name: true, price: true, thumbnailUrl: true, categoryId: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+    })
+    return items.map((sp) => sp.product).filter((p): p is NonNullable<typeof p> => !!p)
+  } catch {
+    return []
+  }
+}
+
+export default async function LandingPage() {
+  const products = await getLandingProducts()
   return (
     <main className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white text-gray-900">
       {/* 헤더 */}
@@ -67,6 +94,50 @@ export default function LandingPage() {
             관리자 로그인
           </a>
         </div>
+      </section>
+
+      {/* 공급 상품 (오너클랜식 메인 노출) */}
+      <section className="mx-auto max-w-6xl px-6 pb-16">
+        <div className="mb-5 flex items-end justify-between">
+          <h2 className="text-2xl font-bold">오늘의 공급 상품</h2>
+          <Link href={SHOP_PATH} className="text-sm font-semibold text-emerald-700 hover:underline">
+            전체 상품 보기 →
+          </Link>
+        </div>
+        {products.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-16 text-center text-sm text-gray-500">
+            상품 준비 중입니다. 어드민에서 소싱·발행을 시작하면 이곳에 자동으로 노출됩니다.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {products.map((p) => (
+              <Link
+                key={p.id}
+                href={`/goodfood/product/${p.id}`}
+                className="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-md"
+              >
+                <div className="aspect-square w-full overflow-hidden bg-gray-100">
+                  {p.thumbnailUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.thumbnailUrl}
+                      alt={p.name}
+                      className="h-full w-full object-cover transition group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-3xl">🥬</div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="line-clamp-2 text-sm font-medium text-gray-800">{p.name}</p>
+                  <p className="mt-1 text-base font-bold text-emerald-700">
+                    {p.price ? `${p.price.toLocaleString()}원` : '가격 문의'}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 특징 */}
