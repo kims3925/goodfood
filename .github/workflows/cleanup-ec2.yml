@@ -6,11 +6,10 @@ name: EC2 Disk Cleanup (Daily)
 #   - 매일 새벽 정리로 운영 시간대 부하 없음
 #   - 디스크 사용률 임계값 초과 시 GitHub Actions 실패 → 슬랙/이메일 알림 가능
 
+# ⚠️ Wholesale food 포크 (2026-06-11): 일일 스케줄 비활성 — 타깃이 원본 bandauto EC2.
+# 새 인프라 구성 후 schedule 을 복원할 것. 수동 실행만 허용.
 on:
-  schedule:
-    # UTC 17:00 = KST 새벽 02:00. 운영 트래픽 최저 시간대.
-    - cron: '0 17 * * *'
-  workflow_dispatch:  # 수동 실행도 가능
+  workflow_dispatch:  # 수동 실행만 가능
 
 env:
   INSTANCE_ID: i-0e6ef7c646a61356f

@@ -61,7 +61,9 @@ jobs:
   build-and-push:
     name: Build and Push to ECR
     needs: ci
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # ⚠️ Wholesale food 포크 (2026-06-11): 자동 배포 차단 — 이 워크플로의 ECR/EC2 타깃은
+    # 원본 bandauto 프로덕션 인프라다. 새 인프라 구성 전까지 수동 실행(workflow_dispatch)만 허용.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
