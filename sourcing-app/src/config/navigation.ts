@@ -1,4 +1,5 @@
 import {
+  FolderTree,
   LayoutDashboard,
   Store,
   Zap,
