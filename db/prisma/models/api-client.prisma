@@ -1,0 +1,44 @@
+// B2B 공급몰 전환 Phase 4 (2026-06-11): 오픈 API v1 인증 (카페24 호환 패턴)
+// 외부 판매자(B2B APPROVED 회원)가 상품조회/발주에 사용하는 OAuth2 client_credentials.
+
+model ApiClient {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id") // 소유 판매자 (B2B APPROVED 회원)
+  name         String    @db.VarChar(100)
+  clientId     String    @unique @map("client_id") @db.VarChar(40)
+  clientSecret String    @map("client_secret") @db.VarChar(128) // bcrypt 해시 저장
+  scopes       String    @db.VarChar(255) // "products:read,orders:write,orders:read"
+  isActive     Boolean   @default(true) @map("is_active")
+  rateLimit    Int       @default(60) @map("rate_limit") // 분당 요청 수
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamp(0)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  tokens       ApiToken[]
+
+  @@index([userId])
+  @@map("api_client")
+}
+
+model ApiToken {
+  id          Int       @id @default(autoincrement())
+  clientId    Int       @map("client_id")
+  accessToken String    @unique @map("access_token") @db.VarChar(64)
+  expiresAt   DateTime  @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  client      ApiClient @relation(fields: [clientId], references: [id])
+
+  @@index([expiresAt])
+  @@map("api_token")
+}
+
+model ApiCallLog {
+  id         Int      @id @default(autoincrement())
+  clientId   Int      @map("client_id")
+  method     String   @db.VarChar(10)
+  path       String   @db.VarChar(255)
+  statusCode Int      @map("status_code")
+  durationMs Int      @map("duration_ms")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+  @@index([clientId, createdAt])
+  @@map("api_call_log")
+}
