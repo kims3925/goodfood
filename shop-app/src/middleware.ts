@@ -112,6 +112,16 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url)
       }
     }
+    // 기본 샵 리다이렉트 (2026-06-11): 단일샵 도메인(굿푸드몰 goodshop.hublink.im) 운영용.
+    // DEFAULT_SHOP_SLUG 환경변수가 설정되어 있으면 루트 접속 시 해당 샵으로 이동.
+    const defaultSlug = process.env.DEFAULT_SHOP_SLUG
+    if (defaultSlug) {
+      const shop = await fetchShopBySlug(defaultSlug, request)
+      if (shop && shop.isActive) {
+        url.pathname = `/${shop.subdomain}${pathname === '/' ? '/main' : pathname}`
+        return NextResponse.redirect(url)
+      }
+    }
     return new NextResponse('Shop not found. Please access via shop URL like /your-shop/main', { status: 404 })
   }
 
