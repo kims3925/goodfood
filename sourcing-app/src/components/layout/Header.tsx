@@ -556,7 +556,7 @@ export default function Header({ onMenuClick, currentSection, onSectionChange, u
             </button>
 
             <a href={getDefaultPathBySection(currentSection)} className="flex items-center ml-2 lg:ml-0 cursor-pointer hover:opacity-80 transition-opacity">
-              <h1 className="text-2xl font-bold text-primary-color">SNS AUTO</h1>
+              <h1 className="text-2xl font-bold text-primary-color">GoodShop</h1>
             </a>
 
           </div>
