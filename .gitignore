@@ -57,6 +57,9 @@ Thumbs.db
 # Logs
 logs
 *.log
+# Next.js 라우트 폴더(src/app/**/logs/)는 로그 출력 디렉터리가 아니므로 예외
+# (이 예외가 없으면 /admin/openapi/logs 같은 라우트 page.tsx가 커밋에서 누락됨)
+!**/src/app/**/logs/
 
 # Runtime data
 pids
