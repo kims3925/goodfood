@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const publishStatus = searchParams.get('publishStatus') as 'all' | 'unpublished' | 'published' | null
+    const categoryId = searchParams.get('categoryId') // 'UNCLASSIFIED' = 분류 대기 필터
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
 
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       publishStatus: publishStatus || undefined,
+      categoryId: categoryId || undefined,
       page,
       limit,
     })

@@ -21,6 +21,9 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260611-006 | Done(코드) | 2026-06-11 | - | [B2B Phase 1-3] AI 카테고리 자동 매핑 — 키워드 분류 미스(ETC) 시 Gemini 폴백(category.ai-classifier.ts, DB Category 트리 프롬프트 포함, 10분 캐시), 실패 시 categoryId='UNCLASSIFIED', 가공상품 페이지 카테고리 필터(분류 대기 포함), /api/product?categoryId= 필터 | Medium | Claude |
+| TR-20260611-005 | Done(코드) | 2026-06-11 | - | [B2B Phase 1-2] Category 트리 모델+시드+관리 — Category 모델(code unique, 최대 3단계, soft delete), 시드 32건(기존 8 대분류+식품 중분류 23+UNCLASSIFIED), 어드민 트리 CRUD(/admin/categories, 순환 방지·하위/상품 있으면 삭제 차단) | Medium | Claude |
+| TR-20260611-004 | Done(코드) | 2026-06-11 | - | [B2B Phase 1-1] 발행 타깃 옵션 — AutomationConfig.publishTarget(SHOP_ONLY/BAND_ONLY/BOTH, 기본 BOTH), runPublishPipeline 타깃 분기(SHOP_ONLY=밴드 생략+shopProducts 기준 미발행 필터), publishToShop 시 isActive=true 동기화, 자동화 설정 타깃 토글(SHOP_ONLY 시 밴드 세션 검증 면제) | Medium | Claude |
 | TR-20260611-003 | Done(코드)/14시 배포 예정 | 2026-06-11 | - | Band API 토큰 일괄설정 모드 — SourcingApiConfig.useGlobalToken, 설정 페이지 "플랫폼 일괄설정 vs 내 API 직접 등록" 선택 버튼, 어드민 "플랫폼 Band API" 페이지(/admin/band-api)로 공용 토큰 중앙 관리, getEffectiveBandToken 해석(/api/band/list·수집 파이프라인·연결 테스트 적용) | Medium | Claude |
 | TR-20260611-002 | Done(코드)/배포 대기 | 2026-06-11 | - | 도매밴드 가등록 카탈로그 — WholesaleBandCatalog 모델+Channel.catalogId, 어드민 가등록 페이지(/admin/wholesale-catalog, 내 채널에서 가져오기/수동입력), 매니저 선택 연결(/sourcing/channel/catalog — 신청 즉시 본인 WHOLESALE 채널 생성+플랫폼 세션 복사, API설정 불필요), keep-alive 쿠키 전파를 sessionAccountEmail 기준 cross-user 로 확장 | Medium | Claude |
 | TR-20260611-001 | Done(코드)/배포 대기 | 2026-06-11 | - | 설정 메뉴에 "밴드 연동 / API" 항목 추가 (/sourcing/settings/api 직접 진입 — 밴드 로그인 계정·Band/AliExpress API·확장프로그램 키 설정 페이지가 메뉴에 없어 URL 직접 입력으로만 접근 가능했던 문제) | Low | Claude |

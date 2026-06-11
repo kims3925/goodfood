@@ -17,6 +17,7 @@ import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
 import ThumbnailImage from '@/components/ui/ThumbnailImage'
 import { formatScheduledTime } from '@/lib/delayed-publish'
+import { CATEGORY_LIST } from '@/modules/category/category.keywords'
 
 interface Channel {
   id: number
@@ -129,6 +130,8 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
   // Filter states
   const [channels, setChannels] = useState<Channel[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
+  // 카테고리 필터 (STEP 1-3: 'UNCLASSIFIED' = 분류 대기)
+  const [categoryFilter, setCategoryFilter] = useState<string>('')
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -586,6 +589,7 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
       if (query) params.append('search', query)
       if (selectedChannelId) params.append('channelId', selectedChannelId)
       if (publishStatus) params.append('publishStatus', publishStatus)
+      if (categoryFilter) params.append('categoryId', categoryFilter)
 
       const response = await fetch(`/api/product?${params.toString()}`)
       const data = await response.json()
@@ -610,7 +614,7 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
       setIsLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChannelId, query, itemsPerPage, publishStatus])
+  }, [selectedChannelId, query, itemsPerPage, publishStatus, categoryFilter])
 
   // 필터 변경 시 1페이지로 리셋하여 조회
   useEffect(() => {
@@ -1743,16 +1747,35 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
                   ))}
                 </div>
 
-                {/* 오른쪽: 검색창 - 데스크톱 */}
-                <div className="relative hidden sm:block">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <Input
-                    type="text"
-                    placeholder="상품명으로 검색..."
-                    value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); setQuery(e.target.value) }}
-                    className="pl-10 w-64"
-                  />
+                {/* 오른쪽: 카테고리 필터 + 검색창 - 데스크톱 */}
+                <div className="flex items-center gap-2">
+                  {/* 카테고리 필터 (STEP 1-3: 분류 대기 = AI 분류 실패 상품) */}
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1) }}
+                    className={`min-h-[44px] sm:min-h-[38px] px-3 py-1.5 border rounded-lg text-sm bg-white ${
+                      categoryFilter === 'UNCLASSIFIED' ? 'border-amber-400 text-amber-700' : 'border-gray-300 text-gray-700'
+                    }`}
+                  >
+                    <option value="">카테고리 전체</option>
+                    {CATEGORY_LIST.map((cat) => (
+                      <option key={cat.code} value={cat.code}>
+                        {cat.emoji} {cat.name}
+                      </option>
+                    ))}
+                    <option value="UNCLASSIFIED">⏳ 분류 대기</option>
+                  </select>
+
+                  <div className="relative hidden sm:block">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                    <Input
+                      type="text"
+                      placeholder="상품명으로 검색..."
+                      value={searchTerm}
+                      onChange={(e) => { setSearchTerm(e.target.value); setQuery(e.target.value) }}
+                      className="pl-10 w-64"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

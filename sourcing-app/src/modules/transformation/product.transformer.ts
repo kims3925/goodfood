@@ -14,9 +14,10 @@ import {
   OptionPrice,
   GeneratedVariant,
 } from './product.types'
-import { createAiClient, generateContentWithFallback, AiResponse } from './ai.client'
+import { createAiClient, generateContentWithFallback, AiResponse, type AiClientConfig } from './ai.client'
 import { generateVariants } from './variant.generator'
 import { classifyProduct } from '../category/category.classifier'
+import { classifyCategoryWithAi } from '../category/category.ai-classifier'
 import {
   EXTRACTION_RULES,
   SINGLE_RESPONSE_FORMAT,
@@ -956,6 +957,31 @@ function buildProductDraft(
   return draft
 }
 
+/**
+ * 카테고리 AI 폴백 (B2B 공급몰 전환 STEP 1-3)
+ *
+ * 키워드 분류가 미스(ETC = 매칭 0건)인 draft 에 한해 Gemini 폴백 분류를 시도한다.
+ * - AI 가 유효 코드를 반환하면 그 코드로 확정 (Category 트리의 중분류 코드 가능)
+ * - AI 도 실패하면 'UNCLASSIFIED' — 관리자 "분류 대기" 필터에서 수동 처리
+ * - AI 후보(candidates)가 없으면 기존 동작(ETC) 유지
+ */
+async function applyAiCategoryFallback(
+  draft: ProductDraft,
+  candidates: AiClientConfig[]
+): Promise<void> {
+  if (draft.categoryId !== 'ETC') return // 키워드 분류 성공 — 폴백 불필요
+  if (!candidates.length) return
+
+  const aiCode = await classifyCategoryWithAi(draft.name, draft.description, candidates)
+  if (aiCode && aiCode !== 'ETC') {
+    console.log(`🏷️ 카테고리 AI 폴백 분류: "${draft.name.slice(0, 30)}" → ${aiCode}`)
+    draft.categoryId = aiCode
+  } else {
+    console.log(`🏷️ 카테고리 분류 실패 (키워드+AI): "${draft.name.slice(0, 30)}" → UNCLASSIFIED`)
+    draft.categoryId = 'UNCLASSIFIED'
+  }
+}
+
 // =============================================
 // MAIN TRANSFORMATION FUNCTION
 // =============================================
@@ -1031,6 +1057,9 @@ export async function transformPostToProduct(
 
   // Build product draft
   const draft = buildProductDraft(analysis, input)
+
+  // 카테고리 키워드 분류 미스 시 AI 폴백 (STEP 1-3)
+  await applyAiCategoryFallback(draft, candidates)
 
   return draft
 }
@@ -1309,22 +1338,32 @@ export async function transformPostsToProductsBatch(
   const parseResults = parseBatchAiResponse(aiResponse, postIds)
 
   // ProductDraft 생성
-  const results: BatchTransformResult[] = parseResults.map((result, index) => {
+  const batchCandidates: AiClientConfig[] = [{
+    provider: aiConfig.provider,
+    apiKey: aiConfig.apiKey,
+    model: aiConfig.model,
+  }]
+  const results: BatchTransformResult[] = []
+  for (let index = 0; index < parseResults.length; index++) {
+    const result = parseResults[index]
     if (!result.success || !result.analysis) {
-      return { postId: result.postId, success: false, error: result.error }
+      results.push({ postId: result.postId, success: false, error: result.error })
+      continue
     }
 
     try {
       const draft = buildProductDraft(result.analysis, validInputs[index])
-      return { postId: result.postId, success: true, draft }
+      // 카테고리 키워드 분류 미스 시 AI 폴백 (STEP 1-3) — 미스 상품만 추가 호출
+      await applyAiCategoryFallback(draft, batchCandidates)
+      results.push({ postId: result.postId, success: true, draft })
     } catch (draftError: any) {
-      return {
+      results.push({
         postId: result.postId,
         success: false,
         error: `ProductDraft 생성 실패: ${draftError.message}`
-      }
+      })
     }
-  })
+  }
 
   // 첫 번째 결과에 전체 배치의 토큰 사용량 추가
   if (results.length > 0 && aiResponse.tokensUsed) {

@@ -29,6 +29,7 @@ export class ProductRepository {
       startDate,
       endDate,
       publishStatus,
+      categoryId,
       page = 1,
       limit = 20,
     } = params
@@ -37,6 +38,11 @@ export class ProductRepository {
 
     if (channelId) {
       where.channelId = channelId
+    }
+
+    // 카테고리 필터 (B2B 공급몰 전환 STEP 1-3: UNCLASSIFIED = 분류 대기)
+    if (categoryId && categoryId !== 'all') {
+      where.categoryId = categoryId
     }
 
     if (search) {

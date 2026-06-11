@@ -7,6 +7,8 @@ export interface ProductListParams {
   startDate?: string
   endDate?: string
   publishStatus?: 'all' | 'unpublished' | 'published'
+  /** 카테고리 코드 필터 (예: 'SEA', 'UNCLASSIFIED'=분류 대기) */
+  categoryId?: string
   page?: number
   limit?: number
 }
