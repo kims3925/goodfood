@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic'
-export const maxDuration = 600 // 밴드 실삭제 포함 시 장시간 (nginx 600s 한도 내)
+export const maxDuration = 300 // Vercel Hobby 한도 300s (장시간 작업은 분할 실행)
 
 /**
  * POST /api/sourcing/cleanup/execute
