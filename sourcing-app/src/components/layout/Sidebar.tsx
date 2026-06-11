@@ -484,7 +484,7 @@ export default function Sidebar({
         <div className="h-full flex flex-col overflow-y-auto">
           {/* Mobile header */}
           <div className="flex items-center justify-between p-4 border-b border-divider lg:hidden">
-            <h2 className="text-xl font-bold text-primary-color">BandAuto</h2>
+            <h2 className="text-xl font-bold text-primary-color">굿푸드몰</h2>
             <button
               onClick={onClose}
               className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"

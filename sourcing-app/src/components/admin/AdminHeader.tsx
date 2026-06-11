@@ -73,7 +73,7 @@ export default function AdminHeader({ userName, userRole }: AdminHeaderProps) {
                 >
                   <Cpu size={16} className="text-indigo-600 mt-0.5" />
                   <div>
-                    <div className="font-medium">어드민 패널</div>
+                    <div className="font-medium">굿푸드몰 어드민</div>
                     <div className="text-[10px] text-gray-500">시스템 / 셀러 / 발행 관리</div>
                   </div>
                 </Link>
@@ -107,7 +107,7 @@ export default function AdminHeader({ userName, userRole }: AdminHeaderProps) {
         <div className="h-5 w-px bg-gray-200" />
         <div className="flex items-center gap-2">
           <Cpu size={16} className="text-indigo-600" />
-          <span className="text-sm font-semibold text-gray-900">어드민 패널</span>
+          <span className="text-sm font-semibold text-gray-900">굿푸드몰 어드민</span>
         </div>
       </div>
 
