@@ -1,0 +1,21 @@
+// B2B 공급몰 전환 STEP 1-2 (2026-06-11): 카테고리 트리.
+// Product.categoryId(문자열)는 Category.code 를 참조한다 — 기존 평면 코드
+// (SEA/AGR/MEA/MKT/PRC/HLT/COM/ETC) 데이터 무파괴. FK 마이그레이션은 데이터 정리 후 2차에.
+model Category {
+  id        Int        @id @default(autoincrement())
+  code      String     @unique @db.VarChar(100) // Product.categoryId(문자열)와 연결 — 기존 데이터 무파괴
+  name      String     @db.VarChar(100)
+  parentId  Int?       @map("parent_id")
+  depth     Int        @default(1) // 1=대, 2=중, 3=소
+  sortOrder Int        @default(0) @map("sort_order")
+  isActive  Boolean    @default(true) @map("is_active")
+  deletedAt DateTime?  @map("deleted_at") @db.Timestamp(0)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamp(0)
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+
+  @@index([parentId])
+  @@index([isActive])
+  @@map("category")
+}

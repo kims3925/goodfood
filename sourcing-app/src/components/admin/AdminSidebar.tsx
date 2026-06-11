@@ -29,6 +29,7 @@ import {
   Building2,
   CreditCard,
   KeyRound,
+  FolderTree,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -47,6 +48,7 @@ const adminNav: NavItem[] = [
     children: [
       { label: '테넌트 관리', href: '/admin/tenants', icon: Building2 },
       { label: '도매밴드 카탈로그', href: '/admin/wholesale-catalog', icon: Store },
+      { label: '카테고리 관리', href: '/admin/categories', icon: FolderTree },
       { label: '플랫폼 Band API', href: '/admin/band-api', icon: KeyRound },
       { label: '사용량 모니터링', href: '/admin/usage', icon: BarChart3 },
       { label: '결제 관리', href: '/admin/billing', icon: CreditCard },
