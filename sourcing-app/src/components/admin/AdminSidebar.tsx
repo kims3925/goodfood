@@ -4,99 +4,17 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard,
   Bot,
-  Network,
-  Radio,
-  GitMerge,
-  Target,
-  Workflow,
-  History,
-  Settings,
-  UserCog,
-  Users,
-  Shield,
-  Server,
-  Activity,
-  BarChart3,
-  ShoppingBag,
-  Store,
   ChevronDown,
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
   Cpu,
-  Building2,
-  CreditCard,
-  KeyRound,
-  FolderTree,
-  BadgeCheck,
 } from 'lucide-react'
-import { LucideIcon } from 'lucide-react'
+// 메뉴 정의 단일 소스 — navigation.ts의 굿푸드몰 통합 메뉴 사용 (하드코딩 제거)
+import { adminMenuItems } from '@/config/navigation'
 
-interface NavItem {
-  label: string
-  href?: string
-  icon: LucideIcon
-  children?: NavItem[]
-}
-
-const adminNav: NavItem[] = [
-  { label: '플랫폼 현황', href: '/admin/dashboard', icon: LayoutDashboard },
-  {
-    label: 'SaaS 운영',
-    icon: Building2,
-    children: [
-      { label: '테넌트 관리', href: '/admin/tenants', icon: Building2 },
-      { label: '도매밴드 카탈로그', href: '/admin/wholesale-catalog', icon: Store },
-      { label: '카테고리 관리', href: '/admin/categories', icon: FolderTree },
-      { label: '플랫폼 Band API', href: '/admin/band-api', icon: KeyRound },
-      { label: '사용량 모니터링', href: '/admin/usage', icon: BarChart3 },
-      { label: '결제 관리', href: '/admin/billing', icon: CreditCard },
-    ],
-  },
-  {
-    label: '에이전트 관리',
-    icon: Bot,
-    children: [
-      { label: '대시보드', href: '/admin/agents/dashboard', icon: LayoutDashboard },
-      { label: '레지스트리', href: '/admin/agents/registry', icon: Network },
-      { label: '실시간 모니터링', href: '/admin/agents/monitor', icon: Radio },
-      { label: '워크플로우', href: '/admin/agents/workflows', icon: GitMerge },
-      { label: 'KPI', href: '/admin/agents/kpi', icon: Target },
-      { label: '태스크', href: '/admin/agents/tasks', icon: Workflow },
-      { label: '로그', href: '/admin/agents/logs', icon: History },
-      { label: '설정', href: '/admin/agents/settings', icon: Settings },
-    ],
-  },
-  {
-    label: '사용자 관리',
-    icon: UserCog,
-    children: [
-      { label: '전체 사용자', href: '/admin/users/list', icon: Users },
-      { label: '셀러 관리', href: '/admin/users/sellers', icon: Store },
-      { label: 'B2B 사업자 승인', href: '/admin/users/b2b', icon: BadgeCheck },
-      { label: '역할/권한', href: '/admin/users/roles', icon: Shield },
-    ],
-  },
-  {
-    label: '쇼핑몰 발행',
-    icon: ShoppingBag,
-    children: [
-      { label: '신규 발행', href: '/admin/shops/publish', icon: ShoppingBag },
-      { label: 'Lite 셀러 발급', href: '/admin/lite/sellers', icon: Store },
-    ],
-  },
-  {
-    label: '시스템',
-    icon: Server,
-    children: [
-      { label: '서비스 상태', href: '/admin/system/status', icon: Activity },
-      { label: '통계/분석', href: '/admin/system/analytics', icon: BarChart3 },
-      { label: '시스템 설정', href: '/admin/system/settings', icon: Settings },
-    ],
-  },
-]
+const adminNav = adminMenuItems
 
 interface AdminSidebarProps {
   collapsed: boolean
@@ -150,8 +68,8 @@ export default function AdminSidebar({ collapsed, onToggleCollapse }: AdminSideb
           </div>
           {!collapsed && (
             <div>
-              <span className="font-bold text-sm text-white">Admin Panel</span>
-              <span className="block text-[10px] text-gray-400 -mt-0.5">BandAuto</span>
+              <span className="font-bold text-sm text-white">굿푸드몰 어드민</span>
+              <span className="block text-[10px] text-gray-400 -mt-0.5">GoodFood Mall</span>
             </div>
           )}
         </div>
@@ -217,6 +135,11 @@ export default function AdminSidebar({ collapsed, onToggleCollapse }: AdminSideb
                       >
                         <ChildIcon size={14} />
                         <span>{child.label}</span>
+                        {child.badge && (
+                          <span className="ml-auto px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/20 text-emerald-300">
+                            {child.badge}
+                          </span>
+                        )}
                       </Link>
                     )
                   })}
