@@ -21,6 +21,7 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260611-013 | Done(코드) | 2026-06-11 | - | 굿푸드몰 어드민패널 통합 — adminMenuItems 굿푸드몰 통합 메뉴 교체(소매밴드 발행 메뉴 제외: 종합발행/콜라주/밴드공지, 카톡광고만 유지)+adminPathToMenuMap 갱신, AdminSidebar 하드코딩 제거(navigation.ts 단일 소스+badge), AdminPanelShell 추출+ADMIN 역할 전 경로 어드민패널 레이아웃(단일 패널, preferAdmin 상시), 브랜딩(굿푸드몰 어드민/굿푸드몰 섹션 라벨), placeholder 3종(/admin/monitoring, /admin/openapi/clients·logs). B2B 승인은 기존 /admin/users/b2b 연결 | Medium | Claude |
 | TR-20260611-012 | Done(코드) | 2026-06-11 | - | [B2B 후속 UI] 쇼핑몰 메인 "주간 베스트" 섹션(/api/shop/best 연동, 판매 이력 있을 때만 노출) + 상품 상세 B2B 사업자 공급가 표시(승인 회원만 — API 가 필드를 내려줄 때만 렌더) | Low | Claude |
 | TR-20260611-011 | Done(코드) | 2026-06-11 | - | [SaaS P0-3] 밴드 세션 쿠키 컬럼 암호화 — AES-256-GCM(BAND_COOKIE_ENC_KEY), enc:v1: prefix 레거시 평문 호환, 쓰기 5곳 암호화+getValidSession 중앙 복호화, 기존 행 일괄 암호화 스크립트(encrypt-session-cookies.cjs). P0-1/2/4 는 TR-20260610-001/002 기구현 → P0 전건 완료 | High | Claude |
 | TR-20260611-010 | Done(코드) | 2026-06-11 | - | [B2B Phase 5] 판매데이터 기반 추천 — ProductSalesDaily 일배치(AnalystAgent 06시 + 수동 트리거 API), 스코어(7일×3+30일+신상품 부스트−품절 페널티), 오픈 API sort=best_7d/trending, /api/shop/best 공개 피드, 어드민 소싱 의사결정용 스코어 조회 | Medium | Claude |
