@@ -112,6 +112,16 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url)
       }
     }
+    // 기본 샵 리다이렉트 (2026-06-11): 단일샵 도메인(굿푸드몰 goodshop.hublink.im) 운영용.
+    // DEFAULT_SHOP_SLUG 환경변수가 설정되어 있으면 루트 접속 시 해당 샵으로 이동.
+    const defaultSlug = process.env.DEFAULT_SHOP_SLUG
+    if (defaultSlug) {
+      const shop = await fetchShopBySlug(defaultSlug, request)
+      if (shop && shop.isActive) {
+        url.pathname = `/${shop.subdomain}${pathname === '/' ? '/main' : pathname}`
+        return NextResponse.redirect(url)
+      }
+    }
     return new NextResponse('Shop not found. Please access via shop URL like /your-shop/main', { status: 404 })
   }
 
@@ -209,25 +219,4 @@ async function fetchShopBySlug(
     const shop = data.shop as ShopData | null
 
     // 캐시 저장
-    shopCache.set(slug, { data: shop, timestamp: Date.now() })
-
-    return shop
-  } catch (error) {
-    console.error('Failed to fetch shop:', error)
-    return null
-  }
-}
-
-export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api/internal (internal APIs)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images (public images)
-     */
-    '/((?!api/internal|_next/static|_next/image|favicon.ico|images).*)',
-  ],
-}
+    shopCache.set(slug, { data: shop, t
