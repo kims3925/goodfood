@@ -81,6 +81,11 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '10mb',
     },
+    // Vercel(서버리스) 배포: 커스텀 output(db/src/generated)의 Prisma 쿼리엔진(.so.node)을
+    // 람다 번들에 포함 (미포함 시 "could not locate the Query Engine" 런타임 에러)
+    outputFileTracingIncludes: {
+      '*': ['../db/src/generated/**'],
+    },
   },
 }
 
