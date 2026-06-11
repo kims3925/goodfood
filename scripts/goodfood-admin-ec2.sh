@@ -1,11 +1,12 @@
-﻿#!/bin/bash
-# 援욱뫖?쒕ぐ ?대뱶誘?sourcing-app) ??湲곗〈 EC2??蹂묓뻾 湲곕룞 (?ы듃 3004)
-# ?ㅽ뻾 而⑦뀓?ㅽ듃: GitHub Actions ??SSM(AWS-RunShellScript, root) ?????ㅽ겕由쏀듃
-# 湲곗〈 bandauto(snsauto) ?ㅽ깮? 嫄대뱶由ъ? ?딆쓬. DB??Supabase(goodfood ?ㅽ궎留?.
+#!/bin/bash
+# 굿푸드몰 어드민(sourcing-app) — 기존 EC2에 병행 기동 (포트 3004)
+# 실행 컨텍스트: GitHub Actions → SSM(AWS-RunShellScript, root) → 이 스크립트
+# 기존 bandauto(snsauto) 스택은 건드리지 않음. DB는 Supabase(goodfood 스키마).
+# 포트: 3002는 skill-testbed 컨테이너가 점유 중이라 3004 사용 (2026-06-11 inspect 확인)
 set -euo pipefail
 cd /home/ubuntu/goodfood
 
-echo "=== [1/6] 湲곗〈 ?댁쁺 env?먯꽌 API ???ъ궗??==="
+echo "=== [1/6] 기존 운영 env에서 API 키 재사용 ==="
 OLD_ENV=""
 for c in /home/ubuntu/bandauto/sourcing-app/.env /home/ubuntu/bandauto/sourcing-app/.env.local; do
   [ -f "$c" ] && OLD_ENV="$c" && break
@@ -38,13 +39,13 @@ TZ=Asia/Seoul
 EOF
 echo "env written ($(grep -c . "$ENVF") lines)"
 
-echo "=== [2/6] ?대?吏 ?먯궛 ?붾젆?좊━ (援욱뫖???꾩슜) ==="
+echo "=== [2/6] 이미지 자산 디렉토리 (굿푸드 전용) ==="
 mkdir -p /home/ubuntu/assets-goodfood/images/{product,post,channel,shop}
 
-echo "=== [3/6] Docker 鍮뚮뱶 (??遺??뚯슂) ==="
+echo "=== [3/6] Docker 빌드 (수 분 소요) ==="
 docker build -f docker/Dockerfile.sourcing -t goodfood-admin:latest . 2>&1 | tail -5
 
-echo "=== [4/6] 而⑦뀒?대꼫 湲곕룞 (3004 ??3001) ==="
+echo "=== [4/6] 컨테이너 기동 (3004 → 3001) ==="
 docker rm -f goodfood-admin 2>/dev/null || true
 docker run -d --name goodfood-admin --restart unless-stopped \
   -p 3004:3001 \
@@ -74,9 +75,9 @@ NGINX
 ln -sf /etc/nginx/sites-available/goodshop-admin /etc/nginx/sites-enabled/goodshop-admin
 nginx -t && systemctl reload nginx
 certbot --nginx -d goodshop-admin.hublink.im --non-interactive --agree-tos -m skkim3925@gmail.com --redirect \
-  || echo "WARN: certbot ?ㅽ뙣 ??http濡?癒쇱? ?뺤씤 ???ъ떆??媛??
+  || echo "WARN: certbot 실패 — http로 먼저 확인 후 재시도 가능"
 
-echo "=== [6/6] 寃利?==="
+echo "=== [6/6] 검증 ==="
 sleep 10
 docker ps --filter name=goodfood-admin --format '{{.Names}} {{.Status}} {{.Ports}}'
 echo "local /login:"
