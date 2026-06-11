@@ -28,6 +28,7 @@ import {
   TransformResult,
   ProductCreateResult,
   PublishResult,
+  normalizePublishTarget,
 } from './types'
 import { createPipelineNotification } from './notification-helper'
 
@@ -308,7 +309,11 @@ export async function executePublishPipeline(
     // retailChannelIds 사용
     const channelIdsForPublish = config?.channelIds ?? parseNumberArray(automationConfig?.retailChannelIds)
 
-    if (!channelIdsForPublish || channelIdsForPublish.length === 0) {
+    // 발행 타깃 (STEP 1-1): config 우선, 없으면 자동화 설정값 (기본 BOTH)
+    const publishTarget = config?.publishTarget ?? normalizePublishTarget((automationConfig as any)?.publishTarget)
+
+    // SHOP_ONLY 는 밴드 채널 없이도 발행 가능 (쇼핑몰만 발행)
+    if (publishTarget !== 'SHOP_ONLY' && (!channelIdsForPublish || channelIdsForPublish.length === 0)) {
       throw new Error('발행할 채널이 설정되지 않았습니다')
     }
 
@@ -316,6 +321,7 @@ export async function executePublishPipeline(
       channelIds: channelIdsForPublish,
       productIds: config?.productIds,
       publishReadyOnly: config?.publishReadyOnly ?? true,
+      publishTarget,
     }
 
     const result = await runPublishPipeline(publishConfig)
@@ -505,11 +511,13 @@ export async function executeFullPipeline(
 
     // 4. 발행 단계
     if (!options?.skipPublish) {
-      if (retailChannelIds.length === 0) {
+      // 발행 타깃 (STEP 1-1): SHOP_ONLY 는 밴드 채널 없이도 쇼핑몰 발행 진행
+      const publishTarget = normalizePublishTarget((automationConfig as any).publishTarget)
+      if (publishTarget !== 'SHOP_ONLY' && retailChannelIds.length === 0) {
         log('WARN', '발행할 채널이 설정되지 않았습니다. 발행 단계를 건너뜁니다.', logCtx)
       } else {
         logStageStart('발행(Publish)', { ...logCtx, stage: 'PUBLISH' })
-        log('DEBUG', `발행 대상 채널: ${retailChannelIds.join(', ')}`, { ...logCtx, stage: 'PUBLISH' })
+        log('DEBUG', `발행 타깃: ${publishTarget}, 대상 채널: ${retailChannelIds.join(', ') || '(없음 - 쇼핑몰만)'}`, { ...logCtx, stage: 'PUBLISH' })
 
         // ⚠️ 변경: 이전엔 ProductCreate 단계에서 생성한 productIds만 발행 대상으로 사용해서,
         // 사용자가 별도로 수동 AI 가공해 만든 상품(오늘 createdAt이지만 자동 파이프라인이
@@ -523,6 +531,7 @@ export async function executeFullPipeline(
           channelIds: retailChannelIds,
           publishReadyOnly: true,
           createdAfter: publishWindowStart,
+          publishTarget,
         })
 
         totalItems += publishResult.totalItems
@@ -948,7 +957,9 @@ export async function executeFullPipelineWithLock(
       await throwIfCancelled()
       await startWorkflowStep(logId, StepType.PUBLISH, retailChannelIds.length)
 
-      if (retailChannelIds.length === 0) {
+      // 발행 타깃 (STEP 1-1): SHOP_ONLY 는 밴드 채널 없이도 쇼핑몰 발행 진행
+      const publishTarget = normalizePublishTarget((automationConfig as any).publishTarget)
+      if (publishTarget !== 'SHOP_ONLY' && retailChannelIds.length === 0) {
         log('WARN', '발행할 채널이 설정되지 않았습니다.', logCtx)
         await completeWorkflowStep(logId, StepType.PUBLISH, {
           status: 'SKIPPED',
@@ -965,11 +976,12 @@ export async function executeFullPipelineWithLock(
         // — 같은 반일(KST 오전/오후) 생성분만 발행 (getPublishWindowStart 참조).
         const createdProductIds = productCreateResult?.details?.createdProductIds || []
         const publishWindowStart = getPublishWindowStart()
-        log('DEBUG', `자동 생성 ${createdProductIds.length}개 + 같은 반일(${publishWindowStart.toISOString()} 이후) 생성 미발행 상품 발행`, { ...logCtx, stage: 'PUBLISH' })
+        log('DEBUG', `발행 타깃: ${publishTarget} / 자동 생성 ${createdProductIds.length}개 + 같은 반일(${publishWindowStart.toISOString()} 이후) 생성 미발행 상품 발행`, { ...logCtx, stage: 'PUBLISH' })
         publishResult = await runPublishPipeline({
           channelIds: retailChannelIds,
           publishReadyOnly: true,
           createdAfter: publishWindowStart,
+          publishTarget,
         })
 
         totalItems += publishResult.totalItems

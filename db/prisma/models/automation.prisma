@@ -70,6 +70,9 @@ model AutomationConfig {
   // 밴드 발행 방식 전체 스위치 (2026-06-07): COMPOSE(AI 본문작성) | CROSSPOST(다른 밴드에 올리기).
   // 저장 시 사용자의 활성 RETAIL 채널 bandPublishMethod 에 일괄 적용. 기본 COMPOSE.
   bandPublishMethod             String     @default("COMPOSE") @map("band_publish_method") @db.VarChar(20)
+  // B2B 공급몰 전환 (2026-06-11): 자동 발행 타깃 — SHOP_ONLY(쇼핑몰만) | BAND_ONLY(밴드만) | BOTH(둘 다).
+  // 기존 사용자 동작 보존을 위해 기본 BOTH. 도매밴드→쇼핑몰 B2B 파이프라인은 SHOP_ONLY 사용.
+  publishTarget                 String     @default("BOTH") @map("publish_target") @db.VarChar(20)
   user                          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([isEnabled])

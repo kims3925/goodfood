@@ -65,12 +65,18 @@ export async function runPublishPipeline(
     }
   }
 
-  console.log(`[Publish Pipeline] Starting for user ${userId}`)
+  // 발행 타깃 (B2B 공급몰 전환 STEP 1-1): SHOP_ONLY | BAND_ONLY | BOTH (기본 BOTH = 기존 동작)
+  const publishTarget = config.publishTarget ?? 'BOTH'
 
-  // 발행할 채널 IDs
-  const channelIds = config.channelIds
-  if (!channelIds?.length) {
+  console.log(`[Publish Pipeline] Starting for user ${userId} (target=${publishTarget})`)
+
+  // 발행할 채널 IDs — SHOP_ONLY 는 밴드 채널이 필요 없다
+  const channelIds = config.channelIds ?? []
+  if (publishTarget !== 'SHOP_ONLY' && channelIds.length === 0) {
     throw new Error('발행할 채널이 지정되지 않았습니다')
+  }
+  if (publishTarget === 'SHOP_ONLY' && (!shopIds || shopIds.length === 0)) {
+    throw new Error('쇼핑몰 전용 발행(SHOP_ONLY)인데 발행할 쇼핑몰이 설정되지 않았습니다')
   }
 
   // 발행할 상품 조회
@@ -102,16 +108,29 @@ export async function runPublishPipeline(
     whereClause.id = { in: config.productIds }
   } else if (config.publishReadyOnly) {
     // publishReadyOnly가 true인 경우: 아직 발행되지 않은 상품만
-    // 지정된 모든 채널에 발행되지 않은 상품 조회
-    whereClause.AND = [
-      {
-        OR: channelIds.map(channelId => ({
-          channelProducts: {
-            none: { channelId },
-          },
-        })),
-      },
-    ]
+    if (publishTarget === 'SHOP_ONLY') {
+      // 쇼핑몰 전용: 지정된 쇼핑몰 중 하나라도 미발행인 상품 조회
+      whereClause.AND = [
+        {
+          OR: (shopIds ?? []).map(shopId => ({
+            shopProducts: {
+              none: { shopId },
+            },
+          })),
+        },
+      ]
+    } else {
+      // 지정된 모든 채널에 발행되지 않은 상품 조회
+      whereClause.AND = [
+        {
+          OR: channelIds.map(channelId => ({
+            channelProducts: {
+              none: { channelId },
+            },
+          })),
+        },
+      ]
+    }
   }
 
   const products = await prisma.product.findMany({
@@ -218,33 +237,39 @@ export async function runPublishPipeline(
   console.log(`[Publish Pipeline] Found ${productIds.length} valid products to publish (${skippedProducts.length} skipped)`)
 
   // 발행할 소매채널 조회 (kind=RETAIL = 발행 대상). publishPriceTier 로 가격 tier 구분.
-  const retailChannelsRaw = await prisma.channel.findMany({
-    where: {
-      userId,
-      id: { in: channelIds },
-      kind: ChannelKind.RETAIL,
-      isActive: true,
-    },
-    select: { id: true, name: true, publishPriceTier: true },
-  })
+  // SHOP_ONLY 타깃은 밴드 발행을 생략하므로 채널 조회/검증을 건너뛴다.
+  let retailChannels: { id: number; name: string; publishPriceTier: string | null }[] = []
+  if (publishTarget !== 'SHOP_ONLY') {
+    const retailChannelsRaw = await prisma.channel.findMany({
+      where: {
+        userId,
+        id: { in: channelIds },
+        kind: ChannelKind.RETAIL,
+        isActive: true,
+      },
+      select: { id: true, name: true, publishPriceTier: true },
+    })
 
-  if (retailChannelsRaw.length === 0) {
-    cleanup()
-    throw new Error('No active retail channels found')
+    if (retailChannelsRaw.length === 0) {
+      cleanup()
+      throw new Error('No active retail channels found')
+    }
+
+    // 발행 순서: 1차 도매(WHOLESALE) → 2차 소매(RETAIL) (지시서 §3.1 / 골든 G6).
+    // 가족도매방밴드(WHOLESALE tier)에 먼저 도매가로 발행한 뒤, 쇼핑몰·소매밴드에 소매가로 발행한다.
+    retailChannels = [...retailChannelsRaw].sort((a, b) => {
+      const aw = a.publishPriceTier === 'WHOLESALE' ? 0 : 1
+      const bw = b.publishPriceTier === 'WHOLESALE' ? 0 : 1
+      return aw - bw
+    })
+
+    const wholesaleCount = retailChannels.filter((c) => c.publishPriceTier === 'WHOLESALE').length
+    console.log(
+      `[Publish Pipeline] Publishing to ${retailChannels.length} retail channels (batch=${publishBatchId}, wholesale-tier=${wholesaleCount})`
+    )
+  } else {
+    console.log(`[Publish Pipeline] SHOP_ONLY target — 밴드 채널 발행 생략 (batch=${publishBatchId})`)
   }
-
-  // 발행 순서: 1차 도매(WHOLESALE) → 2차 소매(RETAIL) (지시서 §3.1 / 골든 G6).
-  // 가족도매방밴드(WHOLESALE tier)에 먼저 도매가로 발행한 뒤, 쇼핑몰·소매밴드에 소매가로 발행한다.
-  const retailChannels = [...retailChannelsRaw].sort((a, b) => {
-    const aw = a.publishPriceTier === 'WHOLESALE' ? 0 : 1
-    const bw = b.publishPriceTier === 'WHOLESALE' ? 0 : 1
-    return aw - bw
-  })
-
-  const wholesaleCount = retailChannels.filter((c) => c.publishPriceTier === 'WHOLESALE').length
-  console.log(
-    `[Publish Pipeline] Publishing to ${retailChannels.length} retail channels (batch=${publishBatchId}, wholesale-tier=${wholesaleCount})`
-  )
 
   // 이미 발행된 상품 정보 매핑 (productId -> 발행된 channelIds)
   const publishedChannelsMap = new Map<number, Set<number>>()
@@ -284,9 +309,9 @@ export async function runPublishPipeline(
   let currentFailed = 0
 
   // =============================================
-  // 1. 쇼핑몰(Shop) 발행 먼저 수행
+  // 1. 쇼핑몰(Shop) 발행 먼저 수행 (BAND_ONLY 타깃은 생략)
   // =============================================
-  if (shopIds && shopIds.length > 0) {
+  if (publishTarget !== 'BAND_ONLY' && shopIds && shopIds.length > 0) {
     console.log(`[Publish Pipeline] Publishing to ${shopIds.length} shop(s) first: ${shopIds.join(', ')}`)
 
     for (const shopId of shopIds) {
@@ -420,7 +445,7 @@ export async function runPublishPipeline(
   }
 
   // =============================================
-  // 2. 소매채널(Band) 발행
+  // 2. 소매채널(Band) 발행 — SHOP_ONLY 타깃은 retailChannels 가 비어 있어 자연스럽게 생략됨
   // =============================================
   // PublishService를 사용하여 각 채널에 순차 발행 (실시간 진행 상황 추적)
   // 각 채널을 순차적으로 처리하면서 진행 상황을 업데이트

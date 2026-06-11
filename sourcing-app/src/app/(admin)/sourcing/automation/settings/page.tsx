@@ -100,6 +100,8 @@ interface AutomationConfig {
   digestImagesPerProduct: 1 | 2 | 4
   // 밴드 발행 방식 전체 스위치: COMPOSE(AI 본문작성) | CROSSPOST(다른 밴드에 올리기)
   bandPublishMethod: 'COMPOSE' | 'CROSSPOST'
+  // 발행 타깃 (B2B 공급몰 전환): SHOP_ONLY(쇼핑몰만) | BAND_ONLY(밴드만) | BOTH(둘 다)
+  publishTarget: 'SHOP_ONLY' | 'BAND_ONLY' | 'BOTH'
 }
 
 // 12시간제 → 24시간제 변환
@@ -215,6 +217,7 @@ const defaultConfig: AutomationConfig = {
   digestProductsPerPost: 20,
   digestImagesPerProduct: 1,
   bandPublishMethod: 'COMPOSE',
+  publishTarget: 'BOTH',
 }
 
 // 수집 개수 옵션
@@ -287,7 +290,8 @@ export default function AutomationSettingsPage() {
   const hasAiChanges = config.aiProvider !== initialConfig.aiProvider
 
   const hasPublishChanges = JSON.stringify((config.retailChannelIds || []).slice().sort()) !==
-    JSON.stringify((initialConfig.retailChannelIds || []).slice().sort())
+    JSON.stringify((initialConfig.retailChannelIds || []).slice().sort()) ||
+    config.publishTarget !== initialConfig.publishTarget
 
   const hasShopChanges = JSON.stringify((config.shopIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.shopIds || []).slice().sort())
@@ -313,7 +317,8 @@ export default function AutomationSettingsPage() {
   const isShopMissing = config.shopIds.length === 0
   const isCollectionMissing = config.wholesaleChannelIds.length === 0
   const isAiMissing = !config.aiProvider
-  const isPublishMissing = config.retailChannelIds.length === 0
+  // SHOP_ONLY 타깃은 소매밴드 선택이 필수가 아니다 (B2B 공급몰 전환 STEP 1-1)
+  const isPublishMissing = config.publishTarget !== 'SHOP_ONLY' && config.retailChannelIds.length === 0
   const isPipelineMissing = !config.pipelineSteps.collection && !config.pipelineSteps.transform && !config.pipelineSteps.productCreate && !config.pipelineSteps.publish
 
   // 섹션별 문제 여부 (설정 누락 또는 저장 안 됨)
@@ -418,8 +423,8 @@ export default function AutomationSettingsPage() {
       missingSections.push('ai')
     }
 
-    // 발행할 소매채널 확인
-    if (config.retailChannelIds.length === 0) {
+    // 발행할 소매채널 확인 (SHOP_ONLY 타깃은 소매밴드 불필요)
+    if (config.publishTarget !== 'SHOP_ONLY' && config.retailChannelIds.length === 0) {
       missingSections.push('publish')
     }
 
@@ -459,21 +464,24 @@ export default function AutomationSettingsPage() {
       return
     }
 
-    // 소매채널 중 쇼핑몰 미연결 채널 확인
-    const channelsWithoutShop = retailChannels.filter(
-      (ch) => config.retailChannelIds.includes(ch.id) && !ch.shop
-    )
+    // SHOP_ONLY 타깃은 밴드 발행이 없으므로 쇼핑몰 연결/밴드 세션 검증 생략
+    if (config.publishTarget !== 'SHOP_ONLY') {
+      // 소매채널 중 쇼핑몰 미연결 채널 확인
+      const channelsWithoutShop = retailChannels.filter(
+        (ch) => config.retailChannelIds.includes(ch.id) && !ch.shop
+      )
 
-    if (channelsWithoutShop.length > 0) {
-      setUnconnectedChannels(channelsWithoutShop)
-      setShowShopConnectionWarning(true)
-      return
-    }
+      if (channelsWithoutShop.length > 0) {
+        setUnconnectedChannels(channelsWithoutShop)
+        setShowShopConnectionWarning(true)
+        return
+      }
 
-    // 밴드 세션 유효성 검증 (실패 시 알림도 생성)
-    const isSessionValid = await validateBandSessions(true)
-    if (!isSessionValid) {
-      return
+      // 밴드 세션 유효성 검증 (실패 시 알림도 생성)
+      const isSessionValid = await validateBandSessions(true)
+      if (!isSessionValid) {
+        return
+      }
     }
 
     // 저장된 상태에서만 자동화 시작 (서버에도 저장)
@@ -599,6 +607,7 @@ export default function AutomationSettingsPage() {
             autoPublishLimitByChannel: configData.data?.autoPublishLimitByChannel ?? {},
             digestMode: (configData.data?.digestMode as any) ?? 'individual',
             bandPublishMethod: (configData.data?.bandPublishMethod === 'CROSSPOST' ? 'CROSSPOST' : 'COMPOSE'),
+            publishTarget: (['SHOP_ONLY', 'BAND_ONLY', 'BOTH'].includes(configData.data?.publishTarget) ? configData.data.publishTarget : 'BOTH'),
             digestProductsPerPost: configData.data?.digestProductsPerPost ?? 20,
             digestImagesPerProduct: (configData.data?.digestImagesPerProduct as 1 | 2 | 4) ?? 1,
           }
@@ -720,7 +729,7 @@ export default function AutomationSettingsPage() {
           sectionData = { aiProvider: config.aiProvider }
           break
         case 'publish':
-          sectionData = { retailChannelIds: config.retailChannelIds }
+          sectionData = { retailChannelIds: config.retailChannelIds, publishTarget: config.publishTarget }
           break
         case 'publishLimit':
           sectionData = {
@@ -2288,8 +2297,11 @@ export default function AutomationSettingsPage() {
                       {config.retailChannelIds.length}개
                     </span>
                   )}
+                  <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700">
+                    {config.publishTarget === 'SHOP_ONLY' ? '쇼핑몰만' : config.publishTarget === 'BAND_ONLY' ? '밴드만' : '쇼핑몰+밴드'}
+                  </span>
                 </div>
-                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">소매밴드 선택</p>
+                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">발행 타깃 / 소매밴드 선택</p>
               </div>
             </div>
             <div className="flex items-center gap-2 self-end sm:self-auto">
@@ -2313,6 +2325,40 @@ export default function AutomationSettingsPage() {
               </Button>
             </div>
           </div>
+
+        {/* 발행 타깃 선택 (B2B 공급몰 전환 STEP 1-1) */}
+        <div className="mb-4">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">발행 타깃</label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {[
+              { value: 'SHOP_ONLY', label: '쇼핑몰만', desc: 'B2B 공급몰 — 밴드 발행 생략' },
+              { value: 'BAND_ONLY', label: '밴드만', desc: '소매밴드에만 발행' },
+              { value: 'BOTH', label: '쇼핑몰+밴드', desc: '둘 다 발행 (기존 방식)' },
+            ].map((opt) => {
+              const active = config.publishTarget === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setConfig(prev => ({ ...prev, publishTarget: opt.value as any }))}
+                  className={`p-3 rounded-lg border-2 text-left transition-all ${
+                    active
+                      ? 'border-green-500 bg-green-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-sm font-semibold text-gray-900">{opt.label}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{opt.desc}</div>
+                </button>
+              )
+            })}
+          </div>
+          {config.publishTarget === 'SHOP_ONLY' && (
+            <p className="text-xs text-blue-600 mt-2">
+              쇼핑몰 전용 발행: 소매밴드 선택·밴드 세션 없이 자동 파이프라인이 동작합니다. 아래 소매밴드 선택은 무시됩니다.
+            </p>
+          )}
+        </div>
 
         {retailChannels.length > 0 ? (
           showAllRetail ? (

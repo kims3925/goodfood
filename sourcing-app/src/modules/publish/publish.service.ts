@@ -796,6 +796,7 @@ export class PublishService {
           id: true,
           name: true,
           thumbnailUrl: true,
+          isActive: true,
           images: {
             orderBy: { sortOrder: 'asc' },
             select: { url: true },
@@ -849,6 +850,14 @@ export class PublishService {
           publishedAt: new Date(),
         },
       })
+
+      // 쇼핑몰 발행 = 쇼핑몰 노출 보장 (B2B 공급몰 전환 STEP 1-1: SHOP_ONLY 발행 시 isActive 동기화)
+      if (!product.isActive) {
+        await prisma.product.update({
+          where: { id: productId },
+          data: { isActive: true },
+        })
+      }
 
       console.log(
         `[PublishService] Published product ${productId} to shop ${shop.name} (id: ${shop.id})`

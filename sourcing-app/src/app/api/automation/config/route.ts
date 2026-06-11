@@ -59,6 +59,7 @@ export async function GET() {
             publish: true,
           },
           collectionLimit: 10,
+          publishTarget: 'BOTH',
         },
       })
     }
@@ -126,6 +127,8 @@ export async function GET() {
         digestMode: (config as any).digestMode ?? 'individual',
         digestProductsPerPost: (config as any).digestProductsPerPost ?? 20,
         digestImagesPerProduct: (config as any).digestImagesPerProduct ?? 1,
+        // 발행 타깃 (B2B 공급몰 전환 STEP 1-1)
+        publishTarget: (config as any).publishTarget ?? 'BOTH',
       },
     })
   } catch (error: any) {
@@ -177,7 +180,14 @@ export async function POST(request: NextRequest) {
       digestProductsPerPost,
       digestImagesPerProduct,
       bandPublishMethod,
+      publishTarget,
     } = body
+
+    // 발행 타깃 (STEP 1-1) — 'SHOP_ONLY' | 'BAND_ONLY' | 'BOTH' 만 허용. 미전달 시 변경 없음(undefined).
+    const validPublishTargets = ['SHOP_ONLY', 'BAND_ONLY', 'BOTH']
+    const finalPublishTarget: string | undefined = validPublishTargets.includes(publishTarget)
+      ? publishTarget
+      : undefined
 
     // 밴드 발행 방식 전체 스위치 — 'CROSSPOST' | 'COMPOSE' 만 허용. 미전달 시 변경 없음(undefined).
     const finalBandPublishMethod: 'COMPOSE' | 'CROSSPOST' | undefined =
@@ -280,6 +290,18 @@ export async function POST(request: NextRequest) {
       })
     } catch (e: any) {
       console.warn('[AutomationConfig] digest 컬럼 업데이트 실패 (DB 마이그레이션 필요):', e?.message)
+    }
+
+    // 발행 타깃 컬럼 별도 업데이트 (DB 마이그레이션 미적용 환경 대응) — 명시 전달된 경우에만 적용
+    if (finalPublishTarget) {
+      try {
+        await prisma.automationConfig.update({
+          where: { userId: currentUser.userId },
+          data: { publishTarget: finalPublishTarget } as any,
+        })
+      } catch (e: any) {
+        console.warn('[AutomationConfig] publishTarget 컬럼 업데이트 실패 (DB 마이그레이션 필요):', e?.message)
+      }
     }
 
     // 밴드 발행 방식 전체 스위치 — 명시 전달된 경우에만 적용.

@@ -136,6 +136,20 @@ export interface CreatedProductResult {
 // PUBLISH PIPELINE TYPES
 // =============================================
 
+/**
+ * 발행 타깃 (B2B 공급몰 전환 STEP 1-1)
+ * - SHOP_ONLY: 쇼핑몰만 발행 (밴드 발행 생략) — 도매밴드→쇼핑몰 B2B 파이프라인용
+ * - BAND_ONLY: 밴드만 발행 (쇼핑몰 발행 생략)
+ * - BOTH: 쇼핑몰 + 밴드 모두 발행 (기존 동작)
+ */
+export type PublishTarget = 'SHOP_ONLY' | 'BAND_ONLY' | 'BOTH'
+
+export const PUBLISH_TARGETS: PublishTarget[] = ['SHOP_ONLY', 'BAND_ONLY', 'BOTH']
+
+export function normalizePublishTarget(value: unknown): PublishTarget {
+  return PUBLISH_TARGETS.includes(value as PublishTarget) ? (value as PublishTarget) : 'BOTH'
+}
+
 export interface PublishConfig {
   channelIds?: number[]
   productIds?: number[]
@@ -146,6 +160,8 @@ export interface PublishConfig {
   createdAfter?: Date
   /** 최근 N일 이내 생성된 상품만 발행 */
   daysWithin?: number
+  /** 발행 타깃 — 미지정 시 BOTH (기존 동작) */
+  publishTarget?: PublishTarget
 }
 
 export interface PublishResult extends PipelineResult {
