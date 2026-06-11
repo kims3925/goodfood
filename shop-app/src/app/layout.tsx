@@ -25,11 +25,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: '가족함께 - 신선한 수산물 농수산물 축산물 산지직송 쇼핑몰',
-    template: '%s | 가족함께',
+    default: '굿푸드몰 - 식품 도매 B2B 공급 플랫폼',
+    template: '%s | 굿푸드몰',
   },
   description:
-    '가족함께 쇼핑몰에서 신선한 수산물, 횟감, 과일, 한우, 밀키트, 농수산물, 축산물을 산지직송으로 만나보세요. 매일 새벽 경매로 엄선한 최상급 식품을 합리적인 가격에 제공합니다.',
+    '굿푸드몰 쇼핑몰에서 신선한 수산물, 횟감, 과일, 한우, 밀키트, 농수산물, 축산물을 산지직송으로 만나보세요. 매일 새벽 경매로 엄선한 최상급 식품을 합리적인 가격에 제공합니다.',
   keywords: [
     '수산물', '농수산물', '축산물', '횟감', '과일', '한우', '밀키트', '식품',
     '산지직송', '새벽배송', '신선식품', '해산물', '생선', '회', '참치',
@@ -37,11 +37,11 @@ export const metadata: Metadata = {
     '사과', '딸기', '귤', '한라봉', '수박', '포도', '복숭아',
     '한우선물세트', '소고기', '돼지고기', '닭고기',
     '반찬', '간편식', '가공식품', '건강식품',
-    '온라인수산시장', '직거래쇼핑몰', '가족함께',
+    '온라인수산시장', '직거래쇼핑몰', '굿푸드몰',
   ],
-  authors: [{ name: '가족함께' }],
-  creator: '가족함께',
-  publisher: '가족함께',
+  authors: [{ name: '굿푸드몰' }],
+  creator: '굿푸드몰',
+  publisher: '굿푸드몰',
   formatDetection: {
     telephone: true,
     email: true,
@@ -50,15 +50,15 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'ko_KR',
-    siteName: '가족함께',
-    title: '가족함께 - 신선한 수산물 농수산물 산지직송 쇼핑몰',
+    siteName: '굿푸드몰',
+    title: '굿푸드몰 - 신선한 수산물 농수산물 산지직송 쇼핑몰',
     description:
       '매일 새벽 경매로 엄선한 신선한 수산물, 횟감, 과일, 한우, 밀키트를 산지직송으로 만나보세요.',
     url: SITE_URL,
   },
   twitter: {
     card: 'summary_large_image',
-    title: '가족함께 - 신선한 수산물 농수산물 산지직송 쇼핑몰',
+    title: '굿푸드몰 - 신선한 수산물 농수산물 산지직송 쇼핑몰',
     description:
       '매일 새벽 경매로 엄선한 신선한 수산물, 횟감, 과일, 한우, 밀키트를 산지직송으로 만나보세요.',
   },
