@@ -69,6 +69,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // 굿푸드몰 랜딩 (2026-06-11): 루트 접속 시 랜딩페이지 렌더 (?shop= 개발용 파라미터는 기존 동작 유지)
+  if (pathname === '/landing') {
+    return NextResponse.next()
+  }
+  if (pathname === '/' && !url.searchParams.get('shop')) {
+    url.pathname = '/landing'
+    return NextResponse.rewrite(url)
+  }
+
   // 경로에서 Shop slug 추출
   const { slug, actualPath } = extractShopSlug(pathname)
 
