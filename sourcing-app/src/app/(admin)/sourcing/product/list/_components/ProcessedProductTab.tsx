@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle, Archive, Eye, ChevronDown, ChevronUp, Info, Send } from 'lucide-react'
+import { Plus, Search, Trash2, Package, Boxes, CheckCircle, Clock, ShoppingCart, AlertTriangle, Archive, Eye, ChevronDown, ChevronUp, Info, Send, FolderTree } from 'lucide-react'
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import ConfirmModal from '@/components/ui/ConfirmModal'
@@ -13,6 +13,7 @@ import Loading from '@/components/ui/Loading'
 import PostSelectionModal from '@/components/product/PostSelectionModal'
 import PolicySelectionModal from '@/components/product/PolicySelectionModal'
 import ProductFormModal from '@/components/product/ProductFormModal'
+import CategoryChangeModal from '@/components/product/CategoryChangeModal'
 import Pagination from '@/components/ui/Pagination'
 import { useToast } from '@/components/ui/Toast'
 import ThumbnailImage from '@/components/ui/ThumbnailImage'
@@ -146,6 +147,7 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
   const [showPostSelectionModal, setShowPostSelectionModal] = useState(false)
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [showProductFormModal, setShowProductFormModal] = useState(false)
+  const [showCategoryModal, setShowCategoryModal] = useState(false) // 카테고리 일괄 변경 (2026-06-12)
   const [selectedPostIds, setSelectedPostIds] = useState<number[]>([]) // 다중 선택 지원
   const [pendingPostIds, setPendingPostIds] = useState<number[]>([]) // 정책 선택 대기 중인 게시물
   const [productDrafts, setProductDrafts] = useState<any[]>([]) // 다중 AI 결과
@@ -1684,6 +1686,17 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
           <button
             onClick={() => {
               if (selectedProductIds.length === 0) { toast.error('먼저 상품을 선택해주세요.'); return }
+              setShowCategoryModal(true)
+            }}
+            disabled={isAutoPublishing}
+            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+          >
+            <FolderTree size={15} />
+            카테고리 변경
+          </button>
+          <button
+            onClick={() => {
+              if (selectedProductIds.length === 0) { toast.error('먼저 상품을 선택해주세요.'); return }
               handleAutoPublish()
             }}
             disabled={isAutoPublishing}
@@ -2470,6 +2483,15 @@ export default function ProcessedProductTab({ onStatsLoaded, autoOpenRegister, p
         onPolicySelected={handlePolicySelected}
         selectedPostCount={pendingPostIds.length}
       />
+
+      {/* 카테고리 일괄 변경 모달 (2026-06-12) */}
+      {showCategoryModal && (
+        <CategoryChangeModal
+          productIds={selectedProductIds}
+          onClose={() => setShowCategoryModal(false)}
+          onDone={() => { setSelectedProductIds([]); fetchProducts(currentPage) }}
+        />
+      )}
 
       {/* 상품 정보 수정 모달 */}
       {productDrafts.length > 0 && (
