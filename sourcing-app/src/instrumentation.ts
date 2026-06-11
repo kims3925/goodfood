@@ -4,6 +4,12 @@
  */
 
 export async function register() {
+  // 서버리스(Vercel) 배포 (2026-06-11): 스케줄러/에이전트/Bull 등 백그라운드 잡 비활성화.
+  // 서버리스 환경에는 상주 프로세스·Redis가 없어 초기화 시 오류/지연 발생 — 관리 UI/API만 제공.
+  if (process.env.DISABLE_BACKGROUND_JOBS === '1') {
+    console.log('[instrumentation] DISABLE_BACKGROUND_JOBS=1 — 백그라운드 잡 초기화 생략')
+    return
+  }
   // 서버 사이드에서만 실행
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     // 동적으로 스케줄러 모듈 로드 (서버 사이드 전용)
