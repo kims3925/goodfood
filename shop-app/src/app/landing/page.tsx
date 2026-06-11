@@ -11,7 +11,7 @@ export const revalidate = 60
 // - 관리자 로그인: goodshop-admin.hublink.im (sourcing-app 어드민)
 
 export const metadata: Metadata = {
-  title: '굿푸드몰 — 식품 도매 B2B 공급 플랫폼',
+  title: { absolute: '굿푸드몰 — 식품 도매 B2B 공급 플랫폼' },
   description:
     '산지·도매 직소싱 식품을 AI가 가공해 공급하는 B2B 도매 플랫폼. 오픈 API로 내 쇼핑몰에 바로 연동하세요.',
 }
