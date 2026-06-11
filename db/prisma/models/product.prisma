@@ -12,6 +12,9 @@ model Product {
   wholesalePrice     Decimal?           @map("wholesale_price") @db.Decimal(12, 2)
   price              Int?
   isActive           Boolean           @default(true) @map("is_active") // 쇼핑몰 노출 여부
+  // B2B 공급몰 전환 Phase 2: 원본 도매 게시물 상태 — 품절 시 isActive=false 와 별도로 사유 보존
+  sourceStatus       SourceStatus      @default(ACTIVE) @map("source_status")
+  soldOutAt          DateTime?         @map("sold_out_at") @db.Timestamp(0)
   deletedAt          DateTime?         @map("deleted_at") @db.Timestamp(0) // Soft Delete
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamp(0)

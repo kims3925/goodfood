@@ -214,3 +214,11 @@ enum ExternalOrderKind {
   RETAIL     // 소매주문 (고객에게 받음)
   WHOLESALE  // 도매발주 (도매처에 직접 발주)
 }
+
+// B2B 공급몰 전환 Phase 2 (2026-06-11): 원본 도매 게시물 상태
+enum SourceStatus {
+  ACTIVE
+  SOLDOUT       // 품절 키워드 감지
+  POST_DELETED  // 원본 게시물 삭제됨
+  PRICE_CHANGED
+}

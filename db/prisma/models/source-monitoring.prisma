@@ -1,0 +1,45 @@
+// B2B 공급몰 전환 Phase 2 (2026-06-11): 도매밴드 소스 모니터링
+// 발행 중 상품의 원본 도매 게시물을 재방문해 품절/삭제/가격변동을 감지한다.
+
+// 원본 도매 게시물 재확인 스냅샷
+model SourceSnapshot {
+  id              Int          @id @default(autoincrement())
+  productId       Int          @map("product_id")
+  collectedPostId Int          @map("collected_post_id")
+  status          SourceStatus @default(ACTIVE)
+  wholesalePrice  Decimal?     @map("wholesale_price") @db.Decimal(12, 2)
+  rawText         String?      @map("raw_text") @db.Text // 감지 근거 (품절 문구 등)
+  checkedAt       DateTime     @default(now()) @map("checked_at") @db.Timestamp(0)
+
+  @@index([productId, checkedAt])
+  @@map("source_snapshot")
+}
+
+// 가격 변동 이력 (판매가 정책 반영용)
+model PriceHistory {
+  id                Int      @id @default(autoincrement())
+  productId         Int      @map("product_id")
+  oldWholesalePrice Decimal? @map("old_wholesale_price") @db.Decimal(12, 2)
+  newWholesalePrice Decimal? @map("new_wholesale_price") @db.Decimal(12, 2)
+  oldPrice          Int?     @map("old_price")
+  newPrice          Int?     @map("new_price")
+  applied           Boolean  @default(false) // 판매가 자동 반영 여부
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+  @@index([productId, createdAt])
+  @@map("price_history")
+}
+
+// 중복상품 후보
+model ProductDuplicate {
+  id           Int      @id @default(autoincrement())
+  productId    Int      @map("product_id")
+  dupProductId Int      @map("dup_product_id")
+  method       String   @db.VarChar(30) // TITLE_SIM | IMAGE_PHASH | SOURCE_POST
+  similarity   Float
+  resolved     Boolean  @default(false) // 관리자 처리 완료
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+  @@unique([productId, dupProductId, method])
+  @@map("product_duplicate")
+}
