@@ -68,10 +68,12 @@ export async function PATCH(request: NextRequest) {
   }
 
   // 세션 갱신 — 쿠키 등록 시 만료 시각을 +30일로 가정 (실제 검증은 publish 시 시도)
+  // P0-3: 쿠키 암호화 저장
+  const { encryptBandCookie } = await import('@/lib/band-cookie-crypto')
   const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   await prisma.channel.update({
     where: { id: channelId },
-    data: { bandSessionCookie, sessionExpiresAt, isActive: true },
+    data: { bandSessionCookie: encryptBandCookie(bandSessionCookie), sessionExpiresAt, isActive: true },
   })
 
   return NextResponse.json({ success: true })

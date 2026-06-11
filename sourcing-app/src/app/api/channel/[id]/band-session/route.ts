@@ -150,10 +150,12 @@ export async function PUT(
       expiresAt.setDate(expiresAt.getDate() + 14)
     }
 
+    // P0-3: 쿠키 암호화 저장
+    const { encryptBandCookie } = await import('@/lib/band-cookie-crypto')
     await prisma.channel.update({
       where: { id: channelId },
       data: {
-        bandSessionCookie: cookieString,
+        bandSessionCookie: encryptBandCookie(cookieString),
         sessionExpiresAt: expiresAt,
       },
     })

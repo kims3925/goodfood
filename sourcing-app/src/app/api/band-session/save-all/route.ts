@@ -158,13 +158,14 @@ export async function POST(request: NextRequest) {
       expiresAt.setDate(expiresAt.getDate() + 14)
     }
 
-    // 모든 소매 채널에 세션 일괄 업데이트
+    // 모든 소매 채널에 세션 일괄 업데이트 (P0-3: 쿠키 암호화 저장)
+    const { encryptBandCookie } = await import('@/lib/band-cookie-crypto')
     const updateResult = await prisma.channel.updateMany({
       where: {
         id: { in: retailChannels.map((ch) => ch.id) },
       },
       data: {
-        bandSessionCookie: cookieString,
+        bandSessionCookie: encryptBandCookie(cookieString),
         sessionExpiresAt: expiresAt,
         // 이 세션이 어느 밴드 계정 것인지 기록 (계정 검증 통과값 또는 설정값)
         sessionAccountEmail: provided ?? expected,

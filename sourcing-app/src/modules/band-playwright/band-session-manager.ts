@@ -14,6 +14,8 @@
 import prisma from '@bandauto/db'
 import { browserPool } from './band-browser-pool'
 import { BandSession, BandPlaywrightError, BandPlaywrightErrorCode } from './types'
+// P0-3 (2026-06-11): 세션 쿠키 컬럼 암호화 — 저장 시 encrypt, 사용 시 decrypt (레거시 평문 호환)
+import { encryptBandCookie, decryptBandCookie } from '@/lib/band-cookie-crypto'
 
 // 보수화 파라미터
 const INVALIDATE_THRESHOLD = 3        // 연속 N회 실패 시 NULL 처리
@@ -86,9 +88,19 @@ export class BandSessionManager {
         }
       }
 
+      // P0-3: 암호화 저장분 복호화 (평문 레거시는 그대로). 복호화 실패 = 세션 없음 취급.
+      const cookies = decryptBandCookie(channel.bandSessionCookie)
+      if (!cookies) {
+        console.error(`[BandSessionManager] 채널 ${channelId} 세션 쿠키 복호화 실패 — 재저장 필요`)
+        throw new BandPlaywrightError(
+          '세션 쿠키를 읽을 수 없습니다 (암호화 키 변경/손상). 채널 설정에서 쿠키를 다시 등록해주세요.',
+          BandPlaywrightErrorCode.SESSION_EXPIRED
+        )
+      }
+
       console.log(`[BandSessionManager] Using existing session for channel ${channelId}`)
       return {
-        cookies: channel.bandSessionCookie,
+        cookies,
         expiresAt: channel.sessionExpiresAt ? new Date(channel.sessionExpiresAt) : null,
         isValid: true,
       }
@@ -187,7 +199,7 @@ export class BandSessionManager {
     await prisma.channel.update({
       where: { id: channelId },
       data: {
-        bandSessionCookie: cookies,
+        bandSessionCookie: encryptBandCookie(cookies), // P0-3
         sessionExpiresAt: expiresAt,
       },
     })
@@ -253,7 +265,7 @@ export class BandSessionManager {
       const updated = await prisma.channel.updateMany({
         where,
         data: {
-          bandSessionCookie: JSON.stringify(relevant),
+          bandSessionCookie: encryptBandCookie(JSON.stringify(relevant)), // P0-3
           // keep-alive 가 지속 갱신하므로 만료일 없는 세션으로 취급 (기존 정책과 동일)
           sessionExpiresAt: null,
         },
