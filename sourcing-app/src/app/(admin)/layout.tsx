@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Sidebar from '@/components/layout/Sidebar'
+import AdminPanelShell from '@/components/admin/AdminPanelShell'
 import { ToastProvider } from '@/components/ui/Toast'
 import { BandSessionProvider } from '@/contexts/BandSessionContext'
 import { AppSection, UserRole, getSectionFromPath, getDefaultPathBySection, getAvailableSections } from '@/config/navigation'
@@ -23,15 +24,17 @@ export default function AdminLayout({
   const [currentSection, setCurrentSection] = useState<AppSection>('sourcing')
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [userRole, setUserRole] = useState<UserRole>('USER')
+  const [userName, setUserName] = useState('')
 
   // 인증 상태 확인
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // 어드민 경로(/admin/*)에선 admin 쿠키 우선 조회 — 매니저 쿠키가 함께 있어도
-        // 어드민 세션이 매니저로 가려지지 않도록. 그 외 경로는 기존(매니저 우선) 동작.
-        const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
-        const response = await fetch(`/api/auth/session${isAdminPath ? '?preferAdmin=1' : ''}`)
+        // 항상 admin 쿠키 우선 조회 (?preferAdmin=1) — ADMIN 역할이면 /sourcing/*, /shop/*
+        // 에서도 어드민패널 레이아웃(단일 패널)을 적용해야 하므로, 매니저 쿠키가 함께 있어도
+        // 어드민 세션이 가려지지 않도록 한다. admin 쿠키가 없으면 manager 쿠키로 폴백되어
+        // 매니저 전용 로그인에는 영향 없음 (기존 섹션 탭 레이아웃 유지).
+        const response = await fetch('/api/auth/session?preferAdmin=1')
         const data = await response.json()
 
         if (!data.success || !data.user) {
@@ -42,6 +45,7 @@ export default function AdminLayout({
 
         setIsAuthenticated(true)
         setUserRole(data.user.role || 'USER')
+        setUserName(data.user.name || data.user.email || '')
       } catch (error) {
         console.error('인증 확인 실패:', error)
         router.replace('/login')
@@ -96,8 +100,8 @@ export default function AdminLayout({
     return null
   }
 
-  // /admin 경로는 자체 독립 레이아웃(admin/layout.tsx)을 사용하므로
-  // 상위 Header/Sidebar를 렌더링하지 않음
+  // /admin 경로는 자체 독립 레이아웃(admin/layout.tsx → AdminPanelShell)이 셸을 그리므로
+  // 여기서는 Provider만 감싸고 통과 (이중 셸 방지)
   if (pathname.startsWith('/admin')) {
     return (
       <ToastProvider>
@@ -107,6 +111,21 @@ export default function AdminLayout({
       </ToastProvider>
     )
   }
+
+  // ADMIN 역할: /sourcing/*, /shop/* 에서도 굿푸드몰 어드민패널 레이아웃 유지 (단일 패널)
+  if (userRole === 'ADMIN') {
+    return (
+      <ToastProvider>
+        <BandSessionProvider>
+          <AdminPanelShell userName={userName} userRole={userRole}>
+            {children}
+          </AdminPanelShell>
+        </BandSessionProvider>
+      </ToastProvider>
+    )
+  }
+
+  // MANAGER: 기존 섹션 탭 레이아웃 유지 (변경 없음)
 
   return (
     <ToastProvider>
