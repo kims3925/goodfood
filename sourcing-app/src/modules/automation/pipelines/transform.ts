@@ -28,6 +28,7 @@ import {
   PipelineError,
 } from '../types'
 import { filterPriceImages } from '@/modules/utils/priceImageFilter'
+import { findExactDuplicateProduct } from '@/modules/monitoring/duplicate-detector.service'
 
 // =============================================
 // PROCESSING CONFIGURATION
@@ -199,6 +200,7 @@ export async function runTransformPipeline(
   // 변환할 게시물 조회 (아직 CollectedProduct가 없는 게시물)
   const whereClause: any = {
     userId,
+    deletedAt: null, // 중복 차단 등으로 soft-delete 된 게시물 제외 (STEP 2-3)
     collectedProducts: {
       none: {}, // CollectedProduct가 없는 게시물만
     },
@@ -209,7 +211,7 @@ export async function runTransformPipeline(
   }
 
   // 제한 없이 모든 대기 게시물 조회
-  const posts = await prisma.collectedPost.findMany({
+  const allPosts = await prisma.collectedPost.findMany({
     where: whereClause,
     include: {
       images: {
@@ -217,6 +219,31 @@ export async function runTransformPipeline(
       },
     },
   })
+
+  // 중복상품 1차 차단 (STEP 2-3): 동일 채널 내 정규화 제목 완전 일치 →
+  // 게시물 soft-delete(가역) + 변환 스킵. AI 호출 비용 자체를 절감한다.
+  const posts: typeof allPosts = []
+  let duplicateSkipped = 0
+  for (const post of allPosts) {
+    try {
+      const dupProductId = await findExactDuplicateProduct(userId, post.channelId, post.title)
+      if (dupProductId) {
+        duplicateSkipped++
+        console.log(`[Transform] 중복 게시물 스킵: post#${post.id} "${post.title.slice(0, 30)}" = product#${dupProductId}`)
+        await prisma.collectedPost.update({
+          where: { id: post.id },
+          data: { deletedAt: new Date() },
+        }).catch(() => {})
+        continue
+      }
+    } catch (e: any) {
+      console.warn(`[Transform] 중복 검사 실패 (계속 진행): post#${post.id}`, e?.message)
+    }
+    posts.push(post)
+  }
+  if (duplicateSkipped > 0) {
+    console.log(`[Transform] 중복 차단: ${duplicateSkipped}건 스킵 (AI 호출 절감)`)
+  }
 
   if (posts.length === 0) {
     console.log('[Transform] No posts to transform')

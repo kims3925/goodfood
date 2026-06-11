@@ -73,6 +73,8 @@ model AutomationConfig {
   // B2B 공급몰 전환 (2026-06-11): 자동 발행 타깃 — SHOP_ONLY(쇼핑몰만) | BAND_ONLY(밴드만) | BOTH(둘 다).
   // 기존 사용자 동작 보존을 위해 기본 BOTH. 도매밴드→쇼핑몰 B2B 파이프라인은 SHOP_ONLY 사용.
   publishTarget                 String     @default("BOTH") @map("publish_target") @db.VarChar(20)
+  // B2B 공급몰 전환 Phase 2: 도매가 변동 처리 정책 — NOTIFY_ONLY(알림만) | AUTO_MARGIN(마진율 유지 자동 갱신)
+  priceChangePolicy             String     @default("NOTIFY_ONLY") @map("price_change_policy") @db.VarChar(20)
   user                          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([isEnabled])

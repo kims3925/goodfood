@@ -102,6 +102,8 @@ interface AutomationConfig {
   bandPublishMethod: 'COMPOSE' | 'CROSSPOST'
   // 발행 타깃 (B2B 공급몰 전환): SHOP_ONLY(쇼핑몰만) | BAND_ONLY(밴드만) | BOTH(둘 다)
   publishTarget: 'SHOP_ONLY' | 'BAND_ONLY' | 'BOTH'
+  // 도매가 변동 처리 정책 (Phase 2): NOTIFY_ONLY(알림만) | AUTO_MARGIN(마진율 유지 자동 갱신)
+  priceChangePolicy: 'NOTIFY_ONLY' | 'AUTO_MARGIN'
 }
 
 // 12시간제 → 24시간제 변환
@@ -218,6 +220,7 @@ const defaultConfig: AutomationConfig = {
   digestImagesPerProduct: 1,
   bandPublishMethod: 'COMPOSE',
   publishTarget: 'BOTH',
+  priceChangePolicy: 'NOTIFY_ONLY',
 }
 
 // 수집 개수 옵션
@@ -291,7 +294,8 @@ export default function AutomationSettingsPage() {
 
   const hasPublishChanges = JSON.stringify((config.retailChannelIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.retailChannelIds || []).slice().sort()) ||
-    config.publishTarget !== initialConfig.publishTarget
+    config.publishTarget !== initialConfig.publishTarget ||
+    config.priceChangePolicy !== initialConfig.priceChangePolicy
 
   const hasShopChanges = JSON.stringify((config.shopIds || []).slice().sort()) !==
     JSON.stringify((initialConfig.shopIds || []).slice().sort())
@@ -608,6 +612,7 @@ export default function AutomationSettingsPage() {
             digestMode: (configData.data?.digestMode as any) ?? 'individual',
             bandPublishMethod: (configData.data?.bandPublishMethod === 'CROSSPOST' ? 'CROSSPOST' : 'COMPOSE'),
             publishTarget: (['SHOP_ONLY', 'BAND_ONLY', 'BOTH'].includes(configData.data?.publishTarget) ? configData.data.publishTarget : 'BOTH'),
+            priceChangePolicy: (configData.data?.priceChangePolicy === 'AUTO_MARGIN' ? 'AUTO_MARGIN' : 'NOTIFY_ONLY'),
             digestProductsPerPost: configData.data?.digestProductsPerPost ?? 20,
             digestImagesPerProduct: (configData.data?.digestImagesPerProduct as 1 | 2 | 4) ?? 1,
           }
@@ -729,7 +734,7 @@ export default function AutomationSettingsPage() {
           sectionData = { aiProvider: config.aiProvider }
           break
         case 'publish':
-          sectionData = { retailChannelIds: config.retailChannelIds, publishTarget: config.publishTarget }
+          sectionData = { retailChannelIds: config.retailChannelIds, publishTarget: config.publishTarget, priceChangePolicy: config.priceChangePolicy }
           break
         case 'publishLimit':
           sectionData = {
@@ -2358,6 +2363,34 @@ export default function AutomationSettingsPage() {
               쇼핑몰 전용 발행: 소매밴드 선택·밴드 세션 없이 자동 파이프라인이 동작합니다. 아래 소매밴드 선택은 무시됩니다.
             </p>
           )}
+        </div>
+
+        {/* 도매가 변동 처리 정책 (B2B 공급몰 전환 STEP 2-2) */}
+        <div className="mb-4">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">도매가 변동 처리</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {[
+              { value: 'NOTIFY_ONLY', label: '알림만', desc: '가격 변동 감지 시 알림만 — 판매가 수동 관리' },
+              { value: 'AUTO_MARGIN', label: '자동 갱신', desc: '마진율 유지하며 판매가 자동 갱신 (100원 단위 올림)' },
+            ].map((opt) => {
+              const active = config.priceChangePolicy === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setConfig(prev => ({ ...prev, priceChangePolicy: opt.value as any }))}
+                  className={`p-3 rounded-lg border-2 text-left transition-all ${
+                    active
+                      ? 'border-green-500 bg-green-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-sm font-semibold text-gray-900">{opt.label}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{opt.desc}</div>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {retailChannels.length > 0 ? (

@@ -43,6 +43,7 @@ import {
   Megaphone,
   LayoutGrid,
   Trash2,
+  Copy,
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 
@@ -71,6 +72,7 @@ export const sourcingMenuItems: MenuItem[] = [
       { label: '소싱 현황', href: '/sourcing/pipeline', icon: ClipboardList },
       { label: '상품소싱', href: '/sourcing/post/list', icon: FileText },
       { label: '가공상품', href: '/sourcing/product/list', icon: Package },
+      { label: '중복 후보', href: '/sourcing/product/duplicates', icon: Copy },
       { label: '발행', href: '/sourcing/publish', icon: Upload },
       { label: '삭제 관리', href: '/sourcing/cleanup', icon: Trash2 },
     ],

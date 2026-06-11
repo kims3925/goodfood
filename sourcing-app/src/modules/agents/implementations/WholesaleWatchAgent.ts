@@ -22,6 +22,8 @@ import { AgentLayer } from '../types'
 import type { AgentEvent, AgentResult } from '../types'
 import { browserPool, sessionManager } from '@/modules/band-playwright'
 import { extractPriceFromContent } from '@/modules/automation/utils/price-extractor'
+// B2B 공급몰 전환 STEP 2-2: 감지 결과 영속화 (SourceSnapshot/sourceStatus/PriceHistory+정책)
+import { recordSourceSnapshot, markSourceUnavailable, reportPriceChange } from '@/modules/monitoring/source-monitor.service'
 
 // 감시 대상 도매밴드 이름 키워드 (부분일치, 대소문자 무시)
 const DEFAULT_WHITELIST = ['경영수산', '외주상품']
@@ -53,8 +55,8 @@ interface WholesaleWatchOptions {
 
 type PostState =
   | { kind: 'DELETED' }
-  | { kind: 'SOLD_OUT'; price: number | null }
-  | { kind: 'OK'; price: number | null }
+  | { kind: 'SOLD_OUT'; price: number | null; excerpt?: string }
+  | { kind: 'OK'; price: number | null; excerpt?: string }
   | { kind: 'UNKNOWN' } // 조회 실패 — 절대 반영하지 않음
 
 export class WholesaleWatchAgent extends AgentBase {
@@ -149,6 +151,7 @@ export class WholesaleWatchAgent extends AgentBase {
         id: true,
         name: true,
         channelId: true,
+        collectedPostId: true,
         wholesalePrice: true,
         collectedPost: { select: { externalId: true } },
       },
@@ -200,7 +203,18 @@ export class WholesaleWatchAgent extends AgentBase {
 
         if (state.kind === 'UNKNOWN') continue // 조회 실패 → 절대 반영하지 않음
 
-        // 가격변동 감지 (감지/로그/이벤트만 — 자동 수정 없음)
+        // 점검 스냅샷 기록 (STEP 2-2 — 매 점검마다 근거 보존)
+        if (product.collectedPostId) {
+          await recordSourceSnapshot({
+            productId: product.id,
+            collectedPostId: product.collectedPostId,
+            status: state.kind === 'DELETED' ? 'POST_DELETED' : state.kind === 'SOLD_OUT' ? 'SOLDOUT' : 'ACTIVE',
+            wholesalePrice: state.kind === 'DELETED' ? null : state.price,
+            rawText: state.kind === 'DELETED' ? '삭제된 글입니다' : state.excerpt ?? null,
+          })
+        }
+
+        // 가격변동 감지 — PriceHistory 기록 + 테넌트 정책(NOTIFY_ONLY/AUTO_MARGIN) 적용
         if ((state.kind === 'OK' || state.kind === 'SOLD_OUT') && state.price != null) {
           const stored = product.wholesalePrice != null ? Number(product.wholesalePrice) : null
           if (stored && stored > 0) {
@@ -213,6 +227,15 @@ export class WholesaleWatchAgent extends AgentBase {
               await this.emitEvent('wholesale.watch.price_changed', {
                 productId: product.id, storedPrice: stored, currentPrice: state.price,
               })
+              const applied = await reportPriceChange({
+                userId: channel.userId,
+                productId: product.id,
+                productName: product.name,
+                newWholesalePrice: state.price,
+              })
+              if (applied?.applied) {
+                await this.log('INFO', `판매가 자동 갱신 (AUTO_MARGIN): product#${product.id} ${applied.oldPrice} → ${applied.newPrice}`)
+              }
             }
           }
         }
@@ -226,6 +249,15 @@ export class WholesaleWatchAgent extends AgentBase {
           })
           await this.emitEvent(state.kind === 'DELETED' ? 'wholesale.watch.deleted' : 'wholesale.watch.sold_out', {
             productId: product.id, channelName: channel.name,
+          })
+
+          // 사유 보존 + 관리자 알림 (STEP 2-2 — autoFix 여부와 무관하게 상태는 기록)
+          await markSourceUnavailable({
+            userId: channel.userId,
+            productId: product.id,
+            productName: product.name,
+            status: state.kind === 'DELETED' ? 'POST_DELETED' : 'SOLDOUT',
+            channelName: channel.name,
           })
 
           if (autoFix) {
@@ -336,8 +368,14 @@ export class WholesaleWatchAgent extends AgentBase {
       }
 
       const price = extractPriceFromContent(bodyText)
-      if (SOLD_OUT_PATTERN.test(bodyText)) return { kind: 'SOLD_OUT', price }
-      return { kind: 'OK', price }
+      if (SOLD_OUT_PATTERN.test(bodyText)) {
+        // 감지 근거: 품절 키워드 주변 발췌 (SourceSnapshot.rawText 보존용)
+        const m = bodyText.match(SOLD_OUT_PATTERN)
+        const idx = m?.index ?? 0
+        const excerpt = bodyText.slice(Math.max(0, idx - 80), idx + 120)
+        return { kind: 'SOLD_OUT', price, excerpt }
+      }
+      return { kind: 'OK', price, excerpt: bodyText.slice(0, 200) }
     } catch {
       return { kind: 'UNKNOWN' }
     } finally {

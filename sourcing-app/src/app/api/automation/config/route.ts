@@ -129,6 +129,8 @@ export async function GET() {
         digestImagesPerProduct: (config as any).digestImagesPerProduct ?? 1,
         // 발행 타깃 (B2B 공급몰 전환 STEP 1-1)
         publishTarget: (config as any).publishTarget ?? 'BOTH',
+        // 도매가 변동 처리 정책 (B2B 공급몰 전환 STEP 2-2)
+        priceChangePolicy: (config as any).priceChangePolicy ?? 'NOTIFY_ONLY',
       },
     })
   } catch (error: any) {
@@ -181,6 +183,7 @@ export async function POST(request: NextRequest) {
       digestImagesPerProduct,
       bandPublishMethod,
       publishTarget,
+      priceChangePolicy,
     } = body
 
     // 발행 타깃 (STEP 1-1) — 'SHOP_ONLY' | 'BAND_ONLY' | 'BOTH' 만 허용. 미전달 시 변경 없음(undefined).
@@ -188,6 +191,12 @@ export async function POST(request: NextRequest) {
     const finalPublishTarget: string | undefined = validPublishTargets.includes(publishTarget)
       ? publishTarget
       : undefined
+
+    // 도매가 변동 정책 (STEP 2-2) — 'NOTIFY_ONLY' | 'AUTO_MARGIN'. 미전달 시 변경 없음.
+    const finalPriceChangePolicy: string | undefined =
+      priceChangePolicy === 'AUTO_MARGIN' ? 'AUTO_MARGIN'
+        : priceChangePolicy === 'NOTIFY_ONLY' ? 'NOTIFY_ONLY'
+          : undefined
 
     // 밴드 발행 방식 전체 스위치 — 'CROSSPOST' | 'COMPOSE' 만 허용. 미전달 시 변경 없음(undefined).
     const finalBandPublishMethod: 'COMPOSE' | 'CROSSPOST' | undefined =
@@ -301,6 +310,18 @@ export async function POST(request: NextRequest) {
         })
       } catch (e: any) {
         console.warn('[AutomationConfig] publishTarget 컬럼 업데이트 실패 (DB 마이그레이션 필요):', e?.message)
+      }
+    }
+
+    // 도매가 변동 정책 컬럼 별도 업데이트 (STEP 2-2) — 명시 전달된 경우에만 적용
+    if (finalPriceChangePolicy) {
+      try {
+        await prisma.automationConfig.update({
+          where: { userId: currentUser.userId },
+          data: { priceChangePolicy: finalPriceChangePolicy } as any,
+        })
+      } catch (e: any) {
+        console.warn('[AutomationConfig] priceChangePolicy 컬럼 업데이트 실패 (DB 마이그레이션 필요):', e?.message)
       }
     }
 

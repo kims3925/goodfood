@@ -4,6 +4,7 @@ import { downloadAndSaveProductImages } from '@/modules/utils/imageUtils'
 import type { ProductListParams, ProductCreateInput, ProductUpdateInput, OptionGroupInput, VariantInput } from '../types/product.types'
 import type { BatchResult, ProgressCallback } from '@/types/batch.types'
 import { createEmptyBatchResult } from '@/types/batch.types'
+import { scanSimilarDuplicates } from '@/modules/monitoring/duplicate-detector.service'
 
 export class ProductService {
   async getList(params: ProductListParams) {
@@ -190,6 +191,10 @@ export class ProductService {
         }
       }
     }
+
+    // 중복상품 2차 감지 (STEP 2-3): 제목 유사도 ≥0.85 후보를 ProductDuplicate 에 기록.
+    // 비차단 — 실패해도 상품 생성에는 영향 없음. 관리자 "중복 후보" 화면에서 처리.
+    scanSimilarDuplicates(data.userId, product.id, product.name).catch(() => {})
 
     return product
   }
