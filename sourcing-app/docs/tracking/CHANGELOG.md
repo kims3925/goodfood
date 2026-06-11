@@ -21,6 +21,8 @@ TR-{YYYYMMDD}-{NUMBER}
 
 | TR-ID | Status | Date | REQ-ID | Title | Risk | Author |
 |-------|--------|------|--------|-------|------|--------|
+| TR-20260611-012 | Done(코드) | 2026-06-11 | - | [B2B 후속 UI] 쇼핑몰 메인 "주간 베스트" 섹션(/api/shop/best 연동, 판매 이력 있을 때만 노출) + 상품 상세 B2B 사업자 공급가 표시(승인 회원만 — API 가 필드를 내려줄 때만 렌더) | Low | Claude |
+| TR-20260611-011 | Done(코드) | 2026-06-11 | - | [SaaS P0-3] 밴드 세션 쿠키 컬럼 암호화 — AES-256-GCM(BAND_COOKIE_ENC_KEY), enc:v1: prefix 레거시 평문 호환, 쓰기 5곳 암호화+getValidSession 중앙 복호화, 기존 행 일괄 암호화 스크립트(encrypt-session-cookies.cjs). P0-1/2/4 는 TR-20260610-001/002 기구현 → P0 전건 완료 | High | Claude |
 | TR-20260611-010 | Done(코드) | 2026-06-11 | - | [B2B Phase 5] 판매데이터 기반 추천 — ProductSalesDaily 일배치(AnalystAgent 06시 + 수동 트리거 API), 스코어(7일×3+30일+신상품 부스트−품절 페널티), 오픈 API sort=best_7d/trending, /api/shop/best 공개 피드, 어드민 소싱 의사결정용 스코어 조회 | Medium | Claude |
 | TR-20260611-009 | Done(코드) | 2026-06-11 | - | [B2B Phase 4] 오픈 API v1 — ApiClient/ApiToken/ApiCallLog, OAuth2 client_credentials(2h Bearer), scope+rate limit(분당 60), v1 카테고리/상품(증분)/발주, /b2b/developers 키 관리, openapi-v1.md. ⚠️ 외부 오픈은 SaaS P0 4건 완료 후 | Large | Claude |
 | TR-20260611-008 | Done(코드) | 2026-06-11 | - | [B2B Phase 3] B2B 회원·도매가 — B2bStatus+User b2b 필드, /b2b/apply 신청, /admin/users/b2b 승인 큐, 공급가 노출 차단(미승인 응답에서 wholesalePrice 필드 제거 — 기존 전체 노출 누수 수정), B2B 주문 공급가 단가+Order.orderType | Critical | Claude |

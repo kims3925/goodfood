@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package, Search, X, Fish, CalendarDays } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ShoppingCart, Sparkles, Package, Search, X, Fish, CalendarDays, Trophy } from 'lucide-react'
 import { useCartNotification } from '@/contexts/CartNotificationContext'
 import { useShop } from '@/contexts/ShopContext'
 import { useShopUrl } from '@/hooks/useShopUrl'
@@ -40,6 +40,10 @@ export default function StorePage() {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [cardsPerView, setCardsPerView] = useState(2)
+  // 베스트 상품 (B2B Phase 5 — 판매데이터 기반, 데이터 없으면 섹션 미노출)
+  const [bestProducts, setBestProducts] = useState<
+    { id: number; name: string; thumbnailUrl: string | null; price: number; salesQty: number }[]
+  >([])
 
   // 화면 크기에 따라 cardsPerView 조정
   useEffect(() => {
@@ -119,6 +123,20 @@ export default function StorePage() {
   useEffect(() => {
     loadShopProducts()
   }, [shop?.id, loadShopProducts])
+
+  // 베스트 상품 로드 (검색 모드 제외, 실패해도 메인 렌더에 영향 없음)
+  useEffect(() => {
+    if (searchQuery) {
+      setBestProducts([])
+      return
+    }
+    fetch(getApiPath('/api/shop/best?window=7&limit=10'))
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) setBestProducts(data.data || [])
+      })
+      .catch(() => setBestProducts([]))
+  }, [shop?.id, searchQuery, getApiPath])
 
   // 자동 슬라이드 (3초마다)
   useEffect(() => {
@@ -294,6 +312,51 @@ export default function StorePage() {
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 베스트 상품 (판매데이터 기반, B2B Phase 5) — 판매 이력이 있을 때만 노출 */}
+      {bestProducts.length > 0 && (
+        <section className="py-6 md:py-10 bg-white border-t border-gray-100">
+          <div className="kurly-container">
+            <div className="flex items-center gap-2 mb-4 md:mb-6">
+              <Trophy className="w-5 h-5 md:w-6 md:h-6 text-amber-500" />
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">주간 베스트</h2>
+              <span className="text-xs text-gray-400 mt-1">최근 7일 판매량 기준</span>
+            </div>
+            <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 scrollbar-hide">
+              {bestProducts.map((p, rank) => (
+                <Link
+                  key={`best-${p.id}`}
+                  href={getPath(`/product/${p.id}`)}
+                  className="group block w-[120px] sm:w-[140px] md:w-[160px] flex-shrink-0"
+                >
+                  <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200 hover:border-amber-400 transition-all">
+                    <Image
+                      src={p.thumbnailUrl || '/placeholder.jpg'}
+                      alt={p.name}
+                      fill
+                      sizes="(max-width: 640px) 120px, (max-width: 768px) 140px, 160px"
+                      className="object-cover transition-transform group-hover:scale-105"
+                    />
+                    <span
+                      className={`absolute top-0 left-0 w-7 h-7 md:w-8 md:h-8 flex items-center justify-center text-xs md:text-sm font-bold text-white rounded-br-xl ${
+                        rank < 3 ? 'bg-amber-500' : 'bg-gray-700/80'
+                      }`}
+                    >
+                      {rank + 1}
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <h4 className="text-xs md:text-sm font-medium text-gray-900 line-clamp-2 min-h-[32px]">
+                      {p.name}
+                    </h4>
+                    <span className="text-sm font-bold text-gray-900">{formatPrice(p.price)}원</span>
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
         </section>

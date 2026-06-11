@@ -792,6 +792,20 @@ export default function ProductDetailClient() {
                 </div>
               )}
 
+              {/* B2B 사업자 공급가 (Phase 3) — 승인 사업자에게만 API 가 wholesalePrice 를 내려준다.
+                  주문 시 서버가 공급가 단가를 자동 적용 (배송비 정책 동일). */}
+              {(product as any).isB2bMember && Number(selectedVariant?.wholesalePrice) > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-blue-700">🏷️ 사업자 공급가</p>
+                    <p className="text-[11px] text-blue-500 mt-0.5">주문 시 공급가로 자동 적용됩니다</p>
+                  </div>
+                  <span className="text-lg font-bold text-blue-700">
+                    {formatPrice(Math.round(Number(selectedVariant.wholesalePrice)))}원
+                  </span>
+                </div>
+              )}
+
               {/* 합배송 할인 안내 */}
               {hasBundleOptions && (() => {
                 const bundleMaxQty = product.bundleMaxQty || activeBundleOptions.length
