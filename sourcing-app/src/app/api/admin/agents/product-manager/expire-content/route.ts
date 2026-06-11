@@ -25,7 +25,7 @@ import { productManagerAgent } from '@/modules/agents/implementations/ProductMan
 export const dynamic = 'force-dynamic'
 // Playwright Band 삭제는 1건당 ~10-15초. limit=100이면 최악 25분.
 // nginx 600s를 넘기지 않게 limit로 자제하는 책임은 호출자에 있음.
-export const maxDuration = 1800
+export const maxDuration = 300 // Vercel Hobby 한도 300s
 
 export async function POST(request: NextRequest) {
   try {
