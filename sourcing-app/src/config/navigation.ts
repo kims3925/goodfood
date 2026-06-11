@@ -75,6 +75,7 @@ export const sourcingMenuItems: MenuItem[] = [
       { label: '중복 후보', href: '/sourcing/product/duplicates', icon: Copy },
       { label: '발행', href: '/sourcing/publish', icon: Upload },
       { label: '삭제 관리', href: '/sourcing/cleanup', icon: Trash2 },
+      { label: '카테고리 관리', href: '/sourcing/categories', icon: FolderTree }, // 등록/숨김/변경 (2026-06-12)
     ],
   },
   {
@@ -260,6 +261,7 @@ export const sourcingPathToMenuMap: Record<string, string> = {
   // 상품
   '/sourcing/pipeline': '상품',
   '/sourcing/cleanup': '상품',
+  '/sourcing/categories': '상품',
   '/sourcing/post': '상품',
   '/sourcing/collected-product': '상품',
   '/sourcing/product': '상품',
