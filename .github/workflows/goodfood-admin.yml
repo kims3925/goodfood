@@ -1,0 +1,78 @@
+name: GoodFood Admin (EC2)
+
+# 굿푸드몰 어드민을 기존 EC2(i-0e6ef7c646a61356f)에 병행 배포 (포트 3002).
+# mode=inspect: 서버 상태 점검만 / mode=deploy: scripts/goodfood-admin-ec2.sh 실행
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'inspect or deploy'
+        required: true
+        default: 'inspect'
+        type: choice
+        options:
+          - inspect
+          - deploy
+
+jobs:
+  ssm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Build command
+        id: cmd
+        run: |
+          if [ "${{ github.event.inputs.mode }}" = "inspect" ]; then
+            cat > cmd.sh <<'EOS'
+          echo "== free =="; free -h
+          echo "== disk =="; df -h /
+          echo "== docker =="; docker ps --format '{{.Names}} | {{.Ports}} | {{.Status}}'
+          echo "== home =="; ls /home/ubuntu
+          echo "== nginx =="; ls /etc/nginx/sites-enabled 2>/dev/null || echo no-nginx
+          grep -hE "server_name|proxy_pass|listen " /etc/nginx/sites-enabled/* 2>/dev/null || true
+          echo "== old env keys =="; grep -oE "^[A-Z_]+" /home/ubuntu/bandauto/sourcing-app/.env 2>/dev/null | head -30 || echo no-old-env
+          EOS
+          else
+            cat > cmd.sh <<'EOS'
+          set -e
+          export HOME=/root
+          cd /home/ubuntu
+          if [ ! -d goodfood ]; then git clone https://github.com/kims3925/goodfood.git goodfood; fi
+          cd goodfood
+          git fetch origin kims3925-patch-1
+          git checkout kims3925-patch-1
+          git reset --hard origin/kims3925-patch-1
+          bash scripts/goodfood-admin-ec2.sh
+          EOS
+          fi
+          jq -n --rawfile c cmd.sh '{commands: [$c], executionTimeout: ["3500"]}' > params.json
+
+      - name: Send SSM command and wait
+        run: |
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids i-0e6ef7c646a61356f \
+            --document-name AWS-RunShellScript \
+            --comment "goodfood-admin ${{ github.event.inputs.mode }}" \
+            --parameters file://params.json \
+            --query 'Command.CommandId' --output text)
+          echo "CommandId: $CMD_ID"
+          STATUS=Pending
+          for i in $(seq 1 200); do
+            STATUS=$(aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id i-0e6ef7c646a61356f --query Status --output text 2>/dev/null || echo Pending)
+            case "$STATUS" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+            sleep 10
+          done
+          echo "Status: $STATUS"
+          echo "===== STDOUT ====="
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id i-0e6ef7c646a61356f --query StandardOutputContent --output text
+          echo "===== STDERR ====="
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id i-0e6ef7c646a61356f --query StandardErrorContent --output text
+          [ "$STATUS" = "Success" ]
