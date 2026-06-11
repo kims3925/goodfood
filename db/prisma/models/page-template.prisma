@@ -11,17 +11,17 @@ model PageGenerationJob {
   // 입력 소스
   sourceType    String    @map("source_type") @db.VarChar(20)  // 'html' | 'url' | 'file' | 'band_post'
   sourceUrl     String?   @map("source_url") @db.VarChar(1000)
-  sourceHtml    String?   @map("source_html") @db.LongText
+  sourceHtml    String?   @map("source_html") @db.Text
   sourceFiles   Json?     @map("source_files")
 
   // AI 분석 결과
   extractedData  Json?    @map("extracted_data")     // { name, price, options, images, ... }
-  screenshot     String?  @db.LongText              // base64 또는 URL
+  screenshot     String?  @db.Text              // base64 또는 URL
   layoutAnalysis Json?    @map("layout_analysis")   // Vision API 결과
 
   // 생성 결과
-  generatedHtml  String?  @map("generated_html") @db.LongText
-  generatedCss   String?  @map("generated_css") @db.LongText
+  generatedHtml  String?  @map("generated_html") @db.Text
+  generatedCss   String?  @map("generated_css") @db.Text
   previewImage   String?  @map("preview_image") @db.VarChar(1000)
   templateId     Int?     @map("template_id")
 
@@ -56,8 +56,8 @@ model PageTemplate {
   type          String    @db.VarChar(20)         // 'detail' | 'catalog' | 'landing' | 'banner'
   category      String?   @db.VarChar(50)         // 'seafood' | 'fruit' | 'meat' | 'general'
 
-  htmlTemplate  String    @map("html_template") @db.LongText
-  cssStyles     String?   @map("css_styles") @db.LongText
+  htmlTemplate  String    @map("html_template") @db.Text
+  cssStyles     String?   @map("css_styles") @db.Text
   thumbnail     String?   @db.VarChar(1000)
 
   variables     Json?                              // [{name, type, default}]
@@ -84,8 +84,8 @@ model GeneratedPage {
   slug          String    @db.VarChar(200)
   title         String    @db.VarChar(500)
 
-  htmlContent   String    @map("html_content") @db.LongText
-  cssContent    String?   @map("css_content") @db.LongText
+  htmlContent   String    @map("html_content") @db.Text
+  cssContent    String?   @map("css_content") @db.Text
   metaTitle     String?   @map("meta_title") @db.VarChar(500)
   metaDesc      String?   @map("meta_desc") @db.VarChar(1000)
   ogImage       String?   @map("og_image") @db.VarChar(1000)

@@ -14,7 +14,7 @@ model Payment {
   installmentMonth      Int?              @map("installment_month")
   cancelReason          String?           @map("cancel_reason") @db.VarChar(500)
   cancelledAmount       Decimal?          @map("cancelled_amount") @db.Decimal(12, 2)
-  rawResponse           String?           @map("raw_response") @db.LongText
+  rawResponse           String?           @map("raw_response") @db.Text
   approvedAt            DateTime?         @map("approved_at") @db.Timestamp(0)
   cancelledAt           DateTime?         @map("cancelled_at") @db.Timestamp(0)
   createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamp(0)

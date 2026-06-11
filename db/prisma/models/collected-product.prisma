@@ -8,7 +8,7 @@ model CollectedProduct {
   deletedAt   DateTime?     @map("deleted_at") @db.Timestamp(0)
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
-  rawMetadata String?       @map("raw_metadata") @db.LongText
+  rawMetadata String?       @map("raw_metadata") @db.Text
   isConverted Boolean       @default(false) @map("is_converted")
   post        CollectedPost @relation(fields: [postId], references: [id], onDelete: Restrict)
   user        User          @relation(fields: [userId], references: [id], onDelete: Restrict)

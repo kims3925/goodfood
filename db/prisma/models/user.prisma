@@ -137,7 +137,7 @@ model SourcingApiConfig {
   accessToken       String?          @map("access_token") @db.Text
   refreshToken      String?          @map("refresh_token") @db.Text
   tokenExpiry       DateTime?        @map("token_expiry") @db.Timestamp(0)
-  metadata          String?          @db.LongText
+  metadata          String?          @db.Text
   isActive          Boolean          @default(true) @map("is_active")
   lastSyncedAt      DateTime?        @map("last_synced_at") @db.Timestamp(0)
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
@@ -162,7 +162,7 @@ model AiApiConfig {
   provider        AiProvider
   apiKey          String     @map("api_key") @db.VarChar(500)
   model           String     @db.VarChar(100)
-  config          String?    @db.LongText
+  config          String?    @db.Text
   isActive        Boolean    @default(true) @map("is_active")
   usageCount      Int        @default(0) @map("usage_count")
   dailyUsageCount Int        @default(0) @map("daily_usage_count")
@@ -184,7 +184,7 @@ model AiPromptConfig {
   userId      Int      @map("user_id")
   promptType  String   @map("prompt_type") @db.VarChar(50)
   name        String   @db.VarChar(100)
-  prompt      String   @db.LongText
+  prompt      String   @db.Text
   description String?  @db.VarChar(500)
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
@@ -201,7 +201,7 @@ model AiPromptConfig {
 model GoogleSheetConfig {
   id                 Int       @id @default(autoincrement())
   userId             Int       @unique @map("user_id")
-  serviceAccountJson String    @map("service_account_json") @db.LongText
+  serviceAccountJson String    @map("service_account_json") @db.Text
   spreadsheetId      String    @map("spreadsheet_id") @db.VarChar(255)
   sheetName          String?   @map("sheet_name") @db.VarChar(100)
   isActive           Boolean   @default(true) @map("is_active")

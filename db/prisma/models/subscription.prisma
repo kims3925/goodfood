@@ -18,8 +18,8 @@ model SubscriptionPlan {
   name          String   @db.VarChar(100)               // "Free", "Starter", ...
   priceMonthly  Int      @default(0) @map("price_monthly") // 원 단위
   priceYearly   Int      @default(0) @map("price_yearly")  // 원 단위 (연 결제 할인)
-  features      String   @db.LongText                    // JSON
-  limits        String   @db.LongText                    // JSON
+  features      String   @db.Text                    // JSON
+  limits        String   @db.Text                    // JSON
   sortOrder     Int      @default(0) @map("sort_order")
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)

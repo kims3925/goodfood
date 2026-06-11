@@ -54,15 +54,15 @@ model AutomationConfig {
   nextRunAt                     DateTime?  @map("next_run_at") @db.Timestamp(0)
   createdAt                     DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt                     DateTime   @updatedAt @map("updated_at") @db.Timestamp(0)
-  channelIds                    String?    @map("channel_ids") @db.LongText
-  retailChannelIds              String?    @map("retail_channel_ids") @db.LongText
-  shopIds                       String?    @map("shop_ids") @db.LongText
-  pipelineSteps                 String?    @map("pipeline_steps") @db.LongText
+  channelIds                    String?    @map("channel_ids") @db.Text
+  retailChannelIds              String?    @map("retail_channel_ids") @db.Text
+  shopIds                       String?    @map("shop_ids") @db.Text
+  pipelineSteps                 String?    @map("pipeline_steps") @db.Text
   collectionLimit               Int        @default(10) @map("collection_limit")
-  collectionLimitByChannel      String?    @map("collection_limit_by_channel") @db.LongText
+  collectionLimitByChannel      String?    @map("collection_limit_by_channel") @db.Text
   autoPublishLimit              Int        @default(20) @map("auto_publish_limit")
-  autoPublishLimitByShop        String?    @map("auto_publish_limit_by_shop") @db.LongText
-  autoPublishLimitByChannel     String?    @map("auto_publish_limit_by_channel") @db.LongText
+  autoPublishLimitByShop        String?    @map("auto_publish_limit_by_shop") @db.Text
+  autoPublishLimitByChannel     String?    @map("auto_publish_limit_by_channel") @db.Text
   // 종합발행(digest) 설정
   digestMode                    String     @default("individual") @map("digest_mode") @db.VarChar(20) // individual | digest | both
   digestProductsPerPost         Int        @default(20) @map("digest_products_per_post")
@@ -115,7 +115,7 @@ model WorkflowStepLog {
   processedItems Int         @default(0) @map("processed_items")
   successCount   Int         @default(0) @map("success_count")
   failedCount    Int         @default(0) @map("failed_count")
-  details        String?     @db.LongText
+  details        String?     @db.Text
   errorMessage   String?     @map("error_message") @db.Text
   deletedAt      DateTime?   @map("deleted_at") @db.Timestamp(0)
   workflow       WorkflowLog @relation(fields: [workflowId], references: [id], onDelete: Cascade)

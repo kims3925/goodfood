@@ -11,7 +11,7 @@ model ReturnRequest {
   accountNumber String?      @map("account_number") @db.VarChar(50)
   accountHolder String?      @map("account_holder") @db.VarChar(50)
   status        ReturnStatus @default(REQUESTED)
-  images        String?      @db.LongText
+  images        String?      @db.Text
   adminMemo     String?      @map("admin_memo") @db.Text
   requestedAt   DateTime     @default(now()) @map("requested_at") @db.Timestamp(0)
   processedAt   DateTime?    @map("processed_at") @db.Timestamp(0)
